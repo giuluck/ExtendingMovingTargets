@@ -35,9 +35,6 @@ class ClassFrequenciesStd(Metric):
     def __call__(self, x, y, pred):
         # bincount is similar to np.unique(..., return_counts=True) but allows to fix a minimum number of classes
         # in this way, if the predictions are all the same, the counts will be [n, 0, ..., 0] instead of [n]
-        if self.num_classes is None:
-            num_classes = max(np.argmax(y), np.argmax(pred))
-        else:
-            num_classes = self.num_classes
-        classes_counts = np.bincount(pred, minlength=num_classes)
+        minlength = max(self.num_classes, np.max(y), np.max(pred))
+        classes_counts = np.bincount(pred, minlength=minlength)
         return np.std(classes_counts / len(pred))

@@ -1,4 +1,4 @@
-from src.moving_targets.metric import MultiMetric
+from src.moving_targets.metrics import MultiMetric
 from src.moving_targets.loggers import MultiLogger
 
 

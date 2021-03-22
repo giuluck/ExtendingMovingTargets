@@ -5,7 +5,7 @@ from sklearn.preprocessing import MinMaxScaler
 from src.moving_targets.learners import LogisticRegression
 from src.moving_targets.macs import MACS
 from src.moving_targets.masters import BalancedCounts
-from src.moving_targets.metric import Accuracy, ClassFrequenciesStd
+from src.moving_targets.metrics import Accuracy, ClassFrequenciesStd
 
 SEED = 0
 
