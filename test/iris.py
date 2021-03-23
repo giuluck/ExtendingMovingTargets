@@ -5,8 +5,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
+from src.moving_targets import MACS
 from src.moving_targets.learners import LogisticRegression
-from src.moving_targets.macs import MACS
 from src.moving_targets.masters import BalancedCounts
 from src.moving_targets.metrics import Accuracy, ClassFrequenciesStd
 
@@ -38,6 +38,7 @@ RESULTS = {
     )
 }
 
+
 class TestStringMethods(unittest.TestCase):
     def _test(self, initial_step, use_prob):
         np.random.seed(SEED)
@@ -53,7 +54,7 @@ class TestStringMethods(unittest.TestCase):
         # define model pieces
         metrics = [Accuracy(name='acc'), ClassFrequenciesStd(num_classes=3, name='std')]
         learner = LogisticRegression()
-        master = BalancedCounts(num_classes=3)
+        master = BalancedCounts(n_classes=3)
         model = MACS(learner, master, initial_step=initial_step, use_prob=use_prob, metrics=metrics)
         model.fit(x_train, y_train, iterations=15)
         # test results
@@ -74,6 +75,7 @@ class TestStringMethods(unittest.TestCase):
 
     def test_projection_use_prob(self):
         self._test('projection', True)
+
 
 if __name__ == '__main__':
     unittest.main()

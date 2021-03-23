@@ -1,49 +1,28 @@
 import pandas as pd
 import tensorflow as tf
 import tensorflow.keras.backend as k
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import Mean
-from sklearn.metrics import roc_auc_score
 
-from src.restaurants import data, plot
-from src.restaurants.generators import MLPBatchGenerator
+from src.restaurants.models import MLPBatchGenerator, MLPClassifier
 
 
-class MLPClassifier(Model):
-    def __init__(self, hidden=None):
-        super(MLPClassifier, self).__init__()
-        self.lrs = [] if hidden is None else [Dense(h, activation='relu') for h in hidden]
-        self.lrs = self.lrs + [Dense(1, activation='sigmoid')]
+class SBRBatchGenerator(MLPBatchGenerator):
+    def __init__(self, data, batch_size):
+        super(SBRBatchGenerator, self).__init__(
+            data.sort_values(['index', 'clicked'], ascending=[True, False]).reset_index(drop=True),
+            len(data[data['index'] == 0]) * batch_size
+        )
+        self.batches = [b.drop('index', axis=1) for b in self.batches]
 
-    def get_config(self):
-        pass
+    def __len__(self):
+        return len(self.batches)
 
-    def call(self, inputs, training=None, mask=None):
-        x = inputs
-        for layer in self.lrs:
-            x = layer(x)
-        return x
-
-    def ctr_estimate(self, avg_rating, num_reviews, dr):
-        df = pd.DataFrame({
-            'avg_rating': avg_rating,
-            'num_reviews': num_reviews,
-            'dollar_rating': dr,
-            'clicked': [-1] * len(avg_rating)
-        })
-        return self.predict(MLPBatchGenerator(df, 32))
-
-    def evaluation_summary(self, train_data, val_data, test_data, figsize=(14, 3)):
-        train_predictions = self.predict(MLPBatchGenerator(train_data, 32))
-        val_predictions = self.predict(MLPBatchGenerator(val_data, 32))
-        test_predictions = self.predict(MLPBatchGenerator(test_data, 32))
-        print(roc_auc_score(train_data['clicked'], train_predictions), '(train auc)', end=', ')
-        print(roc_auc_score(val_data['clicked'], val_predictions), '(val auc)', end=', ')
-        print(roc_auc_score(test_data['clicked'], test_predictions), '(test auc)')
-        plot.click_through_rate(self.ctr_estimate, title='Estimated CTR', figsize=figsize)
-        plot.click_through_rate(data.ctr_estimate, title='Real CTR', figsize=figsize)
+    def __getitem__(self, index):
+        batch: pd.DataFrame = self.batches[index]
+        x = batch[['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']]
+        y = batch[['clicked', 'monotonicity']]
+        return x.values, y.values
 
 
 class SBRClassifier(MLPClassifier):

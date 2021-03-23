@@ -1,9 +1,14 @@
-from src.moving_targets.metrics import MultiMetric
-from src.moving_targets.loggers import MultiLogger
+from typing import List
+
+from src.moving_targets.learners import Learner
+from src.moving_targets.masters import Master
+from src.moving_targets.metrics import Metric, MultiMetric
+from src.moving_targets.loggers import Logger, MultiLogger
 
 
 class MACS:
-    def __init__(self, learner, master, alpha=1., beta=1., initial_step='pretraining', use_prob=False, metrics=None):
+    def __init__(self, learner: Learner, master: Master, metrics: List[Metric] = None,
+                 alpha=1., beta=1., initial_step='pretraining', use_prob=False):
         super(MACS, self).__init__()
         assert alpha > 0, "alpha should be a positive number"
         assert beta > 0, "beta should be a positive number"
@@ -16,7 +21,7 @@ class MACS:
         self.use_prob = use_prob
         self.metrics = MultiMetric([]) if metrics is None else MultiMetric(metrics)
 
-    def fit(self, x, y, iterations=1, val_data=None, loggers=None):
+    def fit(self, x, y, iterations=1, val_data=None, loggers: List[Logger] = None):
         # check user input
         assert iterations > 0, "there should be at least one iteration"
         val_x, val_y = (None, None) if val_data is None else val_data

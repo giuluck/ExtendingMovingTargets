@@ -32,7 +32,7 @@ def sample_dataset(n, testing_set):
     }).astype({'avg_rating': 'float', 'num_reviews': 'int', 'dollar_rating': 'category', 'clicked': 'int'})
 
 
-def augment_data(df, n=5):
+def augment_data(df, n=1):
     def monotonicity(x1, x2, att):
         x1 = x1[att]
         x2 = x2[att]

@@ -1,0 +1,2 @@
+from src.moving_targets.learners.classifiers.classifier import Classifier
+from src.moving_targets.learners.classifiers.logistic_regression import LogisticRegression

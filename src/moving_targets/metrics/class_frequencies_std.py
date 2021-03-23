@@ -1,30 +1,6 @@
 import numpy as np
-from sklearn.metrics import accuracy_score
 
-class Metric:
-    def __init__(self, name):
-        super(Metric, self).__init__()
-        self.name = name
-
-    def __call__(self, x, y, pred):
-        pass
-
-
-class MultiMetric(Metric):
-    def __init__(self, metrics):
-        super(MultiMetric, self).__init__(name=None)
-        self.metrics = metrics
-
-    def __call__(self, x, y, pred):
-        return {metric.name: metric(x, y, pred) for metric in self.metrics}
-
-
-class Accuracy(Metric):
-    def __init__(self, name='accuracy'):
-        super(Accuracy, self).__init__(name)
-
-    def __call__(self, x, y, pred):
-        return accuracy_score(y, pred)
+from src.moving_targets.metrics import Metric
 
 
 class ClassFrequenciesStd(Metric):
