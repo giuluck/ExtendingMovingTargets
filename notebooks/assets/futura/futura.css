@@ -1,0 +1,19 @@
+@font-face {
+    font-family: 'FuturaL';
+    /* src: url('Futura-Medium.eot'); */
+    src: /*url('Futura-Medium.eot?#iefix') format('embedded-opentype'),*/
+         /*url('Futura-Medium.woff') format('woff'),*/
+         url('Futura-Medium.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'FuturaL';
+    /* src: url('Futura-MediumItalic.eot'); */
+    src: /*url('Futura-MediumItalic.eot?#iefix') format('embedded-opentype'),*/
+         /*url('Futura-MediumItalic.woff') format('woff'),*/
+         url('Futura-MediumItalic.ttf') format('truetype');
+    font-weight: normal;
+    font-style: italic;
+}
