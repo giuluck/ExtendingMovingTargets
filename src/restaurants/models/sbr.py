@@ -1,19 +1,20 @@
 import pandas as pd
 import tensorflow as tf
 import tensorflow.keras.backend as k
-from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import Mean
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.utils import Sequence
 
-from src.restaurants.models import MLPBatchGenerator, MLPClassifier
+from src.restaurants.models import MLPClassifier
 
 
-class SBRBatchGenerator(MLPBatchGenerator):
-    def __init__(self, data, batch_size):
-        super(SBRBatchGenerator, self).__init__(
-            data.sort_values(['index', 'clicked'], ascending=[True, False]).reset_index(drop=True),
-            len(data[data['index'] == 0]) * batch_size
-        )
-        self.batches = [b.drop('index', axis=1) for b in self.batches]
+class SBRBatchGenerator(Sequence):
+    def __init__(self, x, y, batch_size):
+        super(SBRBatchGenerator, self).__init__()
+        data = x.reset_index(drop=True).join(y.reset_index(drop=True))
+        data = data.sort_values(['index', 'clicked'], ascending=[True, False], ignore_index=True)
+        data['batch'] = data.index // (len(data[data['index'] == 0]) * batch_size)
+        self.batches = [b.drop(['batch', 'index'], axis=1).reset_index(drop=True) for _, b in data.groupby('batch')]
 
     def __len__(self):
         return len(self.batches)
@@ -26,8 +27,8 @@ class SBRBatchGenerator(MLPBatchGenerator):
 
 
 class SBRClassifier(MLPClassifier):
-    def __init__(self, num_augmented_samples, alpha=None, reg_activation=None, hidden=None):
-        super(SBRClassifier, self).__init__(hidden)
+    def __init__(self, num_augmented_samples, hidden=None, scaler=None, alpha=None, reg_activation=None):
+        super(SBRClassifier, self).__init__(hidden=hidden, scaler=scaler)
         self.num_augmented_samples = num_augmented_samples
         if alpha is None:
             self.alpha = tf.Variable(0., name='alpha')
