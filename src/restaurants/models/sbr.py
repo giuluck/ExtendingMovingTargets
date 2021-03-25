@@ -5,38 +5,38 @@ from tensorflow.keras.metrics import Mean
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import Sequence
 
-from src.restaurants.models import MLPClassifier
+from src.restaurants.models import MLP
 
 
 class SBRBatchGenerator(Sequence):
     def __init__(self, x, y, batch_size):
         super(SBRBatchGenerator, self).__init__()
-        data = x.reset_index(drop=True).join(y.reset_index(drop=True))
-        data = data.sort_values(['index', 'clicked'], ascending=[True, False], ignore_index=True)
-        data['batch'] = data.index // (len(data[data['index'] == 0]) * batch_size)
-        self.batches = [b.drop(['batch', 'index'], axis=1).reset_index(drop=True) for _, b in data.groupby('batch')]
+        data = pd.concat((x, y), axis=1).reset_index(drop=True)
+        data = data.sort_values(['ground_index', 'clicked'], ascending=[True, False], ignore_index=True)
+        data['btc'] = data.index // (len(data[data['ground_index'] == 0]) * batch_size)
+        self.batches = [b.drop(['btc', 'ground_index'], axis=1).reset_index(drop=True) for _, b in data.groupby('btc')]
 
     def __len__(self):
         return len(self.batches)
 
     def __getitem__(self, index):
         batch: pd.DataFrame = self.batches[index]
-        x = batch[['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']]
-        y = batch[['clicked', 'monotonicity']]
+        x = batch[['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']].astype('float32')
+        y = batch[['clicked', 'monotonicity']].astype('float32')
         return x.values, y.values
 
 
-class SBRClassifier(MLPClassifier):
-    def __init__(self, num_augmented_samples, hidden=None, scaler=None, alpha=None, reg_activation=None):
-        super(SBRClassifier, self).__init__(hidden=hidden, scaler=scaler)
-        self.num_augmented_samples = num_augmented_samples
+class SBR(MLP):
+    def __init__(self, n_aug, output_act, h_units=None, scaler=None, alpha=None, regularizer_act=None):
+        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scaler=scaler)
+        self.n_aug = n_aug
         if alpha is None:
             self.alpha = tf.Variable(0., name='alpha')
             self.alpha_optimizer = Adam()
         else:
             self.alpha = alpha
             self.optimize_alpha = None
-        self.reg_activation = reg_activation
+        self.regularizer_act = regularizer_act
         self.alpha_tracker = Mean(name='alpha')
         self.tot_loss_tracker = Mean(name='tot_loss')
         self.def_loss_tracker = Mean(name='def_loss')
@@ -49,11 +49,11 @@ class SBRClassifier(MLPClassifier):
         # compiled loss (binary crossentropy) on labeled data
         def_loss = self.compiled_loss(labels[labels != -1], ctr[labels != -1])
         # regularization term computed
-        original_samples_ctr = tf.reshape(ctr, (-1, self.num_augmented_samples))[:, 0]
-        original_samples_ctr = tf.repeat(original_samples_ctr, self.num_augmented_samples)
+        original_samples_ctr = tf.reshape(ctr, (-1, self.n_aug))[:, 0]
+        original_samples_ctr = tf.repeat(original_samples_ctr, self.n_aug)
         deltas = tf.reshape(ctr, (-1,)) - original_samples_ctr
-        if self.reg_activation is not None:
-            deltas = self.reg_activation(deltas)
+        if self.regularizer_act is not None:
+            deltas = self.regularizer_act(deltas)
         reg_loss = k.sum(k.maximum(0., -monotonicities * deltas))
         # final losses
         return sign * (def_loss + self.alpha * reg_loss), def_loss, reg_loss

@@ -1,3 +1,3 @@
 from src.moving_targets.learners.learner import Learner
-from src.moving_targets.learners.regressors import *
-from src.moving_targets.learners.classifiers import *
+from src.moving_targets.learners.linear_regression import LinearRegression
+from src.moving_targets.learners.logistic_regression import LogisticRegression

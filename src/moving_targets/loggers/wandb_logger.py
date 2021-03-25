@@ -17,13 +17,13 @@ class WandBLogger(Logger):
         wandb.finish()
 
     def on_pretraining_start(self, macs):
-        self.on_iteration_start(macs, 0)
+        self.on_iteration_start(macs, -1)
 
     def on_pretraining_end(self, macs):
-        self.on_iteration_end(macs, 0)
+        self.on_iteration_end(macs, -1)
 
     def on_iteration_start(self, macs, idx):
-        self.logs['iteration'] = idx
+        self.logs['iteration'] = idx + 1
         self.logs['time/iteration'] = time.time()
 
     def on_iteration_end(self, macs, idx):

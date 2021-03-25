@@ -1,2 +1,3 @@
-from src.restaurants.models.mlp import MLPClassifier
-from src.restaurants.models.sbr import SBRBatchGenerator, SBRClassifier
+from src.restaurants.models.mlp import MLP
+from src.restaurants.models.sbr import SBR, SBRBatchGenerator
+from src.restaurants.models.mt import MTLearner, MTMaster

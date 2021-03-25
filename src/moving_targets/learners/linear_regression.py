@@ -1,18 +1,18 @@
 import sklearn.linear_model as lm
 
-from src.moving_targets.learners.regressors import Regressor
+from src.moving_targets.learners import Learner
 
 
-class LinearRegression(Regressor):
+class LinearRegression(Learner):
     def __init__(self, **kwargs):
         super(LinearRegression, self).__init__()
         self.model = lm.LinearRegression(**kwargs)
 
-    def fit(self, x, y, **kwargs):
-        self.model.fit(x, y, **kwargs)
+    def fit(self, macs, x, y, iteration):
+        self.model.fit(x, y)
 
     def predict(self, x):
         return self.model.predict(x)
 
     def predict_proba(self, x):
-        raise NotImplementedError('')
+        raise NotImplementedError('Regressors do not support probabilities')

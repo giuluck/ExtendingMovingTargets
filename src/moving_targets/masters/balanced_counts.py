@@ -5,16 +5,23 @@ from src.moving_targets.masters import Master
 
 
 class BalancedCounts(Master):
-    def __init__(self, n_classes, time_limit=30):
-        super(BalancedCounts, self).__init__()
+    def __init__(self, n_classes, alpha=1., beta=1., use_prob=True, time_limit=30):
+        super(BalancedCounts, self).__init__(alpha=alpha, beta=beta)
         self.n_classes = n_classes
+        self.use_prob = use_prob
         self.time_limit = time_limit
 
-    def adjust_targets(self, y, pred, alpha, beta, use_prob):
-        prob = None
-        if use_prob:
-            prob = pred.copy()
-            prob = np.clip(prob, a_min=.01, a_max=.99)
+    def adjust_targets(self, macs, x, y, iteration):
+        # if this is the first iteration and the initial macs step is 'projection', the learner has not been fitted yet
+        # thus we use the original labels, otherwise we use either the predicted classes or the predicted probabilities
+        if iteration == 0 and macs.init_step == 'projection':
+            prob = None
+            pred = y.reshape(-1, )
+        elif self.use_prob is False:
+            prob = None
+            pred = macs.predict(x)
+        else:
+            prob = np.clip(macs.predict_proba(x), a_min=.01, a_max=.99)
             pred = np.argmax(prob, axis=1)
 
         n_samples = len(y)
@@ -23,7 +30,7 @@ class BalancedCounts(Master):
 
         # build model and the decision variables
         model = CPModel()
-        model.timelimit = self.time_limit
+        model.set_time_limit(self.time_limit)
         vy = model.binary_var_matrix(keys1=n_samples, keys2=self.n_classes, name='y')
 
         # constrain the class counts to the maximal value
@@ -37,18 +44,18 @@ class BalancedCounts(Master):
 
         # define the total loss w.r.t. the true labels (y) and the loss w.r.t. the predictions (prob / pred)
         y_loss = model.sum([BalancedCounts._indicator_loss(vy, y, i) for i in range(n_samples)]) / n_samples
-        if use_prob:
-            p_loss = model.sum([BalancedCounts._crossentropy_loss(vy, prob, i) for i in range(n_samples)]) / n_samples
-        else:
+        if prob is None:
             p_loss = model.sum([BalancedCounts._indicator_loss(vy, pred, i) for i in range(n_samples)]) / n_samples
+        else:
+            p_loss = model.sum([BalancedCounts._crossentropy_loss(vy, prob, i) for i in range(n_samples)]) / n_samples
 
         # check for feasibility (i.e., if all the classes have a number of samples which is lesser than the maximal)
         # and behave depending on that
         if np.all(pred_classes_counts <= max_count):
-            model.add(p_loss <= beta)
+            model.add(p_loss <= self.beta)
             model.minimize(y_loss)
         else:
-            model.minimize(y_loss + (1.0 / alpha) * p_loss)
+            model.minimize(y_loss + (1.0 / self.alpha) * p_loss)
 
         # solve the problem and get the adjusted labels
         sol = model.solve()

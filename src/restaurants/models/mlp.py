@@ -7,12 +7,12 @@ from sklearn.metrics import roc_auc_score
 from src import restaurants
 
 
-class MLPClassifier(Model):
-    def __init__(self, hidden=None, scaler=None):
-        super(MLPClassifier, self).__init__()
+class MLP(Model):
+    def __init__(self, output_act, h_units=None, scaler=None):
+        super(MLP, self).__init__()
         self.scaler = scaler
-        self.lrs = [] if hidden is None else [Dense(h, activation='relu') for h in hidden]
-        self.lrs = self.lrs + [Dense(1, activation='sigmoid')]
+        self.lrs = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]
+        self.lrs = self.lrs + [Dense(1, activation=output_act)]
 
     def get_config(self):
         pass
