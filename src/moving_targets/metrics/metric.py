@@ -3,5 +3,5 @@ class Metric:
         super(Metric, self).__init__()
         self.name = name
 
-    def __call__(self, x, y, pred):
+    def __call__(self, x, y, p):
         pass

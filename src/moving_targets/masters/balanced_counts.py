@@ -19,9 +19,9 @@ class BalancedCounts(Master):
             pred = y.reshape(-1, )
         elif self.use_prob is False:
             prob = None
-            pred = macs.predict(x)
+            pred = macs.learner.predict(x)
         else:
-            prob = np.clip(macs.predict_proba(x), a_min=.01, a_max=.99)
+            prob = np.clip(macs.learner.predict_proba(x), a_min=.01, a_max=.99)
             pred = np.argmax(prob, axis=1)
 
         n_samples = len(y)

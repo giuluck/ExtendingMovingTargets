@@ -118,7 +118,7 @@ class TestBalancedCounts(unittest.TestCase):
         x_train = scaler.transform(x_train).values
         x_val = scaler.transform(x_val).values
         # define model pieces
-        metrics = [Accuracy(name='acc'), ClassFrequenciesStd(num_classes=num_classes, name='std')]
+        metrics = [Accuracy(name='acc'), ClassFrequenciesStd(classes=num_classes, name='std')]
         learner = LogisticRegression()
         master = BalancedCounts(n_classes=num_classes)
         model = MACS(learner, master, init_step=init_step, metrics=metrics)

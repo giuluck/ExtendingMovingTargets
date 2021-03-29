@@ -1,12 +1,11 @@
 import numpy as np
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
 
 from src.moving_targets.metrics import Metric
 
-
-class Accuracy(Metric):
-    def __init__(self, classes=None, name='accuracy'):
-        super(Accuracy, self).__init__(name)
+class AUC(Metric):
+    def __init__(self, classes=None, name='AUC'):
+        super(AUC, self).__init__(name)
         self.classes = np.arange(classes) if isinstance(classes, int) else classes
 
     def __call__(self, x, y, p):
@@ -14,4 +13,4 @@ class Accuracy(Metric):
             mask = np.in1d(y, self.classes)
             y = np.array(y)[mask]
             p = np.array(p)[mask]
-        return accuracy_score(y, p)
+        return roc_auc_score(y, p)

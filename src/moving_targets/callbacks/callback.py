@@ -1,6 +1,6 @@
-class Logger:
+class Callback:
     def __init__(self):
-        super(Logger, self).__init__()
+        super(Callback, self).__init__()
 
     def on_process_start(self, macs):
         pass
@@ -23,7 +23,7 @@ class Logger:
     def on_training_start(self, macs):
         pass
 
-    def on_training_end(self, macs, x, y, val_x, val_y):
+    def on_training_end(self, macs, x, y):
         pass
 
     def on_adjustment_start(self, macs):

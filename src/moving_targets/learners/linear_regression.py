@@ -8,11 +8,8 @@ class LinearRegression(Learner):
         super(LinearRegression, self).__init__()
         self.model = lm.LinearRegression(**kwargs)
 
-    def fit(self, macs, x, y, iteration):
+    def fit(self, macs, x, y, iteration, **kwargs):
         self.model.fit(x, y)
 
     def predict(self, x):
         return self.model.predict(x)
-
-    def predict_proba(self, x):
-        raise NotImplementedError('Regressors do not support probabilities')

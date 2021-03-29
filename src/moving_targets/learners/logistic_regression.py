@@ -8,7 +8,7 @@ class LogisticRegression(Learner):
         super(LogisticRegression, self).__init__()
         self.model = lm.LogisticRegression(**kwargs)
 
-    def fit(self, macs, x, y, iteration):
+    def fit(self, macs, x, y, iteration, **kwargs):
         self.model.fit(x, y)
 
     def predict(self, x):

@@ -1,0 +1,13 @@
+import wandb
+
+from src.moving_targets.callbacks import Logger
+
+
+class WandBLogger(Logger):
+    def __init__(self, project, entity, run_name):
+        super(WandBLogger, self).__init__()
+        self.config = dict(project=project, entity=entity, name=run_name)
+
+    def on_iteration_end(self, macs, idx):
+        wandb.log({k: self.cache[k] for k in sorted(self.cache)})
+        self.cache = {}
