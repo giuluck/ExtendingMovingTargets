@@ -31,7 +31,7 @@ class MACS(Logger):
             self.learner.fit(self, x, y, iteration=-1)
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
             self._update_callbacks(callbacks, lambda c: c.on_training_end(self, x, y))
-            self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self))
+            self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self, x, y))
 
         # algorithm core
         for iteration in range(iterations):

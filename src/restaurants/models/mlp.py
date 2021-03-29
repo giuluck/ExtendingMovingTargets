@@ -1,13 +1,10 @@
-import pandas as pd
-from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.utils import to_categorical
-from sklearn.metrics import roc_auc_score
+from tensorflow.keras.models import Model as KerasModel
 
-from src import restaurants
+from src.restaurants.models import Model as RestaurantsModel
 
 
-class MLP(Model):
+class MLP(KerasModel, RestaurantsModel):
     def __init__(self, output_act, h_units=None, scaler=None):
         super(MLP, self).__init__()
         self.scaler = scaler
@@ -22,14 +19,3 @@ class MLP(Model):
         for layer in self.lrs:
             x = layer(x)
         return x
-
-    def ctr_estimate(self, avg_rating, num_reviews, dollar_rating):
-        df = pd.DataFrame({'avg_rating': avg_rating, 'num_reviews': num_reviews})
-        df[['D', 'DD', 'DDD', 'DDDD']] = to_categorical([len(dr) - 1 for dr in dollar_rating], num_classes=4)
-        return self.predict(df)
-
-    def evaluation_summary(self, figsize=(14, 3), **kwargs):
-        summary = ', '.join([f'{roc_auc_score(y, self.predict(x))} ({title} auc)' for title, (x, y) in kwargs.items()])
-        print(summary)
-        restaurants.plot_ctr(self.ctr_estimate, title='Estimated CTR', figsize=figsize)
-        restaurants.plot_ctr(restaurants.ctr_estimate, title='Real CTR', figsize=figsize)

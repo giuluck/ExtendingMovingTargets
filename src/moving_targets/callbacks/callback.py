@@ -11,7 +11,7 @@ class Callback:
     def on_pretraining_start(self, macs):
         pass
 
-    def on_pretraining_end(self, macs):
+    def on_pretraining_end(self, macs, x, y):
         pass
 
     def on_iteration_start(self, macs, idx):
