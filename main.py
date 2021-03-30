@@ -1,3 +1,8 @@
+import os
+os.environ['WANDB_SILENT'] = 'true'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+import time
 import numpy as np
 import pandas as pd
 from tensorflow.keras.callbacks import EarlyStopping
@@ -9,7 +14,6 @@ from src.util.preprocessing import Scaler
 from src.moving_targets.metrics import AUC
 from src.restaurants.models import MLP, MTLearner, MTMaster, MT
 from src.restaurants import compute_monotonicities
-
 
 def get_monotonicities_list(data, kind):
     higher_indices, lower_indices = [], []
@@ -61,30 +65,23 @@ if __name__ == '__main__':
         beta=[1.],
         monotonicities=['ground', 'group', 'all']
     )
-    print(len(study))
-
-    study = cartesian_product(
-        h_units=[[16, 8, 8]],
-        restart_fit=[False],
-        alpha=[1.],
-        beta=[1.],
-        monotonicities=['ground']
-    )
-    print(len(study))
 
     # begin study
-    for params in study:
+    for i, params in enumerate(study):
+        start_time = time.time()
+        print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
         mt = MT(
             learner=MTLearner(
                 build_model=lambda: build_model(params['h_units'], aug_scaler),
                 restart_fit=params['restart_fit'],
                 validation_data=(x_val, y_val),
                 callbacks=[EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)],
-                epochs=200
+                epochs=200,
+                verbose=0
             ),
             master=MTMaster(monotonicities[params['monotonicities']], alpha=params['alpha'], beta=params['beta']),
             evaluation_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
-            metrics=[AUC(name='auc')],
-            **params
+            metrics=[AUC(name='auc')]
         )
-        mt.fit(x, y, iterations=10, callbacks=[WandBLogger('shape', 'giuluck', 'restaurants')])
+        mt.fit(x, y, iterations=10, callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)])
+        print(f' -- elapsed time: {time.time() - start_time}')
