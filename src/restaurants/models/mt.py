@@ -71,11 +71,6 @@ class MTMaster(CplexMaster):
 class MT(MACS, RestaurantModel):
     def __init__(self, learner: MTLearner, master: MTMaster, metrics=None, evaluation_data=None):
         super(MT, self).__init__(learner, master, init_step='pretraining', metrics=metrics)
-        ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=100), np.linspace(0, 200, num=100), ['D', 'DD', 'DDD', 'DDDD'])
-        self.avg_ratings = ar.reshape(-1, )
-        self.num_reviews = nr.reshape(-1, )
-        self.dollar_ratings = dr.reshape(-1, )
-        self.ground_truths = ctr_estimate(self.avg_ratings, self.num_reviews, self.dollar_ratings)
         self.evaluation_data = {} if evaluation_data is None else evaluation_data
 
     def on_pretraining_end(self, macs, x, y):
@@ -87,6 +82,5 @@ class MT(MACS, RestaurantModel):
             pp = self.predict(xx)
             for metric in self.metrics:
                 logs[f'learner/{name}_{metric.name}'] = metric(xx, yy, pp)
-        pred = self.ctr_estimate(self.avg_ratings, self.num_reviews, self.dollar_ratings)
-        logs['learner/ground_r2'] = r2_score(self.ground_truths, pred)
+        logs['learner/ground_r2'] = self.compute_ground_r2()
         self.log(**logs)

@@ -4,7 +4,7 @@ from tensorflow.keras.models import Model as KerasModel
 from src.restaurants.models import Model as RestaurantsModel
 
 
-class MLP(KerasModel, RestaurantsModel):
+class MLP(RestaurantsModel, KerasModel):
     def __init__(self, output_act, h_units=None, scaler=None):
         super(MLP, self).__init__()
         self.scaler = scaler
@@ -13,6 +13,9 @@ class MLP(KerasModel, RestaurantsModel):
 
     def get_config(self):
         pass
+
+    def predict(self, x):
+        return super(RestaurantsModel, self).predict(x)
 
     def call(self, inputs, training=None, mask=None):
         x = inputs if self.scaler is None else self.scaler.transform(inputs)
