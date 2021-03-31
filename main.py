@@ -61,7 +61,6 @@ if __name__ == '__main__':
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
     x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(x_train, y_train)
     monotonicities = {k: get_monotonicities_list(full_aug, k) for k in ['ground', 'group', 'all']}
-    x, y = x_aug.values, y_aug['clicked'].values
 
     # create study list
     study = cartesian_product(
@@ -88,8 +87,13 @@ if __name__ == '__main__':
             ),
             master=MTMaster(monotonicities[params['monotonicities']], alpha=params['alpha'], beta=params['beta']),
             init_step='pretraining',
-            metrics=[AUC(name='auc')],
-            eval_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test))
+            metrics=[AUC(name='auc')]
         )
-        mt.fit(x, y, iterations=10, callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)])
+        mt.fit(
+            x=x_aug.values,
+            y=y_aug['clicked'].values,
+            iterations=10,
+            val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
+            callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)]
+        )
         print(f' -- elapsed time: {time.time() - start_time}')

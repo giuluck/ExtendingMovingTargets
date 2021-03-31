@@ -78,16 +78,15 @@ class MTMaster(CplexMaster):
 
 
 class MT(MACS, RestaurantModel):
-    def __init__(self, learner: MTLearner, master: MTMaster, init_step='pretraining', metrics=None, eval_data=None):
+    def __init__(self, learner: MTLearner, master: MTMaster, init_step='pretraining', metrics=None):
         super(MT, self).__init__(learner, master, init_step=init_step, metrics=metrics)
-        self.eval_data = {} if eval_data is None else eval_data
 
-    def on_pretraining_end(self, macs, x, y):
-        self.on_iteration_end(macs, -1)
+    def on_pretraining_end(self, macs, x, y, val_data):
+        self.on_iteration_end(macs, x, y, val_data, -1)
 
-    def on_iteration_end(self, macs, idx):
-        logs = {'iteration': idx + 1}
-        for name, (xx, yy) in self.eval_data.items():
+    def on_iteration_end(self, macs, x, y, val_data, iteration):
+        logs = {'iteration': iteration + 1}
+        for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)
             for metric in self.metrics:
                 logs[f'learner/{name}_{metric.name}'] = metric(xx, yy, pp)
