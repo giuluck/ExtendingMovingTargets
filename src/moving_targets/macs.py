@@ -60,7 +60,7 @@ class MACS(Logger):
     def _update_callbacks(self, callbacks, routine):
         routine(self)                         # run callback routine for moving targets object itself
         for callback in callbacks:            #
+            if isinstance(callback, Logger):  # update cache for loggers only
+                callback.log(**self.cache)    #
             routine(callback)                 # run callback routine for each external callback
-            if isinstance(callback, Logger):  #
-                callback.log(**self.cache)    # update loggers and eventually clear the cache
-        self.cache = {}
+        self.cache = {}                       # eventually clear the cache

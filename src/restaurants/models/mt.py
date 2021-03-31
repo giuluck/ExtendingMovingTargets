@@ -1,12 +1,10 @@
 import time
 import numpy as np
-from sklearn.metrics import r2_score
 
 from src.moving_targets.learners import Learner
 from src.moving_targets.masters import CplexMaster
 from src.moving_targets import MACS
 from src.restaurants.models import Model as RestaurantModel
-from src.restaurants import ctr_estimate
 
 
 class MTLearner(Learner):
@@ -31,54 +29,65 @@ class MTLearner(Learner):
 class MTMaster(CplexMaster):
     def __init__(self, monotonicities, alpha=1., beta=1., time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
-        self.monotonicities = monotonicities
+        self.higher_indices = np.array([hi for hi, _ in monotonicities])
+        self.lower_indices = np.array([li for _, li in monotonicities])
 
-    def define_variables(self, macs, model, x, y, iteration):
-        return model.continuous_var_list(keys=len(y), lb=0.0, ub=1.0, name='y')
+    def build_model(self, macs, model, x, y, iteration):
+        # handle 'projection' initial step (p = None)
+        p = None if iteration == 0 and macs.init_step == 'projection' else macs.predict(x)
+        # create variables and impose constraints for each monotonicity
+        variables = np.array(model.continuous_var_list(keys=len(y), lb=0.0, ub=1.0, name='y'))
+        model.add_constraints([h >= l for h, l in zip(variables[self.higher_indices], variables[self.lower_indices])])
+        # return model info
+        return variables, p
 
-    def compute_losses(self, macs, model, variables, x, y, iteration):
-        assert macs.init_step == 'pretraining', "This master supports 'pretraining' initial step only"
-        p = macs.predict(x)
-
-        # for each monotonicity, add the constraint and change the feasibility based on whether that is satisfied or not
-        violations = 0
-        for higher, lower in self.monotonicities:
-            violations += 0 if p[higher] >= p[lower] else 1
-            model.add_constraint(variables[higher] >= variables[lower])
-
-        # define the total loss w.r.t. the true labels (y) and the loss w.r.t. the predictions (p)
-        y_loss = [model.abs(yv - cpv) for yv, cpv in zip(y, variables) if yv != -1]
-        y_loss = model.sum(y_loss) / len(y_loss)
-        p_loss = [model.abs(pv - cpv) for pv, cpv in zip(p, variables)]
-        p_loss = model.sum(p_loss) / len(p_loss)
-
+    def is_feasible(self, macs, model, model_info, x, y, iteration):
+        variables, p = model_info
+        if len(self.higher_indices) == 0 or p is None:
+            violations = 0
+        else:
+            violations = np.mean(p[self.higher_indices] < p[self.lower_indices])
         macs.log(**{
-            'master/violations': 0 if len(self.monotonicities) == 0 else violations / len(self.monotonicities),
-            'master/feasible': 1 if violations == 0 else 0
+            'master/violations': violations,
+            'master/feasible': int(violations == 0)
         })
-        return violations == 0, y_loss, p_loss
+        return violations == 0
 
-    def return_solutions(self, macs, solution, variables, x, y, iteration):
+    def y_loss(self, macs, model, model_info, x, y, iteration):
+        variables, _ = model_info
+        y_loss = [model.abs(yy - vv) for yy, vv in zip(y[y != -1], variables[y != -1])]
+        return model.sum(y_loss) / len(y_loss)
+
+    def p_loss(self, macs, model, model_info, x, y, iteration):
+        variables, p = model_info
+        if p is None:
+            return 0.0
+        else:
+            return model.sum([model.abs(pp - vv) for pp, vv in zip(p, variables)]) / len(p)
+
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        variables, _ = model_info
         adj_y = np.array([vy.solution_value for vy in variables])
         macs.log(**{
             'master/adjusted mse': np.mean((adj_y[y != -1] - y[y != -1]) ** 2),
             'master/mip gap': solution.solve_details.gap,
             'time/master': solution.solve_details.time
         })
+        # TODO: compute sample weights and return adjusted labels and sample weights
         return adj_y
 
 
 class MT(MACS, RestaurantModel):
-    def __init__(self, learner: MTLearner, master: MTMaster, metrics=None, evaluation_data=None):
-        super(MT, self).__init__(learner, master, init_step='pretraining', metrics=metrics)
-        self.evaluation_data = {} if evaluation_data is None else evaluation_data
+    def __init__(self, learner: MTLearner, master: MTMaster, init_step='pretraining', metrics=None, eval_data=None):
+        super(MT, self).__init__(learner, master, init_step=init_step, metrics=metrics)
+        self.eval_data = {} if eval_data is None else eval_data
 
     def on_pretraining_end(self, macs, x, y):
         self.on_iteration_end(macs, -1)
 
     def on_iteration_end(self, macs, idx):
         logs = {'iteration': idx + 1}
-        for name, (xx, yy) in self.evaluation_data.items():
+        for name, (xx, yy) in self.eval_data.items():
             pp = self.predict(xx)
             for metric in self.metrics:
                 logs[f'learner/{name}_{metric.name}'] = metric(xx, yy, pp)

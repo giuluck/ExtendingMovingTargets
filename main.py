@@ -9,11 +9,11 @@ from tensorflow.keras.callbacks import EarlyStopping
 
 from src import restaurants
 from src.moving_targets.callbacks import WandBLogger
-from src.util.comb import cartesian_product
-from src.util.preprocessing import Scaler
 from src.moving_targets.metrics import AUC
-from src.restaurants.models import MLP, MTLearner, MTMaster, MT
 from src.restaurants import compute_monotonicities
+from src.restaurants.models import MLP, MTLearner, MTMaster, MT
+from src.util.combinatorial import cartesian_product
+from src.util.preprocessing import Scaler
 
 def get_monotonicities_list(data, kind):
     higher_indices, lower_indices = [], []
@@ -37,32 +37,39 @@ def get_monotonicities_list(data, kind):
     return [(hi, li) for hi, li in zip(higher_indices, lower_indices)]
 
 
-def build_model(h_units, scaler):
+def get_model(h_units, scaler):
     model = MLP(output_act='sigmoid', h_units=h_units, scaler=scaler)
     model.compile(optimizer='adam', loss='mse')
     return model
 
 
+def get_augmented_data(xtr, ytr, ns=None, n=5):
+    if ns is not None:
+        xtr = xtr.iloc[:ns]
+        ytr = ytr.iloc[:ns]
+    agd, agi = restaurants.augment_data(xtr, n=n)
+    xag = pd.concat((xtr, agd)).reset_index(drop=True)
+    yag = pd.concat((ytr, agi)).rename({0: 'clicked'}, axis=1).reset_index(drop=True)
+    yag = yag.fillna({'ground_index': pd.Series(yag.index), 'clicked': -1, 'monotonicity': 0}).astype('int')
+    scl = Scaler(xag, methods=dict(avg_rating='std', num_reviews='std'))
+    fag = pd.concat((xag, yag), axis=1)
+    return xag, yag, fag, scl
+
+
 if __name__ == '__main__':
     # load and prepare data
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
-    aug_data, aug_info = restaurants.augment_data(x_train, n=5)
-    x_aug = pd.concat((x_train, aug_data)).reset_index(drop=True)
-    y_aug = pd.concat((y_train, aug_info)).rename({0: 'clicked'}, axis=1).reset_index(drop=True)
-    y_aug = y_aug.fillna({'ground_index': pd.Series(y_aug.index), 'clicked': -1, 'monotonicity': 0}).astype('int')
-    aug_scaler = Scaler(x_aug, methods=dict(avg_rating='std', num_reviews='std'))
+    x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(x_train, y_train)
+    monotonicities = {k: get_monotonicities_list(full_aug, k) for k in ['ground', 'group', 'all']}
     x, y = x_aug.values, y_aug['clicked'].values
-
-    # compute monotonicity list for each of the three possibilities
-    full_data = pd.concat((x_aug, y_aug), axis=1)
-    monotonicities = {k: get_monotonicities_list(full_data, k) for k in ['ground', 'group', 'all']}
 
     # create study list
     study = cartesian_product(
+        # init_step=['pretraining', 'projection'],
         h_units=[[], [16, 8, 8]],
         restart_fit=[True, False],
-        alpha=list(np.logspace(-2, 2, 13)),
-        beta=[1.],
+        alpha=list(np.logspace(-2, 2, 5)),
+        beta=[0.01, 0.1, 10, 100],
         monotonicities=['ground', 'group', 'all']
     )
 
@@ -72,7 +79,7 @@ if __name__ == '__main__':
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
         mt = MT(
             learner=MTLearner(
-                build_model=lambda: build_model(params['h_units'], aug_scaler),
+                build_model=lambda: get_model(params['h_units'], aug_scaler),
                 restart_fit=params['restart_fit'],
                 validation_data=(x_val, y_val),
                 callbacks=[EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)],
@@ -80,8 +87,9 @@ if __name__ == '__main__':
                 verbose=0
             ),
             master=MTMaster(monotonicities[params['monotonicities']], alpha=params['alpha'], beta=params['beta']),
-            evaluation_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
-            metrics=[AUC(name='auc')]
+            init_step='pretraining',
+            metrics=[AUC(name='auc')],
+            eval_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test))
         )
         mt.fit(x, y, iterations=10, callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)])
         print(f' -- elapsed time: {time.time() - start_time}')
