@@ -32,7 +32,10 @@ def compute_monotonicities(samples, references, eps=1e-5):
     return monotonicities
 
 
-def get_augmented_data(x, y, n=5):
+def get_augmented_data(x, y, n=5, num_ground_samples=None):
+    if num_ground_samples is not None:
+        x = x.head(num_ground_samples)
+        y = y.head(num_ground_samples)
     aug_data, aug_info = augment_data(x, n=n, compute_monotonicities=compute_monotonicities, sampling_functions={
         'avg_rating': lambda s: np.random.uniform(1.0, 5.0, size=s),
         'num_reviews': lambda s: np.round(np.exp(np.random.uniform(0.0, np.log(200), size=s))),

@@ -1,4 +1,5 @@
 import os
+
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -6,9 +7,7 @@ import time
 import shutil
 import random
 import numpy as np
-import pandas as pd
 import tensorflow as tf
-from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping
 
 from src import restaurants
@@ -16,10 +15,10 @@ from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import AUC
 from src.models import MTLearner, MTMaster, MT
 from src.restaurants import compute_monotonicities
+from src.restaurants.augmentation import get_augmented_data
 from src.restaurants.models import RestaurantsMLP
-from src.util.augmentation import augment_data
 from src.util.combinatorial import cartesian_product
-from src.util.preprocessing import Scaler
+
 
 def get_monotonicities_list(data, kind):
     higher_indices, lower_indices = [], []
@@ -47,23 +46,6 @@ def get_model(h_units, scaler):
     model = RestaurantsMLP(output_act='sigmoid', h_units=h_units, scaler=scaler)
     model.compile(optimizer='adam', loss='mse')
     return model
-
-
-def get_augmented_data(xtr, ytr, ns=None, n=5):
-    if ns is not None:
-        xtr = xtr.iloc[:ns]
-        ytr = ytr.iloc[:ns]
-    agd, agi = augment_data(xtr, n=n, compute_monotonicities=compute_monotonicities, sampling_functions={
-        'avg_rating': lambda s: np.random.uniform(1.0, 5.0, size=s),
-        'num_reviews': lambda s: np.round(np.exp(np.random.uniform(0.0, np.log(200), size=s))),
-        ('D', 'DD', 'DDD', 'DDDD'): lambda s: to_categorical(np.random.randint(4, size=s), num_classes=4)
-    })
-    xag = pd.concat((xtr, agd)).reset_index(drop=True)
-    yag = pd.concat((ytr, agi)).rename({0: 'clicked'}, axis=1).reset_index(drop=True)
-    yag = yag.fillna({'ground_index': pd.Series(yag.index), 'monotonicity': 0})
-    scl = Scaler(xag, methods=dict(avg_rating='std', num_reviews='std'))
-    fag = pd.concat((xag, yag), axis=1)
-    return xag, yag, fag, scl
 
 
 if __name__ == '__main__':
