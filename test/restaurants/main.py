@@ -3,8 +3,11 @@ os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import time
+import shutil
+import random
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
 
 from src import restaurants
@@ -57,6 +60,11 @@ def get_augmented_data(xtr, ytr, ns=None, n=5):
 
 
 if __name__ == '__main__':
+    # set random seeds
+    random.seed(0)
+    np.random.seed(0)
+    tf.random.set_seed(0)
+
     # load and prepare data
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
     x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(x_train, y_train)
@@ -65,11 +73,11 @@ if __name__ == '__main__':
     # create study list
     study = cartesian_product(
         # init_step=['pretraining', 'projection'],
-        h_units=[[], [16, 8, 8]],
-        restart_fit=[True, False],
-        alpha=list(np.logspace(-2, 2, 5)),
-        beta=[0.01, 0.1, 10, 100],
-        monotonicities=['ground', 'group', 'all']
+        h_units=[[16, 8, 8]],
+        restart_fit=[True],
+        alpha=[0.1],
+        beta=[0.1],
+        monotonicities=['group']
     )
 
     # begin study
@@ -81,7 +89,7 @@ if __name__ == '__main__':
                 build_model=lambda: get_model(params['h_units'], aug_scaler),
                 restart_fit=params['restart_fit'],
                 validation_data=(x_val, y_val),
-                callbacks=[EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)],
+                callbacks=[EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)],
                 epochs=200,
                 verbose=0
             ),
@@ -97,3 +105,4 @@ if __name__ == '__main__':
             callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)]
         )
         print(f' -- elapsed time: {time.time() - start_time}')
+    shutil.rmtree('wandb')

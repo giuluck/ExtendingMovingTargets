@@ -41,4 +41,6 @@ class CplexMaster(Master):
 
         # solve the problem and get the adjusted labels
         solution = model.solve()
+        if solution is None:
+            raise RuntimeError('The given model has no admissible solution, please check the implemented constraints.')
         return self.return_solutions(macs, solution, model_info, x, y, iteration)

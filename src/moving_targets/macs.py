@@ -27,28 +27,26 @@ class MACS(Logger):
         # handle pretraining
         if self.init_step == 'pretraining':
             self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, x, y, val_data))
-            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self.learner.fit(self, x, y, iteration=-1)
+            self.learner.fit(self, x, y, iteration='pretraining')
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_training_end(self, x, y, val_data))
             self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self, x, y, val_data))
 
         # algorithm core
         for iteration in range(iterations):
             self._update_callbacks(callbacks, lambda c: c.on_iteration_start(self, x, y, val_data, iteration))
-            self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, x, y, val_data))
+            self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, x, y, val_data, iteration))
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
-            outputs = self.master.adjust_targets(self, x, y, iteration)
-            if not isinstance(outputs, dict):
-                outputs = {'y': outputs}
+            adj = self.master.adjust_targets(self, x, y, iteration)
+            if not isinstance(adj, dict):
+                adj = {'y': adj}
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, x, y, outputs['y'], val_data))
-            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data))
+            self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, x, y, adj['y'], val_data, iteration))
+            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data, iteration))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self.learner.fit(self, x, iteration=iteration, **outputs)
+            self.learner.fit(self, x, iteration=iteration, **adj)
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_training_end(self, x, y, val_data))
+            self._update_callbacks(callbacks, lambda c: c.on_training_end(self, x, y, val_data, iteration))
             self._update_callbacks(callbacks, lambda c: c.on_iteration_end(self, x, y, val_data, iteration))
         self._update_callbacks(callbacks, lambda c: c.on_process_end(self, x, y, val_data))
 

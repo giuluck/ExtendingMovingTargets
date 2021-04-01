@@ -108,7 +108,7 @@ class TestBalancedCounts(unittest.TestCase):
         np.random.seed(SEED)
         # load data
         ds = DATASETS[dataset]
-        df = pd.read_csv(f"../res/{ds['name']}.csv", sep=ds['separator']).sample(frac=1)
+        df = pd.read_csv(f"../../res/{ds['name']}.csv", sep=ds['separator']).sample(frac=1)
         x = df.drop(ds['class_column'], axis=1)
         y = df[ds['class_column']].astype('category').cat.codes.values
         num_classes = len(np.unique(y))
@@ -122,7 +122,7 @@ class TestBalancedCounts(unittest.TestCase):
         learner = LogisticRegression()
         master = BalancedCounts(n_classes=num_classes)
         model = MACS(learner, master, init_step=init_step, metrics=metrics)
-        model.fit(x_train, y_train, iterations=3)
+        model.fit(x_train, y_train, iterations=3, callbacks=[])
         # test results
         exp_res = RESULTS[f'{dataset}-{init_step}-{str(use_prob).lower()}']
         act_res = dict(train=model.evaluate(x_train, y_train), val=model.evaluate(x_val, y_val))

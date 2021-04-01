@@ -20,14 +20,14 @@ class Callback:
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         pass
 
-    def on_training_start(self, macs, x, y, val_data):
+    def on_training_start(self, macs, x, y, val_data, iteration):
         pass
 
-    def on_training_end(self, macs, x, y, val_data):
+    def on_training_end(self, macs, x, y, val_data, iteration):
         pass
 
-    def on_adjustment_start(self, macs, x, y, val_data):
+    def on_adjustment_start(self, macs, x, y, val_data, iteration):
         pass
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration):
         pass

@@ -37,16 +37,16 @@ class FileLogger(Logger):
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         self._write_on_file(f'END ITERATION', 'on_iteration_end')
 
-    def on_training_start(self, macs, x, y, val_data):
+    def on_training_start(self, macs, x, y, val_data, iteration):
         self._write_on_file('START TRAINING', 'on_training_start')
 
-    def on_training_end(self, macs, x, y, val_data):
+    def on_training_end(self, macs, x, y, val_data, iteration):
         self._write_on_file('END TRAINING', 'on_training_end')
 
-    def on_adjustment_start(self, macs, x, y, val_data):
+    def on_adjustment_start(self, macs, x, y, val_data, iteration):
         self._write_on_file('START ADJUSTMENT', 'on_adjustment_start')
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration):
         self._write_on_file('END ADJUSTMENT', 'on_adjustment_end')
 
     def _write_on_file(self, message, routine_name):
