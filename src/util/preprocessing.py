@@ -1,10 +1,8 @@
 import numpy as np
-import pandas as pd
-from typing import Any
 
 
 class Scaler:
-    def __init__(self, data: pd.DataFrame, methods: Any = 'std'):
+    def __init__(self, data, methods='std'):
         super(Scaler, self).__init__()
         self.translation = np.zeros_like(data.iloc[0])
         self.scaling = np.ones_like(data.iloc[0])

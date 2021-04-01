@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
-from tensorflow.keras.utils import to_categorical
+from tensorflow.python.keras.utils.np_utils import to_categorical
+
+from src.util.augmentation import augment_data
+from src.util.preprocessing import Scaler
 
 
 def compute_monotonicities(samples, references, eps=1e-5):
@@ -29,23 +32,15 @@ def compute_monotonicities(samples, references, eps=1e-5):
     return monotonicities
 
 
-def augment_data(df, n=1):
-    new_samples = []
-    new_info = []
-    for ground_index, x in df.iterrows():
-        new_values = [
-            ('avg_rating', np.random.uniform(1.0, 5.0, size=n)),
-            ('num_reviews', np.round(np.exp(np.random.uniform(0.0, np.log(200), size=n)))),
-            (['D', 'DD', 'DDD', 'DDDD'], to_categorical(np.random.randint(4, size=n), num_classes=4))
-        ]
-        for attribute, values in new_values:
-            samples = pd.DataFrame([x] * n)
-            samples[attribute] = values
-            monotonicities = compute_monotonicities(samples.values, x.values.reshape(1, -1)).reshape(-1, )
-            new_samples.append(samples.astype(df.dtypes))
-            new_info.append(pd.DataFrame(
-                data=zip([ground_index] * n, monotonicities),
-                columns=['ground_index', 'monotonicity'],
-                dtype='int'
-            ))
-    return pd.concat(new_samples).reset_index(drop=True), pd.concat(new_info).reset_index(drop=True)
+def get_augmented_data(x, y, n=5):
+    aug_data, aug_info = augment_data(x, n=n, compute_monotonicities=compute_monotonicities, sampling_functions={
+        'avg_rating': lambda s: np.random.uniform(1.0, 5.0, size=s),
+        'num_reviews': lambda s: np.round(np.exp(np.random.uniform(0.0, np.log(200), size=s))),
+        ('D', 'DD', 'DDD', 'DDDD'): lambda s: to_categorical(np.random.randint(4, size=s), num_classes=4)
+    })
+    x_aug = pd.concat((x, aug_data)).reset_index(drop=True)
+    y_aug = pd.concat((y, aug_info)).rename({0: 'clicked'}, axis=1).reset_index(drop=True)
+    y_aug = y_aug.fillna({'ground_index': pd.Series(y_aug.index), 'monotonicity': 0})
+    full_aug = pd.concat((x_aug, y_aug), axis=1)
+    aug_scaler = Scaler(x_aug, methods=dict(avg_rating='std', num_reviews='std'))
+    return x_aug, y_aug, full_aug, aug_scaler

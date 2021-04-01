@@ -1,7 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
+import seaborn as sns
 
 
 def plot_ctr(ctr_estimate, title=None, figsize=(14, 3), res=100):

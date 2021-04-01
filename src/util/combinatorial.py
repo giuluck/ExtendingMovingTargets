@@ -1,7 +1,4 @@
-from typing import Any, List, Dict
-
-
-def cartesian_product(fixed_parameters: Dict[str, Any] = None, **kwargs: List[Any]) -> List[Dict[str, Any]]:
+def cartesian_product(fixed_parameters=None, **kwargs):
     fixed_parameters = {} if fixed_parameters is None else fixed_parameters
     if len(kwargs) == 0:
         return [fixed_parameters]
