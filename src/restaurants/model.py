@@ -3,8 +3,8 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score, r2_score
 from tensorflow.keras.utils import to_categorical
 
+from src.models import Model, MT
 from src.restaurants import data, plot
-from src.models import MT, ExtensibleModel as Model
 
 
 def ctr_estimate(model, avg_rating, num_reviews, dollar_rating):

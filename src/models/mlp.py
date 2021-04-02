@@ -1,10 +1,10 @@
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Model as KerasModel
 
-from src.models.extensible import ExtensibleModel
+from src.models.model import Model
 
 
-class MLP(Model, ExtensibleModel):
+class MLP(KerasModel, Model):
     def __init__(self, output_act=None, h_units=None, scaler=None):
         super(MLP, self).__init__()
         self.scaler = scaler

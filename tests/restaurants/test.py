@@ -99,7 +99,7 @@ class TestMT(MT):
         # self.evaluation_summary(**val_data)
         # plt.show()
 
-    def on_training_start(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration):
         exit(0)
 
 

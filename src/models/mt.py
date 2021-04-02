@@ -5,7 +5,7 @@ import numpy as np
 from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
-from src.models.extensible import ExtensibleModel
+from src.models.model import Model
 from src.util.augmentation import filter_vectors
 
 
@@ -85,7 +85,7 @@ class MTMaster(CplexMaster):
         return adj_y
 
 
-class MT(MACS, ExtensibleModel):
+class MT(MACS, Model):
     def __init__(self, learner, master, init_step='pretraining', metrics=None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
 

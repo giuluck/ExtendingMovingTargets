@@ -5,8 +5,8 @@ from tensorflow.keras.metrics import Mean
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import Sequence
 
-from src.models.extensible import ExtensibleModel
 from src.models.mlp import MLP
+from src.models.model import Model
 
 
 class SBRBatchGenerator(Sequence):
@@ -38,7 +38,7 @@ class SBRBatchGenerator(Sequence):
         return tensor[:, :, :-2].reshape(-1, num_features - 2), tensor[:, :, -2], tensor[:, :, -1]
 
 
-class SBR(MLP, ExtensibleModel):
+class SBR(MLP, Model):
     def __init__(self, output_act=None, h_units=None, scaler=None, alpha=None, regularizer_act=None):
         super(SBR, self).__init__(output_act=output_act, h_units=h_units, scaler=scaler)
         if alpha is None:
