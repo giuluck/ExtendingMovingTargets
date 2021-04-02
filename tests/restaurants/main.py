@@ -13,10 +13,9 @@ from tensorflow.keras.callbacks import EarlyStopping
 from src import restaurants
 from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import AUC
-from src.models import MTLearner, MTMaster, MT
+from src.models import MLP, MT, MTLearner, MTMaster
 from src.restaurants import compute_monotonicities
 from src.restaurants.augmentation import get_augmented_data
-from src.restaurants.models import RestaurantsMLP
 from src.util.combinatorial import cartesian_product
 
 
@@ -43,7 +42,7 @@ def get_monotonicities_list(data, kind):
 
 
 def get_model(h_units, scaler):
-    model = RestaurantsMLP(output_act='sigmoid', h_units=h_units, scaler=scaler)
+    model = MLP(output_act='sigmoid', h_units=h_units, scaler=scaler)
     model.compile(optimizer='adam', loss='mse')
     return model
 
@@ -79,7 +78,7 @@ if __name__ == '__main__':
                 restart_fit=params['restart_fit'],
                 validation_data=(x_val, y_val),
                 callbacks=[EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)],
-                epochs=200,
+                epochs=0,
                 verbose=0
             ),
             master=MTMaster(monotonicities[params['monotonicities']], alpha=params['alpha'], beta=params['beta']),

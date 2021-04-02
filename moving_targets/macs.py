@@ -51,7 +51,12 @@ class MACS(Logger):
     def evaluate(self, x, y):
         return {metric.name: metric(x, y, self.predict(x)) for metric in self.metrics}
 
+    def on_pretraining_start(self, macs, x, y, val_data):
+        self.on_iteration_start(macs, x, y, val_data, 'pretraining')
+        self.on_training_start(macs, x, y, val_data, 'pretraining')
+
     def on_pretraining_end(self, macs, x, y, val_data):
+        self.on_training_end(macs, x, y, val_data, 'pretraining')
         self.on_iteration_end(macs, x, y, val_data, 'pretraining')
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
@@ -67,9 +72,9 @@ class MACS(Logger):
         self.log(**logs)
 
     def _update_callbacks(self, callbacks, routine):
-        routine(self)                         # run callback routine for moving targets object itself
-        for callback in callbacks:            #
+        routine(self)  # run callback routine for moving targets object itself
+        for callback in callbacks:  #
             if isinstance(callback, Logger):  # update cache for loggers only
-                callback.log(**self.cache)    #
-            routine(callback)                 # run callback routine for each external callback
-        self.cache = {}                       # eventually clear the cache
+                callback.log(**self.cache)  #
+            routine(callback)  # run callback routine for each external callback
+        self.cache = {}  # eventually clear the cache

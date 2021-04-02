@@ -1,9 +1,11 @@
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model
 
+from src.models.extensible import ExtensibleModel
 
-class MLP(Model):
-    def __init__(self, output_act, h_units=None, scaler=None):
+
+class MLP(Model, ExtensibleModel):
+    def __init__(self, output_act=None, h_units=None, scaler=None):
         super(MLP, self).__init__()
         self.scaler = scaler
         self.lrs = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]

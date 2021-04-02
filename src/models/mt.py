@@ -5,6 +5,7 @@ import numpy as np
 from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
+from src.models.extensible import ExtensibleModel
 from src.util.augmentation import filter_vectors
 
 
@@ -84,14 +85,12 @@ class MTMaster(CplexMaster):
         return adj_y
 
 
-class MT(MACS):
+class MT(MACS, ExtensibleModel):
     def __init__(self, learner, master, init_step='pretraining', metrics=None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
 
-    def on_pretraining_end(self, macs, x, y, val_data):
-        self.on_iteration_end(macs, x, y, val_data, -1)
-
     def on_iteration_end(self, macs, x, y, val_data, iteration):
+        iteration = -1 if iteration == 'pretraining' else iteration
         logs = {'iteration': iteration + 1}
         for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)

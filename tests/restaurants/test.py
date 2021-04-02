@@ -12,10 +12,9 @@ import matplotlib.pyplot as plt
 
 from tensorflow.keras.callbacks import EarlyStopping
 from src import restaurants
-from src.models import MTLearner, MTMaster
+from src.models import MT, MTLearner, MTMaster
 from src.restaurants import ctr_estimate
 from src.restaurants.augmentation import get_augmented_data
-from src.restaurants.models import RestaurantsMT
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import AUC
 from main import get_model, get_monotonicities_list
@@ -90,12 +89,13 @@ class TestMTM(MTMaster):
         return adj_y
 
 
-class TestMT(RestaurantsMT):
+class TestMT(MT):
     def log(self, **kwargs):
         pass
 
     def on_pretraining_end(self, macs, x, y, val_data):
         pass
+        # # noinspection PyUnresolvedReferences
         # self.evaluation_summary(**val_data)
         # plt.show()
 
@@ -142,5 +142,6 @@ if __name__ == '__main__':
         val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
         callbacks=[FileLogger('log.txt', sort_keys=False)]
     )
-    # mt.evaluation_summary(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test))
-    # plt.show()
+    # noinspection PyUnresolvedReferences
+    mt.evaluation_summary(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test))
+    plt.show()
