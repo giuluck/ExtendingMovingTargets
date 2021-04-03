@@ -13,7 +13,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from src import restaurants
 from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import AUC
-from src.models import MLP, MT, MTLearner, MTMaster
+from src.models import MLP, MT, MTLearner, MTMaster, Model
 from src.restaurants import compute_monotonicities
 from src.restaurants.augmentation import get_augmented_data
 from src.util.combinatorial import cartesian_product
@@ -47,11 +47,17 @@ def get_model(h_units, scaler):
     return model
 
 
+def on_training_end(model, macs, x, y, val_data, iteration):
+    model.log(**{'learner/ground_r2': model.compute_ground_r2()})
+
+
 if __name__ == '__main__':
-    # set random seeds
+    # set random seeds and import extension methods
     random.seed(0)
     np.random.seed(0)
     tf.random.set_seed(0)
+    restaurants.import_extension_methods()
+    MT.on_training_end = on_training_end
 
     # load and prepare data
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
