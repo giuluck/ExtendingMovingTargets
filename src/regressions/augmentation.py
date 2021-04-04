@@ -18,18 +18,22 @@ def compute_monotonicities(samples, references, directions, eps=1e-5):
     return monotonicities
 
 
-def get_augmented_data(x, y, directions=1., n=5, num_ground_samples=None):
+def get_augmented_data(x, y, directions: object = 1., n=5, num_ground_samples=None):
+    if isinstance(directions, dict):
+        directions = [directions.get(c, 0) for c in x.columns]
+    elif isinstance(directions, int) or isinstance(directions, float):
+        directions = [directions] * x.shape[1]
+    directions = np.array(directions)
+
     def monotonicities(samples, references, eps=1e-5):
-        return compute_monotonicities(samples, references, directions, eps)
+        return compute_monotonicities(samples, references, np.array(directions), eps)
 
     if num_ground_samples is not None:
         x = x.head(num_ground_samples)
         y = y.head(num_ground_samples)
-    aug_data, aug_info = pd.DataFrame([], columns=x.columns), pd.DataFrame([], columns=['ground_index', 'monotonicity'])
-    if n > 0:
-        aug_data, aug_info = augment_data(x, n=n, compute_monotonicities=monotonicities, sampling_functions={
-            col: lambda s: np.random.uniform(0.0, 1.0, size=s) for col in x.columns
-        })
+    aug_data, aug_info = augment_data(x, n=n, compute_monotonicities=monotonicities, sampling_functions={
+        col: lambda s: np.random.uniform(0.0, 1.0, size=s) for idx, col in enumerate(x.columns) if directions[idx] != 0
+    })
     x_aug = pd.concat((x, aug_data)).reset_index(drop=True)
     y_aug = pd.concat((y, aug_info)).rename({0: y.name}, axis=1).reset_index(drop=True)
     y_aug = y_aug.fillna({'ground_index': pd.Series(y_aug.index), 'monotonicity': 0})

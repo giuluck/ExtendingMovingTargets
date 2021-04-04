@@ -9,6 +9,10 @@ from src.models.mlp import MLP
 from src.models.model import Model
 
 
+def hard_tanh(x, factor=10 ** 6):
+    return k.tanh(factor * x)
+
+
 class SBRBatchGenerator(Sequence):
     def __init__(self, x, y, ground_indices, monotonicities, batch_size):
         super(SBRBatchGenerator, self).__init__()
