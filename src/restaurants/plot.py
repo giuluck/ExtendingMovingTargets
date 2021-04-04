@@ -23,7 +23,7 @@ def plot_ctr(ctr_estimate, title=None, figsize=(14, 3), res=100):
 
 def plot_histograms(figsize=(10, 8), tight_layout=True, **kwargs):
     if len(kwargs) > 0:
-        fig, axes = plt.subplots(len(kwargs), 3, sharex='col', sharey='row', figsize=figsize, tight_layout=tight_layout)
+        _, axes = plt.subplots(len(kwargs), 3, sharex='col', sharey='row', figsize=figsize, tight_layout=tight_layout)
         axes = axes.reshape((-1, 3))
         for i, (title, x) in enumerate(kwargs.items()):
             sns.histplot(x=x['avg_rating'], ax=axes[i, 0]).set(ylabel=title.capitalize())
@@ -33,7 +33,7 @@ def plot_histograms(figsize=(10, 8), tight_layout=True, **kwargs):
 
 def plot_distributions(figsize=(10, 8), tight_layout=True, **kwargs):
     if len(kwargs) > 0:
-        fig, axes = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
+        _, axes = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
         axes = axes.reshape((-1, 3))
         for i, (title, (x, y)) in enumerate(kwargs.items()):
             sns.kdeplot(x=x['avg_rating'], hue=y, ax=axes[i, 0]).set(ylabel=title.capitalize())
@@ -43,7 +43,7 @@ def plot_distributions(figsize=(10, 8), tight_layout=True, **kwargs):
 
 def plot_conclusions(models, figsize=(10, 10), res=100):
     avg_ratings, num_reviews = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res))
-    fig, axes = plt.subplots(4, len(models), figsize=figsize, sharex='all', sharey='all', tight_layout=True)
+    _, axes = plt.subplots(4, len(models), figsize=figsize, sharex='all', sharey='all', tight_layout=True)
     axes = axes.reshape((4, -1))
     for i, rating in enumerate(['D', 'DD', 'DDD', 'DDDD']):
         for j, (title, model) in enumerate(models.items()):

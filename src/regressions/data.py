@@ -1,40 +1,43 @@
 import numpy as np
 import pandas as pd
 
-from src.util.preprocessing import Scaler
+from src.util.preprocessing import Scaler, split_dataset
 
 
-def split_data(df, x_columns, y_columns, x_scaler, y_scaler):
-    outputs = []
-    for split in ['train', 'validation', 'test']:
-        split_df = df[df['split'] == split].reset_index(drop=True)
-        outputs.append((x_scaler.transform(split_df[x_columns]), y_scaler.transform(split_df[y_columns])))
-    outputs.append((x_scaler, y_scaler))
-    return tuple(outputs)
+def load_cars(filepath):
+    # preprocess and split data
+    df = pd.read_csv(filepath).rename(columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
+    df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
+    splits = split_dataset(df[['price']], df['sales'], shuffle=False)
+    # configure scalers and rescale
+    xsc = Scaler(splits[0][0], 'zeromax')
+    ysc = Scaler(splits[0][1], 'zeromax')
+    splits = [(xsc.transform(x).reset_index(drop=True), ysc.transform(y).reset_index(drop=True)) for x, y in splits]
+    # get dictionary
+    splits = {k: v for k, v in zip(['train', 'validation', 'test'], splits)}
+    splits['scalers'] = (xsc, ysc)
+    return splits
 
 
-def load_cars(folder='./'):
+def load_puzzles(filepath):
     # preprocess data
-    df = pd.read_csv(folder + 'cars.csv').rename(columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
-    df = df[['price', 'sales', 'split']].replace({'.': np.nan}).dropna().astype({'price': 'float', 'sales': 'float'})
-    # configure scalers
-    x_scaler = Scaler(df[df['split'] == 'train']['price'], 'norm')
-    y_scaler = Scaler(df[df['split'] == 'train']['sales'], 'norm')
-    # split data
-    return split_data(df, 'price', 'sales', x_scaler, y_scaler)
-
-
-def load_puzzles(folder='./'):
-    # preprocess data
-    df = pd.read_csv(folder + 'puzzles.csv')
+    df = pd.read_csv(filepath)
     for col in df.columns:
         if col not in ['label', 'split']:
             df[col] = df[col].map(lambda l: l.strip('[]').split(';')).map(lambda l: [float(v.strip()) for v in l])
-    df['word_count'] = df['word_count'].map(lambda l: np.mean(l))
-    df['star_rating'] = df['star_rating'].map(lambda l: np.mean(l))
-    df['num_reviews'] = df['is_amazon'].map(lambda l: len(l))
+    x = pd.DataFrame()
+    x['word_count'] = df['word_count'].map(lambda l: np.mean(l))
+    x['star_rating'] = df['star_rating'].map(lambda l: np.mean(l))
+    x['num_reviews'] = df['star_rating'].map(lambda l: len(l))
+    y = df['label']
     # configure scalers
-    x_scaler = Scaler(df[df['split'] == 'train'][['word_count', 'star_rating', 'num_reviews']], 'norm')
-    y_scaler = Scaler(df[df['split'] == 'train']['label'], 'norm')
+    x_scaler = Scaler(x[df['split'] == 'train'], 'zeromax')
+    y_scaler = Scaler(y[df['split'] == 'train'], 'zeromax')
     # split data
-    return split_data(df, ['word_count', 'star_rating', 'num_reviews'], 'label', x_scaler, y_scaler)
+    outputs = {}
+    for split in ['train', 'validation', 'test']:
+        split_x = x[df['split'] == split].reset_index(drop=True)
+        split_y = y[df['split'] == split].reset_index(drop=True)
+        outputs[split] = (x_scaler.transform(split_x), y_scaler.transform(split_y))
+    outputs['scalers'] = (x_scaler, y_scaler)
+    return outputs

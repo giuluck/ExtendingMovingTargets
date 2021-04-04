@@ -1,3 +1,4 @@
+import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model as KerasModel
 
@@ -5,11 +6,14 @@ from src.models.model import Model
 
 
 class MLP(KerasModel, Model):
-    def __init__(self, output_act=None, h_units=None, scaler=None):
+    def __init__(self, output_act=None, h_units=None, scaler=None, input_dim=None):
         super(MLP, self).__init__()
         self.scaler = scaler
         self.lrs = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]
         self.lrs = self.lrs + [Dense(1, activation=output_act)]
+        # handles tensorflow variables (weights) initialization in case input dimension is explicit
+        if input_dim is not None:
+            self(tf.zeros((1, input_dim)))
 
     def get_config(self):
         pass

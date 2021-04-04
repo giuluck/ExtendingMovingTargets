@@ -35,18 +35,18 @@ class SBRBatchGenerator(Sequence):
         batch = self.batches[index]
         num_features = len(batch.columns)
         tensor = batch.values.reshape(-1, self.num_samples, num_features).transpose([1, 0, 2])
-        return tensor[:, :, :-2].reshape(-1, num_features - 2), tensor[:, :, -2], tensor[:, :, -1]
+        return tensor[:, :, :-2].reshape(-1, num_features - 2), (tensor[:, :, -2], tensor[:, :, -1])
 
 
 class SBR(MLP, Model):
-    def __init__(self, output_act=None, h_units=None, scaler=None, alpha=None, regularizer_act=None):
-        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scaler=scaler)
+    def __init__(self, output_act=None, h_units=None, scaler=None, alpha=None, regularizer_act=None, input_dim=None):
+        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scaler=scaler, input_dim=input_dim)
         if alpha is None:
             self.alpha = tf.Variable(0., name='alpha')
             self.alpha_optimizer = Adam()
         else:
             self.alpha = alpha
-            self.optimize_alpha = None
+            self.alpha_optimizer = None
         self.regularizer_act = regularizer_act
         self.alpha_tracker = Mean(name='alpha')
         self.tot_loss_tracker = Mean(name='tot_loss')
@@ -54,7 +54,8 @@ class SBR(MLP, Model):
         self.reg_loss_tracker = Mean(name='reg_loss')
         self.test_loss_tracker = Mean(name='test_loss')
 
-    def _custom_loss(self, x, labels, monotonicities, sign=1):
+    def _custom_loss(self, x, y, sign=1):
+        labels, monotonicities = y
         pred = self(x, training=True)
         pred = tf.reshape(pred, tf.shape(labels))
         # compiled loss on labeled data
@@ -69,19 +70,19 @@ class SBR(MLP, Model):
 
     def train_step(self, d):
         # unpack training data
-        x, labels, monotonicities = d
+        x, y = d
         # split trainable variables
         nn_vars = self.trainable_variables[:-1]
         alpha_var = self.trainable_variables[-1:]
         # first optimization step (network parameters)
         with tf.GradientTape() as tape:
-            tot_loss, def_loss, reg_loss = self._custom_loss(x, labels, monotonicities)
+            tot_loss, def_loss, reg_loss = self._custom_loss(x, y)
         grads = tape.gradient(tot_loss, nn_vars)
         self.optimizer.apply_gradients(zip(grads, nn_vars))
         # second optimization step (alpha: maximization)
         if self.alpha_optimizer is not None:
             with tf.GradientTape() as tape:
-                tot_loss, def_loss, reg_loss = self._custom_loss(x, labels, monotonicities, sign=-1)
+                tot_loss, def_loss, reg_loss = self._custom_loss(x, y, sign=-1)
             grads = tape.gradient(tot_loss, alpha_var)
             self.alpha_optimizer.apply_gradients(zip(grads, alpha_var))
         # loss tracking

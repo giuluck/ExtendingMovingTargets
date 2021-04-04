@@ -19,7 +19,7 @@ def compute_monotonicities(samples, references, eps=1e-5):
     references[2] = 2 ** references[2:6].argmax(axis=0)
     # transpose back with single categorical feature (..., 3) and increase samples dimension to match references
     samples, references = samples[:3].transpose(), references[:3].transpose()
-    samples = np.hstack([samples] * len(references)).reshape((len(references), -1, 3))
+    samples = np.hstack([samples] * len(references)).reshape((-1, len(references), 3))
     # compute differences between samples to get the number of different attributes
     differences = (samples - references).transpose()
     differences[np.abs(differences) < eps] = 0.
