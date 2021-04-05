@@ -8,9 +8,9 @@ class Scaler:
         super(Scaler, self).__init__()
         # handle non-pandas data
         if not isinstance(data, pd.DataFrame):
-            data = pd.DataFrame(np.array(data), columns=['data'])
+            data = pd.DataFrame(np.array(data))
         # handle all-the-same methods
-        if isinstance(methods, str) or methods is None:
+        if not isinstance(methods, dict):
             methods = {column: methods for column in data.columns}
         # default values (translation = 0, scaling = 1)
         self.translation = np.zeros_like(data.iloc[0])
@@ -28,6 +28,10 @@ class Scaler:
             elif method in ['zero', 'max', 'zeromax']:
                 self.translation[idx] = 0.0
                 self.scaling[idx] = values.max()
+            elif isinstance(method, tuple):
+                minimum, maximum = method
+                self.translation[idx] = minimum
+                self.scaling[idx] = maximum - minimum
             elif method is not None:
                 raise ValueError(f'Method {method} is not supported')
 
@@ -39,7 +43,8 @@ class Scaler:
 
     @staticmethod
     def get_default(num_features):
-        return Scaler([0.] * num_features, methods=None)
+        # noinspection PyTypeChecker
+        return Scaler([[0.] * num_features], methods=None)
 
 
 def split_dataset(*data, test_size=0.2, val_size=None, **kwargs):

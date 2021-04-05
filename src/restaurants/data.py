@@ -8,27 +8,27 @@ def ctr_estimate(avg_ratings, num_reviews, dollar_ratings):
     return 1 / (1 + np.exp(dollar_ratings - avg_ratings * np.log1p(num_reviews) / 4))
 
 
-def sample_restaurants(n):
-    avg_ratings = np.random.uniform(1.0, 5.0, n)
-    num_reviews = np.round(np.exp(np.random.uniform(0.0, np.log(200), n)))
-    dollar_ratings = np.random.choice(['D', 'DD', 'DDD', 'DDDD'], n)
+def sample_restaurants(n, rng):
+    avg_ratings = rng.uniform(1.0, 5.0, n)
+    num_reviews = np.round(np.exp(rng.uniform(0.0, np.log(200), n)))
+    dollar_ratings = rng.choice(['D', 'DD', 'DDD', 'DDDD'], n)
     ctr_labels = ctr_estimate(avg_ratings, num_reviews, dollar_ratings)
     return avg_ratings, num_reviews, dollar_ratings, ctr_labels
 
 
-def sample_dataset(n, testing_set):
-    (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = sample_restaurants(n)
+def sample_dataset(n, rng, testing_set=True):
+    (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = sample_restaurants(n, rng)
     # testing has a more uniform distribution over all restaurants
     # while training/validation datasets have more views on popular restaurants
     if testing_set:
-        num_views = np.random.poisson(lam=3, size=n)
+        num_views = rng.poisson(lam=3, size=n)
     else:
-        num_views = np.random.poisson(lam=ctr_labels * num_reviews / 50.0, size=n)
+        num_views = rng.poisson(lam=ctr_labels * num_reviews / 50.0, size=n)
     return pd.DataFrame({
         'avg_rating': np.repeat(avg_ratings, num_views),
         'num_reviews': np.repeat(num_reviews, num_views),
         'dollar_rating': np.repeat(dollar_ratings, num_views),
-        'clicked': np.random.binomial(n=1, p=np.repeat(ctr_labels, num_views))
+        'clicked': rng.binomial(n=1, p=np.repeat(ctr_labels, num_views))
     })
 
 
@@ -40,8 +40,8 @@ def load_data():
         ds = ds.astype({c: 'float' if c == 'avg_rating' else 'int' for c in ds.columns})
         return ds.drop('clicked', axis=1), ds['clicked']
 
-    np.random.seed(0)
-    train_data = sample_dataset(1000, testing_set=False)
-    val_data = sample_dataset(600, testing_set=False)
-    test_data = sample_dataset(600, testing_set=True)
+    rng = np.random.default_rng(seed=0)
+    train_data = sample_dataset(1000, rng, testing_set=False)
+    val_data = sample_dataset(600, rng, testing_set=False)
+    test_data = sample_dataset(600, rng, testing_set=True)
     return process(train_data), process(val_data), process(test_data)

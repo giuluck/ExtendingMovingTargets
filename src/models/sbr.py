@@ -62,8 +62,9 @@ class SBR(MLP, Model):
         labels, monotonicities = y
         pred = self(x, training=True)
         pred = tf.reshape(pred, tf.shape(labels))
-        # compiled loss on labeled data
-        def_loss = self.compiled_loss(labels[0], pred[0])
+        # compiled loss on labeled data (if label is present)
+        mask = tf.math.logical_not(tf.math.is_nan(labels[0]))
+        def_loss = self.compiled_loss(labels[0][mask], pred[0][mask])
         # regularization term computed
         deltas = pred - pred[0]
         if self.regularizer_act is not None:
@@ -108,3 +109,36 @@ class SBR(MLP, Model):
         return {
             'loss': self.test_loss_tracker.result()
         }
+
+
+class UnivariateSBR(SBR):
+    def __init__(self,
+                 direction=1,
+                 output_act=None,
+                 h_units=None,
+                 scaler=None,
+                 alpha=None,
+                 regularizer_act=None,
+                 input_dim=None):
+        super(UnivariateSBR, self).__init__(output_act=output_act,
+                                            h_units=h_units,
+                                            scaler=scaler,
+                                            alpha=alpha,
+                                            regularizer_act=regularizer_act,
+                                            input_dim=input_dim)
+        self.direction = direction
+
+    def _custom_loss(self, x, y, sign=1):
+        x = tf.cast(x, tf.float32)
+        mask = tf.math.logical_not(tf.math.is_nan(y))
+        pred = self(x, training=True)
+        # compiled loss on labeled data
+        def_loss = self.compiled_loss(y[mask], pred[mask])
+        # regularization term computed (sum of violations over each pair of samples)
+        x_deltas = tf.repeat(x, tf.size(x), axis=1) - tf.squeeze(x)
+        y_deltas = tf.repeat(pred, tf.size(pred), axis=1) - tf.squeeze(pred)
+        if self.regularizer_act is not None:
+            y_deltas = self.regularizer_act(y_deltas)
+        reg_loss = k.sum(k.maximum(0., -self.direction * tf.sign(x_deltas) * y_deltas))
+        # final losses
+        return sign * (def_loss + self.alpha * reg_loss), def_loss, reg_loss

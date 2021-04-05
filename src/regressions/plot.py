@@ -6,6 +6,28 @@ import matplotlib.pyplot as plt
 from src.util.preprocessing import Scaler
 
 
+def plot_synthetic(scalers=None, figsize=(12, 10), tight_layout=True, **kwargs):
+    x_scaler, y_scaler = (Scaler.get_default(2), Scaler.get_default(1)) if scalers is None else scalers
+    _, axes = plt.subplots(len(kwargs), 3, sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
+    info = []
+    for idx, (title, (x, y)) in enumerate(kwargs.items()):
+        x, y = x_scaler.invert(x), y_scaler.invert(y)
+        sns.scatterplot(x=x['a'], y=y, ax=axes[0, idx]).set(title=title.capitalize())
+        sns.scatterplot(x=x['b'], y=y, ax=axes[1, idx])
+        sns.scatterplot(x=x['a'], y=x['b'], hue=y, ax=axes[2, idx])
+        info.append(f'{len(x)} ({title} samples)')
+    print(', '.join(info))
+
+
+def plot_synthetic_augmented(x, y, x_scaler=None, figsize=(10, 4), tight_layout=True):
+    scl = Scaler.get_default(2) if x_scaler is None else x_scaler
+    aug = scl.invert(x)
+    aug['Augmented'] = np.isnan(y)
+    _, axes = plt.subplots(1, 2, sharey='all', figsize=figsize, tight_layout=tight_layout)
+    for ax, feature in zip(axes, ['a', 'b']):
+        sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
+
+
 def plot_cars(scalers=None, figsize=(14, 4), tight_layout=True, **kwargs):
     info = []
     x_scaler, y_scaler = (Scaler.get_default(1), Scaler.get_default(1)) if scalers is None else scalers
@@ -18,7 +40,7 @@ def plot_cars(scalers=None, figsize=(14, 4), tight_layout=True, **kwargs):
     print(', '.join(info))
 
 
-def plot_cars_augmented(x, y, x_scaler=None, figsize=(14, 4)):
+def plot_cars_augmented(x, y, x_scaler=None, figsize=(10, 4)):
     scl = Scaler.get_default(1) if x_scaler is None else x_scaler
     aug = scl.invert(x)
     aug['Augmented'] = np.isnan(y)
@@ -27,7 +49,7 @@ def plot_cars_augmented(x, y, x_scaler=None, figsize=(14, 4)):
 
 
 def plot_puzzles(scalers=None, figsize=(12, 10), **kwargs):
-    x_scaler, y_scaler = (Scaler.get_default(3), Scaler.get_default(3)) if scalers is None else scalers
+    x_scaler, y_scaler = (Scaler.get_default(3), Scaler.get_default(1)) if scalers is None else scalers
     dfs, info = [], []
     for key, (x, y) in kwargs.items():
         df = pd.concat((x_scaler.invert(x), y_scaler.invert(y)), axis=1)
