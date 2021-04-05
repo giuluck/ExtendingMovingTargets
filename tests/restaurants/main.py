@@ -1,5 +1,7 @@
 import os
 
+from src.util.augmentation import get_monotonicities_list
+
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -13,32 +15,10 @@ from tensorflow.keras.callbacks import EarlyStopping
 from src import restaurants
 from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import AUC
-from src.models import MLP, MT, MTLearner, MTMaster, Model
+from src.models import MLP, MT, MTLearner, MTMaster
 from src.restaurants import compute_monotonicities
 from src.restaurants.augmentation import get_augmented_data
 from src.util.combinatorial import cartesian_product
-
-
-def get_monotonicities_list(data, kind):
-    higher_indices, lower_indices = [], []
-    if kind == 'ground':
-        for idx, rec in data.iterrows():
-            monotonicity, ground_index = rec['monotonicity'], int(rec['ground_index'])
-            if monotonicity != 0:
-                higher_indices.append(idx if monotonicity > 0 else ground_index)
-                lower_indices.append(ground_index if monotonicity > 0 else idx)
-    elif kind == 'group':
-        for index, group in data.groupby('ground_index'):
-            values = group.drop(['clicked', 'ground_index', 'monotonicity'], axis=1).values
-            his, lis = np.where(compute_monotonicities(values, values) == 1)
-            higher_indices.append(group.index.values[his])
-            lower_indices.append(group.index.values[lis])
-        higher_indices = np.concatenate(higher_indices)
-        lower_indices = np.concatenate(lower_indices)
-    elif kind == 'all':
-        values = data.drop(['clicked', 'ground_index', 'monotonicity'], axis=1).values
-        higher_indices, lower_indices = np.where(compute_monotonicities(values, values) == 1)
-    return [(hi, li) for hi, li in zip(higher_indices, lower_indices)]
 
 
 def get_model(h_units, scaler):
@@ -62,7 +42,7 @@ if __name__ == '__main__':
     # load and prepare data
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
     x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(x_train, y_train)
-    monotonicities = {k: get_monotonicities_list(full_aug, k) for k in ['ground', 'group', 'all']}
+    monotonicities = get_monotonicities_list(full_aug, compute_monotonicities, 'clicked', ['ground', 'group', 'all'])
 
     # create study list
     study = cartesian_product(

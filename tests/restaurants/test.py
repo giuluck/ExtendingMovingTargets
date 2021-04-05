@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import EarlyStopping
 from src import restaurants
 from src.models import MT, MTLearner, MTMaster
-from src.restaurants import ctr_estimate
-from src.restaurants.augmentation import get_augmented_data
+from src.restaurants import ctr_estimate, compute_monotonicities, get_augmented_data
+from src.util.augmentation import get_monotonicities_list
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import AUC
-from main import get_model, get_monotonicities_list
+from main import get_model
 
 
 class TestMTL(MTLearner):
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     # load and prepare data
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
     x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(x_train, y_train, num_ground_samples=None)
-    mono = get_monotonicities_list(full_aug, 'group')
+    mono = get_monotonicities_list(full_aug, compute_monotonicities, 'clicked', 'group')
 
     # moving targets
     mt = TestMT(

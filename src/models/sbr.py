@@ -62,14 +62,18 @@ class SBR(MLP, Model):
         labels, monotonicities = y
         pred = self(x, training=True)
         pred = tf.reshape(pred, tf.shape(labels))
-        # compiled loss on labeled data (if label is present)
+        # compiled loss on labeled data, if label is present (the if-else handles the case of unlabeled data only)
         mask = tf.math.logical_not(tf.math.is_nan(labels[0]))
-        def_loss = self.compiled_loss(labels[0][mask], pred[0][mask])
+        def_loss = tf.cond(
+            pred=tf.math.reduce_any(mask),
+            true_fn=lambda: self.compiled_loss(labels[0][mask], pred[0][mask]),
+            false_fn=lambda: tf.constant(0.)
+        )
         # regularization term computed
         deltas = pred - pred[0]
         if self.regularizer_act is not None:
             deltas = self.regularizer_act(deltas)
-        reg_loss = k.sum(k.maximum(0., -monotonicities * deltas))
+        reg_loss = k.mean(k.maximum(0., -monotonicities * deltas))
         # final losses
         return sign * (def_loss + self.alpha * reg_loss), def_loss, reg_loss
 
@@ -132,8 +136,12 @@ class UnivariateSBR(SBR):
         x = tf.cast(x, tf.float32)
         mask = tf.math.logical_not(tf.math.is_nan(y))
         pred = self(x, training=True)
-        # compiled loss on labeled data
-        def_loss = self.compiled_loss(y[mask], pred[mask])
+        # compiled loss on labeled data (the if-else handles the case of unlabeled data only)
+        def_loss = tf.cond(
+            pred=tf.math.reduce_any(mask),
+            true_fn=lambda: self.compiled_loss(y[mask], pred[mask]),
+            false_fn=lambda: tf.constant(0.)
+        )
         # regularization term computed (sum of violations over each pair of samples)
         x_deltas = tf.repeat(x, tf.size(x), axis=1) - tf.squeeze(x)
         y_deltas = tf.repeat(pred, tf.size(pred), axis=1) - tf.squeeze(pred)
