@@ -31,8 +31,10 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, alpha=1., beta=1., mask_value=np.nan, time_limit=30):
+    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., mask_value=np.nan, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
+        assert loss_fn in ['mae', 'mse']
+        self.loss_fn = MTMaster.mae_loss if loss_fn == 'mae' else MTMaster.mse_loss
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.mask_value = mask_value
@@ -49,21 +51,21 @@ class MTMaster(CplexMaster):
     def is_feasible(self, macs, model, model_info, x, y, iteration):
         variables, p = model_info
         if len(self.higher_indices) == 0 or p is None:
-            violations = [0]
+            violations = np.array([0])
         else:
             violations = np.maximum(0.0, p[self.lower_indices] - p[self.higher_indices])
         violations_indicators = violations > 0
         macs.log(**{
             'master/avg. violation': np.mean(violations),
             'master/pct. violation': np.mean(violations_indicators),
-            'master/is feasible': violations_indicators.all()
+            'master/is feasible': int(violations_indicators.all())
         })
         return violations_indicators.all()
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _ = model_info
         y, variables = filter_vectors(self.mask_value, y, variables)
-        y_loss = [model.abs(yy - vv) for yy, vv in zip(y, variables)]
+        y_loss = [self.loss_fn(model, yy, vv) for yy, vv in zip(y, variables)]
         return model.sum(y_loss) / len(y_loss)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
@@ -71,18 +73,27 @@ class MTMaster(CplexMaster):
         if p is None:
             return 0.0
         else:
-            return model.sum([model.abs(pp - vv) for pp, vv in zip(p, variables)]) / len(p)
+            return model.sum([self.loss_fn(model, pp, vv) for pp, vv in zip(p, variables)]) / len(p)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         variables, _ = model_info
         adj_y = np.array([vy.solution_value for vy in variables])
         adj_ground, ground = filter_vectors(self.mask_value, adj_y, y)
         macs.log(**{
-            'master/adj mae': np.abs(adj_ground - ground).mean(),
+            'master/adj. mae': np.abs(adj_ground - ground).mean(),
             'time/master': solution.solve_details.time
         })
         # TODO: compute sample weights and return adjusted labels and sample weights
         return adj_y
+
+    @staticmethod
+    def mae_loss(model, numeric_variable, model_variable):
+        return model.abs(numeric_variable - model_variable)
+
+    # noinspection PyUnusedLocal
+    @staticmethod
+    def mse_loss(model, numeric_variable, model_variable):
+        return (numeric_variable - model_variable) ** 2
 
 
 class MT(MACS, Model):

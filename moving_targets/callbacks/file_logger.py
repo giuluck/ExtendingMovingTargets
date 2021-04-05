@@ -6,7 +6,7 @@ SEPARATOR = '--------------------------------------------------'
 
 
 class FileLogger(Logger):
-    def __init__(self, filepath=None, routines=None, log_empty=False, sort_keys=True, separator=SEPARATOR, end='\n'):
+    def __init__(self, filepath=None, routines=None, log_empty=False, sort_keys=False, separator=SEPARATOR, end='\n'):
         super(FileLogger, self).__init__()
         self.filepath = filepath
         self.routines = None if routines is None else set(routines)

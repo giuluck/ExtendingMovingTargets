@@ -23,7 +23,7 @@ def augment_data(df, sampling_functions, compute_monotonicities):
     return pd.concat(new_samples).reset_index(drop=True), pd.concat(new_info).reset_index(drop=True)
 
 
-def get_monotonicities_list(data, compute_monotonicities, label, kinds):
+def get_monotonicities_list(data, compute_monotonicities, label, kinds, errors='raise'):
     outputs = {}
     for kind in [kinds] if isinstance(kinds, str) else kinds:
         higher_indices, lower_indices = [], []
@@ -35,14 +35,14 @@ def get_monotonicities_list(data, compute_monotonicities, label, kinds):
                     lower_indices.append(ground_index if monotonicity > 0 else idx)
         elif kind == 'group':
             for index, group in data.groupby('ground_index'):
-                values = group.drop([label, 'ground_index', 'monotonicity'], axis=1).values
+                values = group.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1).values
                 his, lis = np.where(compute_monotonicities(values, values) == 1)
                 higher_indices.append(group.index.values[his])
                 lower_indices.append(group.index.values[lis])
             higher_indices = np.concatenate(higher_indices)
             lower_indices = np.concatenate(lower_indices)
         elif kind == 'all':
-            values = data.drop([label, 'ground_index', 'monotonicity'], axis=1).values
+            values = data.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1).values
             higher_indices, lower_indices = np.where(compute_monotonicities(values, values) == 1)
         outputs[kind] = [(hi, li) for hi, li in zip(higher_indices, lower_indices)]
     return outputs[kinds] if isinstance(kinds, str) else outputs

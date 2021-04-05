@@ -1,4 +1,5 @@
 from moving_targets.callbacks import Logger, FileLogger
+from moving_targets.callbacks.history import History
 
 
 class MACS(Logger):
@@ -9,6 +10,7 @@ class MACS(Logger):
         self.master = master
         self.init_step = init_step
         self.metrics = [] if metrics is None else metrics
+        self.history = History()
 
     def fit(self, x, y, iterations=1, val_data=None, callbacks='stdout'):
         # check user input
@@ -45,6 +47,8 @@ class MACS(Logger):
             self._update_callbacks(callbacks, lambda c: c.on_iteration_end(self, x, y, val_data, iteration))
         self._update_callbacks(callbacks, lambda c: c.on_process_end(self, x, y, val_data))
 
+        return self.history
+
     def predict(self, x):
         return self.learner.predict(x)
 
@@ -72,9 +76,12 @@ class MACS(Logger):
         self.log(**logs)
 
     def _update_callbacks(self, callbacks, routine):
-        routine(self)  # run callback routine for moving targets object itself
-        for callback in callbacks:  #
-            if isinstance(callback, Logger):  # update cache for loggers only
-                callback.log(**self.cache)  #
-            routine(callback)  # run callback routine for each external callback
-        self.cache = {}  # eventually clear the cache
+        # run callback routine for macs object itself and history object
+        routine(self)
+        # run callback routine for the history logger and for each external callback
+        for callback in [self.history] + callbacks:
+            # if the callback is a logger, log the internal cache before calling the routine (and eventually clear it)
+            if isinstance(callback, Logger):
+                callback.log(**self.cache)
+            routine(callback)
+        self.cache = {}
