@@ -54,13 +54,13 @@ class MTMaster(CplexMaster):
             violations = np.array([0])
         else:
             violations = np.maximum(0.0, p[self.lower_indices] - p[self.higher_indices])
-        violations_indicators = violations > 0
+        satisfied = violations == 0
         macs.log(**{
             'master/avg. violation': np.mean(violations),
-            'master/pct. violation': np.mean(violations_indicators),
-            'master/is feasible': int(violations_indicators.all())
+            'master/pct. violation': 1 - np.mean(satisfied),
+            'master/is feasible': int(satisfied.all())
         })
-        return violations_indicators.all()
+        return not satisfied.all()
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _ = model_info
@@ -78,7 +78,7 @@ class MTMaster(CplexMaster):
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         variables, _ = model_info
         adj_y = np.array([vy.solution_value for vy in variables])
-        adj_ground, ground = filter_vectors(self.mask_value, adj_y, y)
+        ground, adj_ground = filter_vectors(self.mask_value, y, adj_y)
         macs.log(**{
             'master/adj. mae': np.abs(adj_ground - ground).mean(),
             'time/master': solution.solve_details.time
@@ -102,7 +102,7 @@ class MT(MACS, Model):
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         iteration = -1 if iteration == 'pretraining' else iteration
-        logs = {'iteration': iteration + 1}
+        logs = {'iteration': iteration + 1, 'time/iteration': time.time() - self.time}
         for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)
             for metric in self.metrics:

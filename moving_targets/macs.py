@@ -1,3 +1,5 @@
+import time
+
 from moving_targets.callbacks import Logger, FileLogger
 from moving_targets.callbacks.history import History
 
@@ -11,14 +13,17 @@ class MACS(Logger):
         self.init_step = init_step
         self.metrics = [] if metrics is None else metrics
         self.history = History()
+        self.time = None
 
-    def fit(self, x, y, iterations=1, val_data=None, callbacks='stdout'):
+    def fit(self, x, y, iterations=1, val_data=None, callbacks=None, verbose=True):
         # check user input
         assert iterations > 0, "there should be at least one iteration"
         val_data = {} if val_data is None else (val_data if isinstance(val_data, dict) else {'val': val_data})
 
-        # handle callbacks
-        callbacks = [FileLogger()] if callbacks == 'stdout' else ([] if callbacks is None else callbacks)
+        # handle callbacks and verbosity
+        callbacks = [] if callbacks is None else callbacks
+        if verbose:
+            callbacks = [FileLogger()] + callbacks
         self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x, y, val_data))
 
         # handle pretraining
@@ -63,8 +68,11 @@ class MACS(Logger):
         self.on_training_end(macs, x, y, val_data, 'pretraining')
         self.on_iteration_end(macs, x, y, val_data, 'pretraining')
 
+    def on_iteration_start(self, macs, x, y, val_data, iteration):
+        self.time = time.time()
+
     def on_iteration_end(self, macs, x, y, val_data, iteration):
-        logs = {'iteration': iteration}
+        logs = {'iteration': iteration, 'elapsed time': time.time() - self.time}
         # log metrics on training data
         for metric in self.metrics:
             logs[metric.name] = metric(x, y, self.predict(x))

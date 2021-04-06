@@ -5,8 +5,8 @@ from src.util.preprocessing import Scaler, split_dataset
 
 
 def synthetic_function(a, b):
-    a = 2 * (a ** 3)
-    b = 4 * (b ** 2)
+    a = 2 * ((a + 0.01) ** 3)
+    b = 4 * ((b - 0.01) ** 2)
     return a / (b + 1) + b
 
 

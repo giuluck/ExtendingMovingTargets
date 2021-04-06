@@ -6,6 +6,7 @@ from sklearn.metrics import r2_score
 
 from src.models import Model
 from src.regressions.data import synthetic_function
+from src.util.plot import ColorFader
 from src.util.preprocessing import Scaler
 
 
@@ -24,19 +25,20 @@ def import_extension_methods():
         grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         grid['pred'] = y_scaler.invert(model.predict(x_scaler.transform(grid)))
         grid['label'] = synthetic_function(grid['a'], grid['b'])
+        fader = ColorFader('red', 'blue', bounds=(-1, 1))
         _, axes = plt.subplots(2, 3, figsize=figsize, tight_layout=tight_layout)
         for ax, (title, y) in zip(axes, {'Ground Truth': 'label', 'Estimated Function': 'pred'}.items()):
             # plot bivariate function
             z = grid[y].values.reshape(res, res)
             ax[0].pcolor(a, b, z, shading='auto', cmap='viridis', vmin=grid['label'].min(), vmax=grid['label'].max())
             # plot first feature (with title as it is the central plot)
-            for _, group in grid.groupby('b'):
-                sns.lineplot(data=group, x='a', y=y, color='#CCC', alpha=0.4, ax=ax[1])
-            sns.lineplot(data=grid, x='a', y=y, color='black', ci=None, label='average', ax=ax[1]).set(title=title)
+            for idx, group in grid.groupby('b'):
+                label = f'b = {idx:.0f}' if idx in [-1, 1] else None
+                sns.lineplot(data=group, x='a', y=y, color=fader(idx), alpha=0.4, label=label, ax=ax[1])
             # plot second feature
-            for _, group in grid.groupby('a'):
-                sns.lineplot(data=group, x='b', y=y, color='#CCC', alpha=0.4, ax=ax[2])
-            sns.lineplot(data=grid, x='b', y=y, color='black', ci=None, label='average', ax=ax[2])
+            for idx, group in grid.groupby('a'):
+                label = f'a = {idx:.0f}' if idx in [-1, 1] else None
+                sns.lineplot(data=group, x='b', y=y, color=fader(idx), alpha=0.4, label=label, ax=ax[2])
 
     def cars_summary(model, scalers=None, res=100, xlim=(0, 60), ylim=(0, 120), figsize=(10, 4), **kwargs):
         plt.figure(figsize=figsize)
@@ -79,12 +81,13 @@ def import_extension_methods():
         grid['pred'] = pred
         for ax, feat in zip(axes, features):
             # plot predictions for each group of other features
-            for _, group in grid.groupby([c for c in grid.columns if c not in [feat, 'pred']]):
-                sns.lineplot(data=group, x=feat, y='pred', color='#CCC', ax=ax)
-            # plot mean prediction
-            sns.lineplot(data=grid, x=feat, y='pred', color='black', ci=None, label='average', ax=ax).set(
-                xlim=(grid[feat].min(), grid[feat].max()), ylim=(pred.min(), pred.max())
-            )
+            ci, cj = [c for c in grid.columns if c not in [feat, 'pred']]
+            li, ui = grid[ci].min(), grid[ci].max()
+            lj, uj = grid[cj].min(), grid[cj].max()
+            fader = ColorFader('black', 'magenta', 'cyan', 'yellow', bounds=(li, lj, ui, uj))
+            for (i, j), group in grid.groupby([ci, cj]):
+                label = f'{ci}: {i:.0f}, {cj}: {j:.0f}' if (i in [li, ui] and j in [lj, uj]) else None
+                sns.lineplot(data=group, x=feat, y='pred', color=fader(i, j), alpha=0.6, label=label, ax=ax)
         fig.suptitle('Estimated Functions')
 
     Model.synthetic_summary = synthetic_summary
