@@ -3,14 +3,15 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from sklearn.neural_network import MLPRegressor
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from src import regressions as reg
 from moving_targets.callbacks import FileLogger
-from moving_targets.metrics import R2, MSE
+from moving_targets.metrics import R2, MSE, MAE
 from src.models import Model, MLP, MTLearner, MTMaster, MT
 from src.util.augmentation import get_monotonicities_list
-from analysis_callback import CarsCallback
+from analysis_callbacks import CarsCallback
 
 random.seed(0)
 np.random.seed(0)
@@ -61,14 +62,31 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
     return xag, yag[yag.columns[0]], mono, data
 
 
-def get_model():
-    model = MLP(output_act=None, h_units=[32, 32])
-    model.compile(optimizer='adam', loss='mse')
-    return model
-
-
 class TestMTL(MTLearner):
-    pass
+    def __init__(self, backend='scikit', warm_start=False, verbose=False):
+        if backend == 'scikit':
+            def model():
+                return MLPRegressor([32, 32], warm_start=warm_start, verbose=verbose)
+
+            super(TestMTL, self).__init__(model, warm_start=True)
+        elif backend == 'keras':
+            def model():
+                m = MLP(output_act=None, h_units=[32, 32])
+                m.compile(optimizer='adam', loss='mse')
+                return m
+
+            # similar to the default behaviour of the scikit MLP:
+            # > tol (min_delta) = 1e-4
+            # > n_iter_no_change (patience) = 10
+            # > max_iter (epochs) = 200
+            fit_args = dict(
+                callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)],
+                verbose=verbose,
+                epochs=200
+            )
+            super(TestMTL, self).__init__(model, warm_start=warm_start, **fit_args)
+        else:
+            raise ValueError('Wrong backend')
 
 
 class TestMTM(MTMaster):
@@ -76,38 +94,49 @@ class TestMTM(MTMaster):
 
 
 class TestMT(MT):
-    def log(self, **kwargs):
-        kwargs = {k.replace('/', ': '): v for k, v in kwargs.items() if k not in ['time/learner', 'time/master']}
-        self.cache.update(kwargs)
+    def on_training_start(self, macs, x, y, val_data, iteration):
+        print('-------------------- ITERATION:', iteration, '--------------------')
+        super(TestMT, self).on_training_start(macs, x, y, val_data, iteration)
 
 
 if __name__ == '__main__':
-    x_aug, y_aug, monotonicities, val_data = retrieve('cars univariate', 'group', ground=None)
+    x_aug, y_aug, monotonicities, validation = retrieve('cars univariate', 'group', ground=None)
+
+    callbacks = [
+        CarsCallback(5, figsize=(20, 10)),
+        FileLogger('log.txt', routines=['on_iteration_end'])
+    ]
 
     # moving targets
     mt = TestMT(
-        learner=TestMTL(
-            build_model=get_model,
-            restart_fit=True,
-            callbacks=[EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)],
-            epochs=1000,
-            verbose=1
-        ),
+        learner=TestMTL('scikit', warm_start=False),
         master=TestMTM(monotonicities, loss_fn='mae', alpha=1, beta=1),
         init_step='pretraining',
-        metrics=[MSE(), R2()]
+        metrics=[MSE(), MAE(), R2()]
     )
     history = mt.fit(
         x=x_aug.values,
         y=y_aug.values,
-        iterations=9,
-        val_data={k: v for k, v in val_data.items() if k != 'scalers'},
-        callbacks=[CarsCallback(3, figsize=(24, 12)), FileLogger('log.txt')],
-        verbose=1
+        iterations=14,
+        val_data={k: v for k, v in validation.items() if k != 'scalers'},
+        callbacks=callbacks,
+        verbose=0
     )
-    plt.show()
+    history.plot(figsize=(20, 10), n_columns=4, columns=[
+        'learner/loss',
+        'learner/epochs',
+        None,
+        None,
+        'metrics/train_mse',
+        'metrics/train_mae',
+        'metrics/train_r2',
+        'metrics/test_r2',
+        'master/is feasible',
+        'master/adj. mae',
+        'master/avg. violation',
+        'master/pct. violation',
+    ])
 
     exit(0)
-    history.plot(figsize=(25, 15))
-    mt.evaluation_summary(**val_data)
+    mt.evaluation_summary(**validation)
     plt.show()

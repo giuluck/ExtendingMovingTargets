@@ -35,7 +35,7 @@ class MACS(Logger):
             self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self, x, y, val_data))
 
         # algorithm core
-        for iteration in range(iterations):
+        for iteration in range(1, iterations + 1):
             self._update_callbacks(callbacks, lambda c: c.on_iteration_start(self, x, y, val_data, iteration))
             self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, x, y, val_data, iteration))
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
@@ -59,14 +59,6 @@ class MACS(Logger):
 
     def evaluate(self, x, y):
         return {metric.name: metric(x, y, self.predict(x)) for metric in self.metrics}
-
-    def on_pretraining_start(self, macs, x, y, val_data):
-        self.on_iteration_start(macs, x, y, val_data, 'pretraining')
-        self.on_training_start(macs, x, y, val_data, 'pretraining')
-
-    def on_pretraining_end(self, macs, x, y, val_data):
-        self.on_training_end(macs, x, y, val_data, 'pretraining')
-        self.on_iteration_end(macs, x, y, val_data, 'pretraining')
 
     def on_iteration_start(self, macs, x, y, val_data, iteration):
         self.time = time.time()

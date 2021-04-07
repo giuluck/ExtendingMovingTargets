@@ -44,3 +44,14 @@ class CplexMaster(Master):
         if solution is None:
             raise RuntimeError('The given model has no admissible solution, please check the implemented constraints.')
         return self.return_solutions(macs, solution, model_info, x, y, iteration)
+
+    @staticmethod
+    def mae_loss(model, numeric_variables, model_variables):
+        losses = [model.abs(nv - mv) for nv, mv in zip(numeric_variables, model_variables)]
+        return model.sum(losses) / len(losses)
+
+    # noinspection PyUnusedLocal
+    @staticmethod
+    def mse_loss(model, numeric_variables, model_variables):
+        losses = [(nv - mv) ** 2 for nv, mv in zip(numeric_variables, model_variables)]
+        return model.sum(losses) / len(losses)

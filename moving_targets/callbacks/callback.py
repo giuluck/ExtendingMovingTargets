@@ -9,10 +9,12 @@ class Callback:
         pass
 
     def on_pretraining_start(self, macs, x, y, val_data):
-        pass
+        self.on_iteration_start(macs, x, y, val_data, 0)
+        self.on_training_start(macs, x, y, val_data, 0)
 
     def on_pretraining_end(self, macs, x, y, val_data):
-        pass
+        self.on_training_end(macs, x, y, val_data, 0)
+        self.on_iteration_end(macs, x, y, val_data, 0)
 
     def on_iteration_start(self, macs, x, y, val_data, iteration):
         pass

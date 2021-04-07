@@ -1,5 +1,4 @@
 import time
-
 import numpy as np
 
 from moving_targets import MACS
@@ -10,10 +9,10 @@ from src.util.augmentation import filter_vectors
 
 
 class MTLearner(Learner):
-    def __init__(self, build_model, restart_fit=True, mask_value=np.nan, **kwargs):
+    def __init__(self, build_model, warm_start=False, mask_value=np.nan, **kwargs):
         super(MTLearner, self).__init__()
         self.build_model = build_model
-        self.restart_fit = restart_fit
+        self.warm_start = warm_start
         self.mask_value = mask_value
         self.fit_args = kwargs
         self.model = build_model()
@@ -21,10 +20,22 @@ class MTLearner(Learner):
     def fit(self, macs, x, y, iteration, **kwargs):
         start_time = time.time()
         y, x = filter_vectors(self.mask_value, y, x)
-        if self.restart_fit:
+        if not self.warm_start:
             self.model = self.build_model()
-        self.model.fit(x, y, **self.fit_args, **kwargs)
-        macs.log(**{'time/learner': time.time() - start_time})
+        fit = self.model.fit(x, y, **self.fit_args, **kwargs)
+        # retrieve number of epochs and last loss depending on the model
+        if 'keras' in str(type(fit)):
+            epochs, loss = fit.epoch[-1] + 1, fit.history['loss'][-1]
+        elif 'sklearn' in str(type(fit)):
+            epochs, loss = fit.n_iter_, fit.loss_
+        else:
+            epochs, loss = np.nan, np.nan
+        # log info
+        macs.log(**{
+            'time/learner': time.time() - start_time,
+            'learner/epochs': epochs,
+            'learner/loss': loss
+        })
 
     def predict(self, x):
         return self.model.predict(x).reshape(-1, )
@@ -34,7 +45,7 @@ class MTMaster(CplexMaster):
     def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., mask_value=np.nan, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
         assert loss_fn in ['mae', 'mse']
-        self.loss_fn = MTMaster.mae_loss if loss_fn == 'mae' else MTMaster.mse_loss
+        self.loss_fn = CplexMaster.mae_loss if loss_fn == 'mae' else CplexMaster.mse_loss
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.mask_value = mask_value
@@ -65,15 +76,14 @@ class MTMaster(CplexMaster):
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _ = model_info
         y, variables = filter_vectors(self.mask_value, y, variables)
-        y_loss = [self.loss_fn(model, yy, vv) for yy, vv in zip(y, variables)]
-        return model.sum(y_loss) / len(y_loss)
+        return self.loss_fn(model, y, variables)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         variables, p = model_info
         if p is None:
             return 0.0
         else:
-            return model.sum([self.loss_fn(model, pp, vv) for pp, vv in zip(p, variables)]) / len(p)
+            return self.loss_fn(model, p, variables)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         variables, _ = model_info
@@ -86,25 +96,16 @@ class MTMaster(CplexMaster):
         # TODO: compute sample weights and return adjusted labels and sample weights
         return adj_y
 
-    @staticmethod
-    def mae_loss(model, numeric_variable, model_variable):
-        return model.abs(numeric_variable - model_variable)
-
-    # noinspection PyUnusedLocal
-    @staticmethod
-    def mse_loss(model, numeric_variable, model_variable):
-        return (numeric_variable - model_variable) ** 2
-
 
 class MT(MACS, Model):
     def __init__(self, learner, master, init_step='pretraining', metrics=None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
-        iteration = -1 if iteration == 'pretraining' else iteration
-        logs = {'iteration': iteration + 1, 'time/iteration': time.time() - self.time}
+        iteration = 0 if iteration == 'pretraining' else iteration
+        logs = {'iteration': iteration, 'time/iteration': time.time() - self.time}
         for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)
             for metric in self.metrics:
-                logs[f'learner/{name}_{metric.name}'] = metric(xx, yy, pp)
+                logs[f'metrics/{name}_{metric.name}'] = metric(xx, yy, pp)
         self.log(**logs)
