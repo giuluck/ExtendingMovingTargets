@@ -2,7 +2,6 @@ import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import matplotlib.pyplot as plt
 from sklearn.neural_network import MLPRegressor
 from tensorflow.python.keras.callbacks import EarlyStopping
 
@@ -140,6 +139,4 @@ if __name__ == '__main__':
         'master/avg. violation'
     ])
 
-    exit(0)
     mt.evaluation_summary(**validation)
-    plt.show()

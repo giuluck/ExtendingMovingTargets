@@ -5,4 +5,3 @@ from src.regressions.model import import_extension_methods
 from src.regressions.plot import plot_synthetic, plot_synthetic_augmented
 from src.regressions.plot import plot_cars, plot_cars_augmented
 from src.regressions.plot import plot_puzzles, plot_puzzles_augmented
-

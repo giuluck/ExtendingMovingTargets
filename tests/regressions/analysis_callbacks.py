@@ -63,6 +63,33 @@ class AnalysisCallback(Callback):
         pass
 
 
+class SyntheticAnalysis(AnalysisCallback):
+    def on_process_start(self, macs, x, y, val_data):
+        super(SyntheticAnalysis, self).on_process_start(macs, x, y, val_data)
+        self.data['ground'] = synthetic_function(self.data['a'], self.data['b'])
+
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration):
+        super(SyntheticAnalysis, self).on_adjustment_end(macs, x, y, adjusted_y, val_data, iteration)
+        self.data[f'err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
+
+    def plot_function(self, iteration):
+        def synthetic_inverse(column):
+            b = np.sin(np.pi * (self.data['b'] - 0.01)) ** 2 + 1
+            return (self.data[column] - b) * b
+
+        ground = synthetic_inverse('ground')
+        pred = synthetic_inverse(f'pred {iteration}')
+        title = f'{iteration})'
+        if iteration == 'pretraining':
+            label = synthetic_inverse('label')
+            sns.scatterplot(x=self.data['a'], y=label, label='labels', color='blue', alpha=0.1, s=20)
+        else:
+            adj = synthetic_inverse(f'adj {iteration}')
+            sns.scatterplot(x=self.data['a'], y=adj, label='adjusted', color='blue', alpha=0.1, s=20)
+        sns.scatterplot(x=self.data['a'], y=pred, label='predictions', color='red', alpha=0.1, s=20)
+        sns.lineplot(x=self.data['a'], y=ground, label='ground', color='black').set(title=title)
+
+
 class CarsAnalysis(AnalysisCallback):
     def __init__(self, scalers, n_columns=5, adj_plot='scatter', plot=True, **kwargs):
         super(CarsAnalysis, self).__init__(scalers=scalers, n_columns=n_columns, plot=plot, **kwargs)
@@ -90,30 +117,3 @@ class CarsAnalysis(AnalysisCallback):
         elif self.adj_plot == 'scatter':
             sns.scatterplot(x=x, y=adj, label='adjusted', color='blue', alpha=0.4, s=20)
         sns.lineplot(x=x, y=p, label='predictions', color='red').set(title=title)
-
-
-class SyntheticAnalysis(AnalysisCallback):
-    def on_process_start(self, macs, x, y, val_data):
-        super(SyntheticAnalysis, self).on_process_start(macs, x, y, val_data)
-        self.data['ground'] = synthetic_function(self.data['a'], self.data['b'])
-
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration):
-        super(SyntheticAnalysis, self).on_adjustment_end(macs, x, y, adjusted_y, val_data, iteration)
-        self.data[f'err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
-
-    def plot_function(self, iteration):
-        def synthetic_inverse(column):
-            b = 4 * ((self.data['b'] - 0.05) ** 2)
-            return (self.data[column] - b) * (b + 1)
-
-        ground = synthetic_inverse('ground')
-        pred = synthetic_inverse(f'pred {iteration}')
-        title = f'{iteration})'
-        if iteration == 'pretraining':
-            label = synthetic_inverse('label')
-            sns.scatterplot(x=self.data['a'], y=label, label='labels', color='blue', alpha=0.1, s=20)
-        else:
-            adj = synthetic_inverse(f'adj {iteration}')
-            sns.scatterplot(x=self.data['a'], y=adj, label='adjusted', color='blue', alpha=0.1, s=20)
-        sns.scatterplot(x=self.data['a'], y=pred, label='predictions', color='red', alpha=0.1, s=20)
-        sns.lineplot(x=self.data['a'], y=ground, label='ground', color='black').set(title=title)
