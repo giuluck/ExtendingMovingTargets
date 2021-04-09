@@ -123,7 +123,7 @@ class TestBalancedCounts(unittest.TestCase):
         learner = LogisticRegression()
         master = BalancedCounts(n_classes=num_classes)
         model = MACS(learner, master, init_step=init_step, metrics=metrics)
-        model.fit(x_train, y_train, iterations=3, callbacks=[])
+        model.fit(x_train, y_train, iterations=3, verbose=False)
         # test results
         exp_res = RESULTS[f'{dataset}-{init_step}-{str(use_prob).lower()}']
         act_res = dict(train=model.evaluate(x_train, y_train), val=model.evaluate(x_val, y_val))

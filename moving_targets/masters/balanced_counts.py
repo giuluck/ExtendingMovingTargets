@@ -10,9 +10,9 @@ class BalancedCounts(CplexMaster):
         self.use_prob = use_prob
 
     def build_model(self, macs, model, x, y, iteration):
-        # if this is the first iteration and the initial macs step is 'projection', the learner has not been fitted yet
-        # thus we use the original labels, otherwise we use either the predicted classes or the predicted probabilities
-        if iteration == 0 and macs.init_step == 'projection':
+        # if the model has not been fitted yet and the initial macs step is 'projection' we use the original labels
+        # otherwise we use either the predicted classes or the predicted probabilities
+        if macs.init_step == 'projection' and not macs.fitted:
             prob = None
             pred = y.reshape(-1, )
         elif self.use_prob is False:

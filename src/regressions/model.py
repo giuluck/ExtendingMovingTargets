@@ -39,6 +39,7 @@ def import_extension_methods():
             for idx, group in grid.groupby('a'):
                 label = f'a = {idx:.0f}' if idx in [-1, 1] else None
                 sns.lineplot(data=group, x='b', y=y, color=fader(idx), alpha=0.4, label=label, ax=ax[2])
+        plt.show()
 
     def cars_summary(model, scalers=None, res=100, xlim=(0, 60), ylim=(0, 120), figsize=(10, 4), **kwargs):
         plt.figure(figsize=figsize)
@@ -60,6 +61,7 @@ def import_extension_methods():
         )
         plt.xlim(xlim)
         plt.ylim(ylim)
+        plt.show()
 
     def puzzles_summary(model, scalers=None, res=5, figsize=(14, 4), tight_layout=True, **kwargs):
         features = ['word_count', 'star_rating', 'num_reviews']
@@ -89,6 +91,7 @@ def import_extension_methods():
                 label = f'{ci}: {i:.0f}, {cj}: {j:.0f}' if (i in [li, ui] and j in [lj, uj]) else None
                 sns.lineplot(data=group, x=feat, y='pred', color=fader(i, j), alpha=0.6, label=label, ax=ax)
         fig.suptitle('Estimated Functions')
+        plt.show()
 
     Model.synthetic_summary = synthetic_summary
     Model.cars_summary = cars_summary

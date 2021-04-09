@@ -11,7 +11,7 @@ from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
 from src.models import Model, MLP, MTLearner, MTMaster, MT
 from src.util.augmentation import get_monotonicities_list
-from analysis_callbacks import CarsCallback
+from analysis_callbacks import CarsAnalysis, SyntheticAnalysis
 
 random.seed(0)
 np.random.seed(0)
@@ -66,7 +66,7 @@ class TestMTL(MTLearner):
     def __init__(self, backend='scikit', warm_start=False, verbose=False):
         if backend == 'scikit':
             def model():
-                return MLPRegressor([32, 32], warm_start=warm_start, verbose=verbose)
+                return MLPRegressor([32, 32], solver='lbfgs', warm_start=warm_start, verbose=verbose)
 
             super(TestMTL, self).__init__(model, warm_start=True)
         elif backend == 'keras':
@@ -90,7 +90,9 @@ class TestMTL(MTLearner):
 
 
 class TestMTM(MTMaster):
-    pass
+    def is_feasible(self, macs, model, model_info, x, y, iteration):
+        is_feasible = super(TestMTM, self).is_feasible(macs, model, model_info, x, y, iteration)
+        return is_feasible
 
 
 class TestMT(MT):
@@ -100,41 +102,42 @@ class TestMT(MT):
 
 
 if __name__ == '__main__':
-    x_aug, y_aug, monotonicities, validation = retrieve('cars univariate', 'group', ground=None)
+    x_aug, y_aug, monotonicities, validation = retrieve('synthetic', 'group', ground=None)
 
     callbacks = [
-        CarsCallback(5, figsize=(20, 10)),
-        FileLogger('log.txt', routines=['on_iteration_end'])
+        SyntheticAnalysis(validation['scalers']),
+        FileLogger('../../temp/log.txt', routines=['on_iteration_end'])
     ]
 
     # moving targets
     mt = TestMT(
-        learner=TestMTL('scikit', warm_start=False),
+        learner=TestMTL('keras', warm_start=False, verbose=False),
         master=TestMTM(monotonicities, loss_fn='mae', alpha=1, beta=1),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
     history = mt.fit(
-        x=x_aug.values,
-        y=y_aug.values,
+        x=x_aug,
+        y=y_aug,
         iterations=14,
         val_data={k: v for k, v in validation.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
     )
+
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
         'learner/epochs',
-        None,
-        None,
+        'metrics/train_r2',
+        'master/is feasible',
         'metrics/train_mse',
         'metrics/train_mae',
-        'metrics/train_r2',
-        'metrics/test_r2',
-        'master/is feasible',
-        'master/adj. mae',
-        'master/avg. violation',
+        'metrics/validation_r2',
         'master/pct. violation',
+        'master/adj. mse',
+        'master/adj. mae',
+        'metrics/test_r2',
+        'master/avg. violation'
     ])
 
     exit(0)

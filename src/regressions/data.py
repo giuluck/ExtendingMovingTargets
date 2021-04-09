@@ -5,26 +5,26 @@ from src.util.preprocessing import Scaler, split_dataset
 
 
 def synthetic_function(a, b):
-    a = 2 * ((a + 0.01) ** 3)
-    b = 4 * ((b - 0.01) ** 2)
-    return a / (b + 1) + b
+    a = a ** 3
+    b = np.sin(np.pi * (b - 0.01)) ** 2 + 1
+    return a / b + b
 
 
-def load_synthetic():
+def load_synthetic(x_noise=0.0, y_noise=0.0):
     # assign number of samples and samples distributions to each split
     rng = np.random.default_rng(seed=0)
     datasets = {
-        'train': (200, lambda s: rng.normal(scale=0.2, size=s)),
-        'validation': (100, lambda s: rng.normal(scale=0.2, size=s)),
+        'train': (150, lambda s: rng.normal(scale=0.2, size=s).clip(min=-1, max=1)),
+        'validation': (50, lambda s: rng.normal(scale=0.2, size=s).clip(min=-1, max=1)),
         'test': (500, lambda s: 2 * rng.uniform(size=s) - 1),
     }
     # generate samples
     for key, (size, get_samples) in datasets.items():
         x = pd.DataFrame.from_dict({'a': get_samples(size), 'b': 2 * rng.uniform(size=size) - 1})
         y = pd.Series(synthetic_function(x['a'], x['b']), name='label')
-        datasets[key] = (x + rng.normal(scale=[0.05, 0.1], size=x.shape), y + rng.normal(scale=0.5, size=y.shape))
+        datasets[key] = (x + rng.normal(scale=x_noise, size=x.shape), y + rng.normal(scale=y_noise, size=y.shape))
     # configure scalers and rescale
-    xsc, ysc = Scaler(datasets['train'][0], (-1, 1)), Scaler(datasets['train'][1], (-1, 1))
+    xsc, ysc = Scaler(datasets['train'][0], (-1, 1)), Scaler(datasets['train'][1], 'norm')
     outputs = {key: (xsc.transform(x), ysc.transform(y)) for key, (x, y) in datasets.items()}
     outputs['scalers'] = (xsc, ysc)
     return outputs
@@ -67,3 +67,19 @@ def load_puzzles(filepath):
         outputs[split] = (x_scaler.transform(split_x), y_scaler.transform(split_y))
     outputs['scalers'] = (x_scaler, y_scaler)
     return outputs
+
+if __name__ == '__main__':
+    from src.models import MLP
+    from src.regressions.model import import_extension_methods
+    from tensorflow.keras.callbacks import EarlyStopping
+    import_extension_methods()
+
+    data = load_synthetic()
+    xtr, ytr = data['train']
+
+    mlp = MLP(None, [32, 32])
+    mlp.compile('adam', 'mse')
+    es = EarlyStopping(monitor='val_loss', patience=50, restore_best_weights=True)
+    mlp.fit(xtr, ytr, epochs=1000, validation_data=data['validation'], callbacks=[es])
+
+    mlp.synthetic_summary(**data)

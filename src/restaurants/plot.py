@@ -19,6 +19,7 @@ def plot_ctr(ctr_estimate, title=None, figsize=(14, 3), res=100):
         axes[idx].set(title=rating, xlabel='Average Rating', ylabel=None if idx > 0 else 'Number of Reviews')
     fig.colorbar(color_bar(), cax=fig.add_axes([0.92, 0.15, 0.01, 0.7]))
     fig.suptitle(title)
+    plt.show()
 
 
 def plot_histograms(figsize=(10, 8), tight_layout=True, **kwargs):
@@ -29,16 +30,17 @@ def plot_histograms(figsize=(10, 8), tight_layout=True, **kwargs):
             sns.histplot(x=x['avg_rating'], ax=axes[i, 0]).set(ylabel=title.capitalize())
             sns.histplot(x=x['num_reviews'], ax=axes[i, 1])
             sns.histplot(x=x[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1), ax=axes[i, 2])
+    plt.show()
 
 
 def plot_distributions(figsize=(10, 8), tight_layout=True, **kwargs):
-    if len(kwargs) > 0:
-        _, axes = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
-        axes = axes.reshape((-1, 3))
-        for i, (title, (x, y)) in enumerate(kwargs.items()):
-            sns.kdeplot(x=x['avg_rating'], hue=y, ax=axes[i, 0]).set(ylabel=title.capitalize())
-            sns.kdeplot(x=x['num_reviews'], hue=y, ax=axes[i, 1])
-            sns.countplot(x=x[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1), hue=y, ax=axes[i, 2])
+    _, axes = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
+    axes = axes.reshape((-1, 3))
+    for i, (title, (x, y)) in enumerate(kwargs.items()):
+        sns.kdeplot(x=x['avg_rating'], hue=y, ax=axes[i, 0]).set(ylabel=title.capitalize())
+        sns.kdeplot(x=x['num_reviews'], hue=y, ax=axes[i, 1])
+        sns.countplot(x=x[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1), hue=y, ax=axes[i, 2])
+    plt.show()
 
 
 def plot_conclusions(models, figsize=(10, 10), res=100):
@@ -50,3 +52,4 @@ def plot_conclusions(models, figsize=(10, 10), res=100):
             ctr = model.ctr_estimate(avg_ratings.flatten(), num_reviews.flatten(), [rating] * (res ** 2))
             axes[i, j].pcolor(avg_ratings, num_reviews, ctr.reshape(100, 100), shading='auto', vmin=0, vmax=1)
             axes[i, j].set(title=title if i == 0 else None, xlabel=None, ylabel=rating if j == 0 else None)
+    plt.show()

@@ -12,7 +12,7 @@ class History(Logger):
         self.history = []
 
     def on_pretraining_end(self, macs, x, y, val_data):
-        self.on_iteration_end(macs, x, y, val_data, -1)
+        self.on_iteration_end(macs, x, y, val_data, 0)
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         self.history.append(pd.DataFrame([self.cache.values()], columns=self.cache.keys(), index=[iteration]))

@@ -52,7 +52,7 @@ class MTMaster(CplexMaster):
 
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
-        p = None if iteration == 0 and macs.init_step == 'projection' else macs.predict(x)
+        p = None if macs.init_step == 'projection' and not macs.fitted else macs.predict(x)
         # create variables and impose constraints for each monotonicity
         variables = np.array(model.continuous_var_list(keys=len(y), lb=0.0, ub=1.0, name='y'))
         model.add_constraints([h >= l for h, l in zip(variables[self.higher_indices], variables[self.lower_indices])])
@@ -71,7 +71,7 @@ class MTMaster(CplexMaster):
             'master/pct. violation': 1 - np.mean(satisfied),
             'master/is feasible': int(satisfied.all())
         })
-        return not satisfied.all()
+        return satisfied.all()
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _ = model_info
@@ -91,6 +91,7 @@ class MTMaster(CplexMaster):
         ground, adj_ground = filter_vectors(self.mask_value, y, adj_y)
         macs.log(**{
             'master/adj. mae': np.abs(adj_ground - ground).mean(),
+            'master/adj. mse': np.mean((adj_ground - ground)**2),
             'time/master': solution.solve_details.time
         })
         # TODO: compute sample weights and return adjusted labels and sample weights
@@ -107,5 +108,5 @@ class MT(MACS, Model):
         for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)
             for metric in self.metrics:
-                logs[f'metrics/{name}_{metric.name}'] = metric(xx, yy, pp)
+                logs[f'metrics/{name}_{metric.__name__}'] = metric(xx, yy, pp)
         self.log(**logs)

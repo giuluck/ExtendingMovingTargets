@@ -1,6 +1,7 @@
 .idea
 .ipynb_checkpoints
 venv
+temp
 wandb
 __pycache__
 log.txt
