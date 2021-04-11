@@ -10,9 +10,9 @@ class BalancedCounts(CplexMaster):
         self.use_prob = use_prob
 
     def build_model(self, macs, model, x, y, iteration):
-        # if the model has not been fitted yet and the initial macs step is 'projection' we use the original labels
+        # if the model has not been fitted yet (i.e., the initial macs step is 'projection') we use the original labels
         # otherwise we use either the predicted classes or the predicted probabilities
-        if macs.init_step == 'projection' and not macs.fitted:
+        if not macs.fitted:
             prob = None
             pred = y.reshape(-1, )
         elif self.use_prob is False:
@@ -20,9 +20,8 @@ class BalancedCounts(CplexMaster):
             pred = macs.learner.predict(x)
         else:
             assert hasattr(macs.learner, 'predict_proba'), "Learner must have method 'predict_proba(x)' for use_prob"
-            # noinspection PyUnresolvedReferences
             prob = np.clip(macs.learner.predict_proba(x), a_min=.01, a_max=.99)
-            pred = np.argmax(prob, axis=1)
+            pred = macs.learner.predict(x)
 
         # define variables and max_count (i.e., upper bound for number of counts for a class)
         num_samples = len(y)

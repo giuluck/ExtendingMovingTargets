@@ -1,7 +1,6 @@
 import time
 
-from moving_targets.callbacks import Logger, FileLogger
-from moving_targets.callbacks.history import History
+from moving_targets.callbacks import Logger, FileLogger, History
 
 
 class MACS(Logger):
@@ -63,7 +62,8 @@ class MACS(Logger):
         return self.learner.predict(x)
 
     def evaluate(self, x, y):
-        return {metric.__name__: metric(x, y, self.predict(x)) for metric in self.metrics}
+        p = self.predict(x)
+        return {metric.__name__: metric(x, y, p) for metric in self.metrics}
 
     def on_iteration_start(self, macs, x, y, val_data, iteration):
         self.time = time.time()
@@ -71,8 +71,9 @@ class MACS(Logger):
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         logs = {'iteration': iteration, 'elapsed time': time.time() - self.time}
         # log metrics on training data
+        p = self.predict(x)
         for metric in self.metrics:
-            logs[metric.__name__] = metric(x, y, self.predict(x))
+            logs[metric.__name__] = metric(x, y, p)
         # log metrics on validation data
         for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)

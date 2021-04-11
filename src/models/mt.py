@@ -52,7 +52,7 @@ class MTMaster(CplexMaster):
 
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
-        p = None if macs.init_step == 'projection' and not macs.fitted else macs.predict(x)
+        p = None if not macs.fitted else macs.predict(x)
         # create variables and impose constraints for each monotonicity
         variables = np.array(model.continuous_var_list(keys=len(y), lb=0.0, ub=1.0, name='y'))
         model.add_constraints([h >= l for h, l in zip(variables[self.higher_indices], variables[self.lower_indices])])
@@ -75,15 +75,14 @@ class MTMaster(CplexMaster):
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _ = model_info
-        y, variables = filter_vectors(self.mask_value, y, variables)
-        return self.loss_fn(model, y, variables)
+        y_masked, variables_masked = filter_vectors(self.mask_value, y, variables)
+        # the mean loss is re-weighted on the total number of samples (not just on the labelled ones)
+        # this should let the y_loss and the p_loss to have the same impact in the default case of alpha = 1
+        return len(y_masked) * self.loss_fn(model, y_masked, variables_masked) / len(y)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         variables, p = model_info
-        if p is None:
-            return 0.0
-        else:
-            return self.loss_fn(model, p, variables)
+        return 0.0 if p is None else self.loss_fn(model, p, variables)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         variables, _ = model_info
@@ -91,7 +90,7 @@ class MTMaster(CplexMaster):
         ground, adj_ground = filter_vectors(self.mask_value, y, adj_y)
         macs.log(**{
             'master/adj. mae': np.abs(adj_ground - ground).mean(),
-            'master/adj. mse': np.mean((adj_ground - ground)**2),
+            'master/adj. mse': np.mean((adj_ground - ground) ** 2),
             'time/master': solution.solve_details.time
         })
         # TODO: compute sample weights and return adjusted labels and sample weights

@@ -52,25 +52,25 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
         num_augmented_samples=nas if aug is None else aug,
         num_ground_samples=ground
     )
-    mono = get_monotonicities_list(
+    mn = get_monotonicities_list(
         data=fag,
         kinds=kinds,
         label=yag.columns[0],
         compute_monotonicities=lambda samples, references: reg.compute_monotonicities(samples, references, dirs)
     )
-    return xag, yag[yag.columns[0]], mono, data
+    return xag, yag[yag.columns[0]], mn, data
 
 
 class TestMTL(MTLearner):
     def __init__(self, backend='scikit', warm_start=False, verbose=False):
         if backend == 'scikit':
             def model():
-                return MLPRegressor([32, 32], solver='lbfgs', warm_start=warm_start, verbose=verbose)
+                return MLPRegressor([16] * 4, solver='lbfgs', warm_start=warm_start, verbose=verbose)
 
             super(TestMTL, self).__init__(model, warm_start=True)
         elif backend == 'keras':
             def model():
-                m = MLP(output_act=None, h_units=[32, 32])
+                m = MLP(output_act=None, h_units=[16] * 4)
                 m.compile(optimizer='adam', loss='mse')
                 return m
 
@@ -89,6 +89,15 @@ class TestMTL(MTLearner):
 
 
 class TestMTM(MTMaster):
+    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1.):
+        super(TestMTM, self).__init__(monotonicities=monotonicities, loss_fn=loss_fn, alpha=alpha, beta=beta)
+        self.base_beta = beta
+
+    def y_loss(self, macs, model, model_info, x, y, iteration):
+        y_loss = super(TestMTM, self).y_loss(macs, model, model_info, x, y, iteration)
+        self.beta = self.base_beta * y_loss
+        return y_loss
+
     def is_feasible(self, macs, model, model_info, x, y, iteration):
         is_feasible = super(TestMTM, self).is_feasible(macs, model, model_info, x, y, iteration)
         return is_feasible
@@ -101,28 +110,29 @@ class TestMT(MT):
 
 
 if __name__ == '__main__':
-    x_aug, y_aug, monotonicities, validation = retrieve('synthetic', 'group', ground=None)
-
+    x_aug, y_aug, mono, validation = retrieve('synthetic', 'group', aug=3, ground=None)
     callbacks = [
-        SyntheticAnalysis(validation['scalers']),
+        # CarsAnalysis(validation['scalers'], adj_plot='scatter'),
+        SyntheticAnalysis(validation['scalers'], plot_fns=[]),
         FileLogger('../../temp/log.txt', routines=['on_iteration_end'])
     ]
 
     # moving targets
     mt = TestMT(
-        learner=TestMTL('keras', warm_start=False, verbose=False),
-        master=TestMTM(monotonicities, loss_fn='mae', alpha=1, beta=1),
+        learner=TestMTL('keras', warm_start=True, verbose=False),
+        master=TestMTM(mono, loss_fn='mae', alpha=1, beta=1),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=14,
+        iterations=1,
         val_data={k: v for k, v in validation.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
     )
+    exit()
 
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
