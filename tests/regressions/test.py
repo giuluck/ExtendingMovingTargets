@@ -10,8 +10,8 @@ from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
 from src.models import Model, MLP, MTLearner, MTMaster, MT
 from src.util.augmentation import get_monotonicities_list
-from cars_callbacks import CarsAdjustments, CarsBounds, CarsGround
-from synthetic_callbacks import SyntheticAdjustments, SyntheticResponse, SyntheticGround, SyntheticBounds
+from analysis_callbacks import BoundsAnalysis, CarsAdjustments, GroundAnalysis
+from analysis_callbacks import SyntheticAdjustments, SyntheticResponse, PuzzlesResponse
 
 random.seed(0)
 np.random.seed(0)
@@ -127,17 +127,21 @@ class TestMT(MT):
 
 
 if __name__ == '__main__':
-    x_aug, y_aug, mono, data = retrieve('synthetic', 'group', aug=None, ground=None)
+    x_aug, y_aug, mono, data = retrieve('puzzles', 'group', aug=None, ground=None)
     # mono = []
 
     callbacks = [
-        # CarsAdjustments(data['scalers'], num_columns=5, sorting_attributes='price', plot_kind='scatter'),
-        # CarsBounds(data['scalers'], num_columns=1, sorting_attributes='price'),
-        # CarsGround(data['scalers'], num_columns=1, sorting_attributes=None),
-        # SyntheticAdjustments(data['scalers'], num_columns=5, sorting_attributes='a'),
-        # SyntheticResponse(data['scalers'], num_columns=5, sorting_attributes='a'),
-        SyntheticBounds(data['scalers'], num_columns=1, sorting_attributes='a'),
-        SyntheticGround(data['scalers'], num_columns=1, sorting_attributes=None),
+        # GroundAnalysis(data['scalers'], num_columns=2, sorting_attributes='price'),
+        # BoundsAnalysis(data['scalers'], num_columns=2, sorting_attributes='price'),
+        # CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
+        # GroundAnalysis(data['scalers'], num_columns=2, sorting_attributes='a'),
+        # SyntheticAdjustments(data['scalers'], num_columns=3, sorting_attributes='a'),
+        # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
+        GroundAnalysis(data['scalers'], num_columns=2, sorting_attributes='num_reviews'),
+        BoundsAnalysis(data['scalers'], num_columns=2, sorting_attributes='num_reviews'),
+        PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
+        PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
+        PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews'),
         FileLogger('../../temp/log.txt', routines=['on_iteration_end'])
     ]
 
@@ -151,7 +155,7 @@ if __name__ == '__main__':
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=1,
+        iterations=5,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
