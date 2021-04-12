@@ -46,12 +46,19 @@ class CplexMaster(Master):
         return self.return_solutions(macs, solution, model_info, x, y, iteration)
 
     @staticmethod
-    def mae_loss(model, numeric_variables, model_variables):
+    def sae_loss(model, numeric_variables, model_variables):
         losses = [model.abs(nv - mv) for nv, mv in zip(numeric_variables, model_variables)]
-        return model.sum(losses) / len(losses)
+        return model.sum(losses)
 
-    # noinspection PyUnusedLocal
+    @staticmethod
+    def sse_loss(model, numeric_variables, model_variables):
+        losses = [(nv - mv) ** 2 for nv, mv in zip(numeric_variables, model_variables)]
+        return model.sum(losses)
+
+    @staticmethod
+    def mae_loss(model, numeric_variables, model_variables):
+        return CplexMaster.sae_loss(model, numeric_variables, model_variables) / len(numeric_variables)
+
     @staticmethod
     def mse_loss(model, numeric_variables, model_variables):
-        losses = [(nv - mv) ** 2 for nv, mv in zip(numeric_variables, model_variables)]
-        return model.sum(losses) / len(losses)
+        return CplexMaster.sse_loss(model, numeric_variables, model_variables) / len(numeric_variables)

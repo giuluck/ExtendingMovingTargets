@@ -31,5 +31,5 @@ class Callback:
     def on_adjustment_start(self, macs, x, y, val_data, iteration):
         pass
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         pass

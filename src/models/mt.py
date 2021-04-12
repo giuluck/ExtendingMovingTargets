@@ -44,27 +44,28 @@ class MTLearner(Learner):
 class MTMaster(CplexMaster):
     def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., mask_value=np.nan, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
-        assert loss_fn in ['mae', 'mse']
-        self.loss_fn = CplexMaster.mae_loss if loss_fn == 'mae' else CplexMaster.mse_loss
+        assert loss_fn in ['mae', 'mse', 'sae', 'sse'], "Loss should be one in ['mae', 'mse', 'sae', 'sse']"
+        self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.mask_value = mask_value
 
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
-        p = None if not macs.fitted else macs.predict(x)
+        pred = None if not macs.fitted else macs.predict(x)
         # create variables and impose constraints for each monotonicity
-        variables = np.array(model.continuous_var_list(keys=len(y), lb=0.0, ub=1.0, name='y'))
-        model.add_constraints([h >= l for h, l in zip(variables[self.higher_indices], variables[self.lower_indices])])
+        var = np.array(model.continuous_var_list(keys=len(y), name='y'))
+        if len(self.higher_indices):
+            model.add_constraints([h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])])
         # return model info
-        return variables, p
+        return var, pred
 
     def is_feasible(self, macs, model, model_info, x, y, iteration):
-        variables, p = model_info
-        if len(self.higher_indices) == 0 or p is None:
+        _, pred = model_info
+        if len(self.higher_indices) == 0 or pred is None:
             violations = np.array([0])
         else:
-            violations = np.maximum(0.0, p[self.lower_indices] - p[self.higher_indices])
+            violations = np.maximum(0.0, pred[self.lower_indices] - pred[self.higher_indices])
         satisfied = violations == 0
         macs.log(**{
             'master/avg. violation': np.mean(violations),
@@ -74,19 +75,17 @@ class MTMaster(CplexMaster):
         return satisfied.all()
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
-        variables, _ = model_info
-        y_masked, variables_masked = filter_vectors(self.mask_value, y, variables)
-        # the mean loss is re-weighted on the total number of samples (not just on the labelled ones)
-        # this should let the y_loss and the p_loss to have the same impact in the default case of alpha = 1
-        return len(y_masked) * self.loss_fn(model, y_masked, variables_masked) / len(y)
+        var, _ = model_info
+        y_masked, var_masked = filter_vectors(self.mask_value, y, var)
+        return self.loss_fn(model, y_masked, var_masked)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
-        variables, p = model_info
-        return 0.0 if p is None else self.loss_fn(model, p, variables)
+        var, pred = model_info
+        return 0.0 if pred is None else self.loss_fn(model, pred, var)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
-        variables, _ = model_info
-        adj_y = np.array([vy.solution_value for vy in variables])
+        var, _ = model_info
+        adj_y = np.array([vy.solution_value for vy in var])
         ground, adj_ground = filter_vectors(self.mask_value, y, adj_y)
         macs.log(**{
             'master/adj. mae': np.abs(adj_ground - ground).mean(),

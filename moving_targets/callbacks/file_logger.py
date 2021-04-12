@@ -46,7 +46,7 @@ class FileLogger(Logger):
     def on_adjustment_start(self, macs, x, y, val_data, iteration):
         self._write_on_file('START ADJUSTMENT', 'on_adjustment_start')
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         self._write_on_file('END ADJUSTMENT', 'on_adjustment_end')
 
     def _write_on_file(self, message, routine_name):

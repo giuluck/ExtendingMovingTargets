@@ -41,14 +41,14 @@ class MACS(Logger):
             self._update_callbacks(callbacks, lambda c: c.on_iteration_start(self, x, y, val_data, iteration))
             self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, x, y, val_data, iteration))
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
-            adj = self.master.adjust_targets(self, x, y, iteration)
-            if not isinstance(adj, dict):
-                adj = {'y': adj}
+            yj, kws = self.master.adjust_targets(self, x, y, iteration), {}
+            if isinstance(yj, tuple):
+                yj, kws = yj
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, x, y, adj['y'], val_data, iteration))
+            self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, x, y, yj, val_data, iteration, **kws))
             self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data, iteration))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self.learner.fit(self, x, iteration=iteration, **adj)
+            self.learner.fit(self, x, y=yj, iteration=iteration, **kws)
             self.fitted = True
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
             self._update_callbacks(callbacks, lambda c: c.on_training_end(self, x, y, val_data, iteration))

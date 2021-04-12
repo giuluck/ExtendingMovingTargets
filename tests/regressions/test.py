@@ -10,7 +10,8 @@ from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
 from src.models import Model, MLP, MTLearner, MTMaster, MT
 from src.util.augmentation import get_monotonicities_list
-from analysis_callbacks import CarsAnalysis, SyntheticAnalysis
+from cars_callbacks import CarsAdjustments, CarsBounds, CarsGround
+from synthetic_callbacks import SyntheticAdjustments, SyntheticResponse, SyntheticGround, SyntheticBounds
 
 random.seed(0)
 np.random.seed(0)
@@ -27,26 +28,26 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
     # dataset without augmentation
     if dataset == 'cars univariate':
         Model.evaluation_summary = Model.cars_summary
-        data = reg.load_cars('../../res/cars.csv')
-        xag, yag = data['train']
+        dt = reg.load_cars('../../res/cars.csv')
+        xag, yag = dt['train']
         if ground is not None:
             xag, yag = xag.head(ground), yag.head(ground)
         mn = get_monotonicities_list(xag, lambda s, r: reg.compute_monotonicities(s, r, -1), 'sales', 'all', 'ignore')
-        return xag, yag, mn, data
+        return xag, yag, mn, dt
     # datasets with augmentation
-    data, dirs, nrs, nas = None, None, None, None
+    dt, dirs, nrs, nas = None, None, None, None
     if dataset == 'synthetic':
         Model.evaluation_summary = Model.synthetic_summary
-        data, dirs, nrs, nas = reg.load_synthetic(), [1, 0], 0, 15
+        dt, dirs, nrs, nas = reg.load_synthetic(), [1, 0], 0, 15
     elif dataset == 'cars':
         Model.evaluation_summary = Model.cars_summary
-        data, dirs, nrs, nas = reg.load_cars('../../res/cars.csv'), -1, 0, 15
+        dt, dirs, nrs, nas = reg.load_cars('../../res/cars.csv'), -1, 0, 15
     elif dataset == 'puzzles':
         Model.evaluation_summary = Model.puzzles_summary
-        data, dirs, nrs, nas = reg.load_puzzles('../../res/puzzles.csv'), [-1, 1, 1], 465, [3, 4, 8]
+        dt, dirs, nrs, nas = reg.load_puzzles('../../res/puzzles.csv'), [-1, 1, 1], 465, [3, 4, 8]
     xag, yag, fag = reg.get_augmented_data(
-        x=data['train'][0],
-        y=data['train'][1],
+        x=dt['train'][0],
+        y=dt['train'][1],
         directions=dirs,
         num_random_samples=nrs if rand is None else rand,
         num_augmented_samples=nas if aug is None else aug,
@@ -58,14 +59,14 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
         label=yag.columns[0],
         compute_monotonicities=lambda samples, references: reg.compute_monotonicities(samples, references, dirs)
     )
-    return xag, yag[yag.columns[0]], mn, data
+    return xag, yag[yag.columns[0]], mn, dt
 
 
 class TestMTL(MTLearner):
     def __init__(self, backend='scikit', warm_start=False, verbose=False):
         if backend == 'scikit':
             def model():
-                return MLPRegressor([16] * 4, solver='lbfgs', warm_start=warm_start, verbose=verbose)
+                return MLPRegressor([16] * 4, solver='adam', warm_start=warm_start, verbose=verbose)
 
             super(TestMTL, self).__init__(model, warm_start=True)
         elif backend == 'keras':
@@ -102,25 +103,48 @@ class TestMTM(MTMaster):
         is_feasible = super(TestMTM, self).is_feasible(macs, model, model_info, x, y, iteration)
         return is_feasible
 
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj_y = super(TestMTM, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        # sample weights are directly proportional to the distance from the adjusted target to the prediction
+        # (if adj_y == p then that sample is pretty useless)
+        _, pred = model_info
+        mask = np.isnan(y)
+        sample_weight = np.abs(adj_y - pred)
+        if sample_weight[mask].max() > 0:
+            sample_weight = sample_weight / sample_weight[mask].max()
+        sample_weight[~mask] = 1.0
+        return adj_y, {'sample_weight': sample_weight}
+
 
 class TestMT(MT):
-    def on_training_start(self, macs, x, y, val_data, iteration):
-        print('-------------------- ITERATION:', iteration, '--------------------')
-        super(TestMT, self).on_training_start(macs, x, y, val_data, iteration)
+    def on_iteration_start(self, macs, x, y, val_data, iteration):
+        print(f'-------------------- ITERATION: {iteration:02} --------------------')
+        super(TestMT, self).on_iteration_start(macs, x, y, val_data, iteration)
+
+    def on_iteration_end(self, macs, x, y, val_data, iteration):
+        super(TestMT, self).on_iteration_end(macs, x, y, val_data, iteration)
+        print(f'Time: {self.cache["time/iteration"]:.4f} s')
 
 
 if __name__ == '__main__':
-    x_aug, y_aug, mono, validation = retrieve('synthetic', 'group', aug=3, ground=None)
+    x_aug, y_aug, mono, data = retrieve('synthetic', 'group', aug=None, ground=None)
+    # mono = []
+
     callbacks = [
-        # CarsAnalysis(validation['scalers'], adj_plot='scatter'),
-        SyntheticAnalysis(validation['scalers'], plot_fns=[]),
+        # CarsAdjustments(data['scalers'], num_columns=5, sorting_attributes='price', plot_kind='scatter'),
+        # CarsBounds(data['scalers'], num_columns=1, sorting_attributes='price'),
+        # CarsGround(data['scalers'], num_columns=1, sorting_attributes=None),
+        # SyntheticAdjustments(data['scalers'], num_columns=5, sorting_attributes='a'),
+        # SyntheticResponse(data['scalers'], num_columns=5, sorting_attributes='a'),
+        SyntheticBounds(data['scalers'], num_columns=1, sorting_attributes='a'),
+        SyntheticGround(data['scalers'], num_columns=1, sorting_attributes=None),
         FileLogger('../../temp/log.txt', routines=['on_iteration_end'])
     ]
 
     # moving targets
     mt = TestMT(
-        learner=TestMTL('keras', warm_start=True, verbose=False),
-        master=TestMTM(mono, loss_fn='mae', alpha=1, beta=1),
+        learner=TestMTL(backend='keras', warm_start=False, verbose=False),
+        master=TestMTM(monotonicities=mono, loss_fn='mae', alpha=1, beta=1),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
@@ -128,11 +152,10 @@ if __name__ == '__main__':
         x=x_aug,
         y=y_aug,
         iterations=1,
-        val_data={k: v for k, v in validation.items() if k != 'scalers'},
+        val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
     )
-    exit()
 
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
@@ -149,4 +172,5 @@ if __name__ == '__main__':
         'master/avg. violation'
     ])
 
-    mt.evaluation_summary(**validation)
+    exit()
+    mt.evaluation_summary(**data)
