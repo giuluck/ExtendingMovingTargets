@@ -1,15 +1,10 @@
 import os
 
-from src.util.augmentation import get_monotonicities_list
-
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import time
 import shutil
-import random
-import numpy as np
-import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping
 
 from src import restaurants
@@ -18,7 +13,9 @@ from moving_targets.metrics import AUC
 from src.models import MLP, MT, MTLearner, MTMaster
 from src.restaurants import compute_monotonicities
 from src.restaurants.augmentation import get_augmented_data
+from src.util.augmentation import get_monotonicities_list
 from src.util.combinatorial import cartesian_product
+from tests.util.experiments import setup
 
 
 def get_model(h_units, scaler):
@@ -33,9 +30,7 @@ def on_training_end(model, macs, x, y, val_data, iteration):
 
 if __name__ == '__main__':
     # set random seeds and import extension methods
-    random.seed(0)
-    np.random.seed(0)
-    tf.random.set_seed(0)
+    setup()
     restaurants.import_extension_methods()
     MT.on_training_end = on_training_end
 

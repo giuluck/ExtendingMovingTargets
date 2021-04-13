@@ -3,11 +3,9 @@ import os
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-import random
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from tensorflow.keras.callbacks import EarlyStopping
@@ -17,7 +15,8 @@ from src.restaurants import ctr_estimate, compute_monotonicities, get_augmented_
 from src.util.augmentation import get_monotonicities_list
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import AUC
-from main import get_model
+from tests.restaurants.main import get_model
+from tests.util.experiments import setup
 
 
 class TestMTL(MTLearner):
@@ -105,16 +104,7 @@ class TestMT(MT):
 
 if __name__ == '__main__':
     # set random seeds
-    random.seed(0)
-    np.random.seed(0)
-    tf.random.set_seed(0)
-
-    # pandas options and dataframe for debugging
-    pd.options.display.max_rows = 10000
-    pd.options.display.max_columns = 10000
-    pd.options.display.width = 10000
-    pd.options.display.max_colwidth = 10000
-    pd.options.display.float_format = '{:.4f}'.format
+    setup()
 
     # load and prepare data
     (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()

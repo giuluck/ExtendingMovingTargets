@@ -1,50 +1,34 @@
-import random
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-from sklearn.neural_network import MLPRegressor
-from tensorflow.python.keras.callbacks import EarlyStopping
-
 from src import regressions as reg
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
-from src.models import Model, MLP, MTLearner, MTMaster, MT
+from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary
 from src.util.augmentation import get_monotonicities_list
-from analysis_callbacks import BoundsAnalysis, CarsAdjustments, GroundAnalysis
-from analysis_callbacks import SyntheticAdjustments, SyntheticResponse, PuzzlesResponse
-
-random.seed(0)
-np.random.seed(0)
-tf.random.set_seed(0)
-reg.import_extension_methods()
-pd.options.display.max_rows = 10000
-pd.options.display.max_columns = 10000
-pd.options.display.width = 10000
-pd.options.display.max_colwidth = 10000
-pd.options.display.float_format = '{:.4f}'.format
+# noinspection PyUnresolvedReferences
+from tests.regressions.analysis_callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis
+# noinspection PyUnresolvedReferences
+from tests.regressions.analysis_callbacks import SyntheticAdjustments, SyntheticResponse, PuzzlesResponse
+# noinspection PyUnresolvedReferences
+from tests.regressions.models import Keras, TestMT, Uniform, DistanceProportional, Scikit
+from tests.util.experiments import setup
 
 
 def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
     # dataset without augmentation
     if dataset == 'cars univariate':
-        Model.evaluation_summary = Model.cars_summary
         dt = reg.load_cars('../../res/cars.csv')
         xag, yag = dt['train']
         if ground is not None:
             xag, yag = xag.head(ground), yag.head(ground)
         mn = get_monotonicities_list(xag, lambda s, r: reg.compute_monotonicities(s, r, -1), 'sales', 'all', 'ignore')
-        return xag, yag, mn, dt
+        return xag, yag, mn, dt, cars_summary
     # datasets with augmentation
-    dt, dirs, nrs, nas = None, None, None, None
+    dt, dirs, nrs, nas, fn = None, None, None, None, None
     if dataset == 'synthetic':
-        Model.evaluation_summary = Model.synthetic_summary
-        dt, dirs, nrs, nas = reg.load_synthetic(), [1, 0], 0, 15
+        dt, dirs, nrs, nas, fn = reg.load_synthetic(), [1, 0], 0, 15, synthetic_summary
     elif dataset == 'cars':
-        Model.evaluation_summary = Model.cars_summary
-        dt, dirs, nrs, nas = reg.load_cars('../../res/cars.csv'), -1, 0, 15
+        dt, dirs, nrs, nas, fn = reg.load_cars('../../res/cars.csv'), -1, 0, 15, cars_summary
     elif dataset == 'puzzles':
-        Model.evaluation_summary = Model.puzzles_summary
-        dt, dirs, nrs, nas = reg.load_puzzles('../../res/puzzles.csv'), [-1, 1, 1], 465, [3, 4, 8]
+        dt, dirs, nrs, nas, fn = reg.load_puzzles('../../res/puzzles.csv'), [-1, 1, 1], 465, [3, 4, 8], puzzles_summary
     xag, yag, fag = reg.get_augmented_data(
         x=dt['train'][0],
         y=dt['train'][1],
@@ -59,103 +43,44 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
         label=yag.columns[0],
         compute_monotonicities=lambda samples, references: reg.compute_monotonicities(samples, references, dirs)
     )
-    return xag, yag[yag.columns[0]], mn, dt
-
-
-class TestMTL(MTLearner):
-    def __init__(self, backend='scikit', warm_start=False, verbose=False):
-        if backend == 'scikit':
-            def model():
-                return MLPRegressor([16] * 4, solver='adam', warm_start=warm_start, verbose=verbose)
-
-            super(TestMTL, self).__init__(model, warm_start=True)
-        elif backend == 'keras':
-            def model():
-                m = MLP(output_act=None, h_units=[16] * 4)
-                m.compile(optimizer='adam', loss='mse')
-                return m
-
-            # similar to the default behaviour of the scikit MLP:
-            # > tol (min_delta) = 1e-4
-            # > n_iter_no_change (patience) = 10
-            # > max_iter (epochs) = 200
-            fit_args = dict(
-                callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)],
-                verbose=verbose,
-                epochs=200
-            )
-            super(TestMTL, self).__init__(model, warm_start=warm_start, **fit_args)
-        else:
-            raise ValueError('Wrong backend')
-
-
-class TestMTM(MTMaster):
-    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1.):
-        super(TestMTM, self).__init__(monotonicities=monotonicities, loss_fn=loss_fn, alpha=alpha, beta=beta)
-        self.base_beta = beta
-
-    def y_loss(self, macs, model, model_info, x, y, iteration):
-        y_loss = super(TestMTM, self).y_loss(macs, model, model_info, x, y, iteration)
-        self.beta = self.base_beta * y_loss
-        return y_loss
-
-    def is_feasible(self, macs, model, model_info, x, y, iteration):
-        is_feasible = super(TestMTM, self).is_feasible(macs, model, model_info, x, y, iteration)
-        return is_feasible
-
-    def return_solutions(self, macs, solution, model_info, x, y, iteration):
-        adj_y = super(TestMTM, self).return_solutions(macs, solution, model_info, x, y, iteration)
-        # sample weights are directly proportional to the distance from the adjusted target to the prediction
-        # (if adj_y == p then that sample is pretty useless)
-        _, pred = model_info
-        mask = np.isnan(y)
-        sample_weight = np.abs(adj_y - pred)
-        if sample_weight[mask].max() > 0:
-            sample_weight = sample_weight / sample_weight[mask].max()
-        sample_weight[~mask] = 1.0
-        return adj_y, {'sample_weight': sample_weight}
-
-
-class TestMT(MT):
-    def on_iteration_start(self, macs, x, y, val_data, iteration):
-        print(f'-------------------- ITERATION: {iteration:02} --------------------')
-        super(TestMT, self).on_iteration_start(macs, x, y, val_data, iteration)
-
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
-        super(TestMT, self).on_iteration_end(macs, x, y, val_data, iteration)
-        print(f'Time: {self.cache["time/iteration"]:.4f} s')
+    return xag, yag[yag.columns[0]], mn, dt, fn
 
 
 if __name__ == '__main__':
-    x_aug, y_aug, mono, data = retrieve('puzzles', 'group', aug=None, ground=None)
+    setup()
+    x_aug, y_aug, mono, data, summary_function = retrieve('cars', 'group', aug=None, ground=None)
     # mono = []
 
     callbacks = [
-        # GroundAnalysis(data['scalers'], num_columns=2, sorting_attributes='price'),
-        # BoundsAnalysis(data['scalers'], num_columns=2, sorting_attributes='price'),
-        # CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
-        # GroundAnalysis(data['scalers'], num_columns=2, sorting_attributes='a'),
+        FileLogger('temp/log.txt', routines=['on_iteration_end']),
+        # ------------------------------------------------ SYNTHETIC ------------------------------------------------
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='a'),
         # SyntheticAdjustments(data['scalers'], num_columns=3, sorting_attributes='a'),
         # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
-        GroundAnalysis(data['scalers'], num_columns=2, sorting_attributes='num_reviews'),
-        BoundsAnalysis(data['scalers'], num_columns=2, sorting_attributes='num_reviews'),
-        PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
-        PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
-        PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews'),
-        FileLogger('../../temp/log.txt', routines=['on_iteration_end'])
+        # ------------------------------------------------    CARS   ------------------------------------------------
+        DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
+        # BoundsAnalysis(data['scalers'], num_columns=2, sorting_attributes='price'),
+        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
+        # ------------------------------------------------  PUZZLES  ------------------------------------------------
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='num_reviews'),
+        # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
+        # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
+        # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews')
     ]
 
     # moving targets
     mt = TestMT(
-        learner=TestMTL(backend='keras', warm_start=False, verbose=False),
-        master=TestMTM(monotonicities=mono, loss_fn='mae', alpha=1, beta=1),
+        learner=Keras(optimizer='adam', warm_start=False, verbose=False),
+        # learner=Scikit(solver='adam', warm_start=False, verbose=False),
+        master=Uniform(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
+        # master=DistanceProportional(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=5,
+        iterations=8,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
@@ -177,4 +102,4 @@ if __name__ == '__main__':
     ])
 
     exit()
-    mt.evaluation_summary(**data)
+    summary_function(mt, **data)
