@@ -4,11 +4,11 @@ from moving_targets.metrics import R2, MSE, MAE
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
-from tests.regressions.analysis_callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis
+from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments, \
+    SyntheticResponse, PuzzlesResponse
 # noinspection PyUnresolvedReferences
-from tests.regressions.analysis_callbacks import SyntheticAdjustments, SyntheticResponse, PuzzlesResponse
-# noinspection PyUnresolvedReferences
-from tests.regressions.models import Keras, TestMT, Uniform, DistanceProportional, Scikit
+from tests.regressions.models import DistanceProportional, GammaWeighted, FeasibilityProportional, FeasibilityGamma, \
+    Keras, Scikit, TestMT, Uniform
 from tests.util.experiments import setup
 
 
@@ -48,21 +48,22 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
 
 if __name__ == '__main__':
     setup()
-    x_aug, y_aug, mono, data, summary_function = retrieve('cars', 'group', aug=None, ground=None)
+    x_aug, y_aug, mono, data, summary = retrieve('synthetic', 'group', aug=3, ground=1)
     # mono = []
 
     callbacks = [
         FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='a'),
-        # SyntheticAdjustments(data['scalers'], num_columns=3, sorting_attributes='a'),
-        # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
+        BoundsAnalysis(data['scalers'], sorting_attributes='a', do_plot=False, file_signature='temp/bounds'),
+        SyntheticAdjustments(data['scalers'], num_columns=2, sorting_attributes='a', file_signature='temp/adjustments'),
+        # DistanceAnalysis(data['scalers'], ground_only=False, num_columns=1, sorting_attributes='a'),
+        # SyntheticAdjustments(data['scalers'], num_columns=2, sorting_attributes='a'),
+        SyntheticResponse(data['scalers'], num_columns=2, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
-        DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
-        # BoundsAnalysis(data['scalers'], num_columns=2, sorting_attributes='price'),
-        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price),
+        # CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='num_reviews'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
         # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
         # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews')
@@ -72,20 +73,24 @@ if __name__ == '__main__':
     mt = TestMT(
         learner=Keras(optimizer='adam', warm_start=False, verbose=False),
         # learner=Scikit(solver='adam', warm_start=False, verbose=False),
-        master=Uniform(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
+        # master=Uniform(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
         # master=DistanceProportional(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
+        # master=GammaWeighted(monotonicities=mono, gamma=15, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
+        master=FeasibilityProportional(monotonicities=mono, gamma=15, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
+        # master=FeasibilityGamma(monotonicities=mono, gamma=15, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=8,
+        iterations=3,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
     )
 
+    # exit()
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
         'learner/epochs',
@@ -102,4 +107,4 @@ if __name__ == '__main__':
     ])
 
     exit()
-    summary_function(mt, **data)
+    summary(mt, **data)

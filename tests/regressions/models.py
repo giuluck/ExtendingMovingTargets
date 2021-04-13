@@ -32,8 +32,9 @@ class Scikit(TestMTL):
 
 # ------------------------------------------------------ MASTERS ------------------------------------------------------
 class TestMTM(MTMaster):
-    def __init__(self, monotonicities, prop_beta=True, loss_fn='mae', alpha=1., beta=1.):
+    def __init__(self, monotonicities, gamma=None, prop_beta=True, loss_fn='mae', alpha=1., beta=1.):
         super(TestMTM, self).__init__(monotonicities=monotonicities, loss_fn=loss_fn, alpha=alpha, beta=beta)
+        self.gamma = gamma
         self.base_beta = beta if prop_beta else None
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
@@ -41,10 +42,6 @@ class TestMTM(MTMaster):
         if self.base_beta is not None:
             self.beta = self.base_beta * y_loss
         return y_loss
-
-    def is_feasible(self, macs, model, model_info, x, y, iteration):
-        is_feasible = super(TestMTM, self).is_feasible(macs, model, model_info, x, y, iteration)
-        return is_feasible
 
 
 class Uniform(TestMTM):
@@ -61,6 +58,54 @@ class DistanceProportional(TestMTM):
         sample_weight = np.abs(adj_y - pred)
         if sample_weight[mask].max() > 0:
             sample_weight = sample_weight / sample_weight[mask].max()
+        sample_weight[~mask] = 1.0
+        return adj_y, {'sample_weight': sample_weight}
+
+
+class GammaWeighted(TestMTM):
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj_y = super(TestMTM, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        # each ground sample is weighted 1.0, while each augmented sample is weighted 1.0 / gamma
+        # (if gamma is the number of augmented samples, the totality of them is weighted exactly as the original one)
+        sample_weight = np.where(np.isnan(y), 1.0 / self.gamma, 1.0)
+        return adj_y, {'sample_weight': sample_weight}
+
+
+class FeasibilityProportional(TestMTM):
+    # noinspection DuplicatedCode
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj_y = super(TestMTM, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        _, pred = model_info
+        mask = np.isnan(y)
+        sample_weight = np.zeros_like(y)
+        violations = np.maximum(0.0, pred[self.lower_indices] - pred[self.higher_indices])
+        for vl, hi, li in zip(violations, self.higher_indices, self.lower_indices):
+            sample_weight[hi] += vl
+            sample_weight[li] += vl
+        # IN CASE OF FEASIBILITY ADOPT GAMMA-WEIGHTED POLICY (OTHERWISE NORMALIZE)
+        if np.all(sample_weight[mask] == 0.0):
+            sample_weight = np.ones_like(y) / self.gamma
+        else:
+            sample_weight = sample_weight / sample_weight[mask].max()
+        sample_weight[~mask] = 1.0
+        return adj_y, {'sample_weight': sample_weight}
+
+
+class FeasibilityGamma(TestMTM):
+    # noinspection DuplicatedCode
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj_y = super(TestMTM, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        _, pred = model_info
+        mask = np.isnan(y)
+        sample_weight = np.zeros_like(y)
+        differences = pred[self.lower_indices] - pred[self.higher_indices]
+        for diff, hi, li in zip(differences, self.higher_indices, self.lower_indices):
+            if diff > 0:
+                sample_weight[hi] += 1.0 / self.gamma
+                sample_weight[li] += 1.0 / self.gamma
+        # IN CASE OF FEASIBILITY ADOPT GAMMA-WEIGHTED POLICY
+        if np.all(sample_weight[mask] == 0.0):
+            sample_weight = np.ones_like(y) / self.gamma
         sample_weight[~mask] = 1.0
         return adj_y, {'sample_weight': sample_weight}
 

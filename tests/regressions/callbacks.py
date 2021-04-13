@@ -175,7 +175,7 @@ class SyntheticAdjustments(AnalysisCallback):
 
 
 class SyntheticResponse(AnalysisCallback):
-    def __init__(self, scalers, res=50, **kwargs):
+    def __init__(self, scalers, res=10, **kwargs):
         super(SyntheticResponse, self).__init__(scalers=scalers, **kwargs)
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         self.grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
