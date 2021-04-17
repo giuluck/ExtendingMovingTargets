@@ -15,7 +15,7 @@ from src.restaurants import ctr_estimate, compute_monotonicities, get_augmented_
 from src.util.augmentation import get_monotonicities_list
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import AUC
-from tests.restaurants.main import get_model
+from tests.restaurants.experiments import get_model
 from tests.util.experiments import setup
 
 

@@ -1,14 +1,14 @@
 from src import regressions as reg
+# noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
+from src.models import MT
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
 from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments, \
-    SyntheticResponse, PuzzlesResponse
-# noinspection PyUnresolvedReferences
-from tests.regressions.models import DistanceProportional, GammaWeighted, FeasibilityProportional, FeasibilityGamma, \
-    Keras, Scikit, TestMT, Uniform
+    SyntheticResponse, PuzzlesResponse, ConsoleLogger
+from tests.regressions.models import Learner, UnsupervisedMaster
 from tests.util.experiments import setup
 
 
@@ -48,20 +48,19 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None):
 
 if __name__ == '__main__':
     setup()
-    x_aug, y_aug, mono, data, summary = retrieve('synthetic', 'group', aug=3, ground=1)
+    x_aug, y_aug, mono, data, summary = retrieve('cars', 'group', aug=None, ground=None)
     # mono = []
 
     callbacks = [
-        FileLogger('temp/log.txt', routines=['on_iteration_end']),
+        ConsoleLogger(),
+        # FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
-        BoundsAnalysis(data['scalers'], sorting_attributes='a', do_plot=False, file_signature='temp/bounds'),
-        SyntheticAdjustments(data['scalers'], num_columns=2, sorting_attributes='a', file_signature='temp/adjustments'),
-        # DistanceAnalysis(data['scalers'], ground_only=False, num_columns=1, sorting_attributes='a'),
-        # SyntheticAdjustments(data['scalers'], num_columns=2, sorting_attributes='a'),
-        SyntheticResponse(data['scalers'], num_columns=2, sorting_attributes='a'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='a'),
+        # SyntheticAdjustments(data['scalers'], num_columns=3, sorting_attributes='a'),
+        # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price),
-        # CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
+        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes=None, plot_kind='scatter', file_signature='temp/cars_adj'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
@@ -70,21 +69,18 @@ if __name__ == '__main__':
     ]
 
     # moving targets
-    mt = TestMT(
-        learner=Keras(optimizer='adam', warm_start=False, verbose=False),
-        # learner=Scikit(solver='adam', warm_start=False, verbose=False),
-        # master=Uniform(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
-        # master=DistanceProportional(monotonicities=mono, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
-        # master=GammaWeighted(monotonicities=mono, gamma=15, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
-        master=FeasibilityProportional(monotonicities=mono, gamma=15, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
-        # master=FeasibilityGamma(monotonicities=mono, gamma=15, prop_beta=True, loss_fn='mae', alpha=1, beta=1),
+    mt = MT(
+        learner=Learner(backend='keras', optimizer='adam', warm_start=False, verbose=False),
+        master=UnsupervisedMaster(monotonicities=mono, loss_fn='mae', alpha=1.0, beta=1.0, beta_method='none',
+                                  gamma=15, min_weight=0.0, weight_method='feasibility-step',
+                                  perturbation_method='none', perturbation=None),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=3,
+        iterations=5,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
@@ -99,7 +95,8 @@ if __name__ == '__main__':
         'metrics/train_mse',
         'metrics/train_mae',
         'metrics/validation_r2',
-        'master/pct. violation',
+        # 'master/pct. violation',
+        'master/method',
         'master/adj. mse',
         'master/adj. mae',
         'metrics/test_r2',

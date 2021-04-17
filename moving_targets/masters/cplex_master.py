@@ -12,7 +12,7 @@ class CplexMaster(Master):
         raise NotImplementedError("Please implement method 'build_model'")
 
     def is_feasible(self, macs, model, model_info, x, y, iteration):
-        return True
+        return False
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         return 0.0

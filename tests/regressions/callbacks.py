@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -8,6 +9,20 @@ from src.regressions import synthetic_function
 from src.util.plot import ColorFader
 
 PRETRAINING = 'PT'
+
+
+class ConsoleLogger(Callback):
+    def __init__(self):
+        super(ConsoleLogger, self).__init__()
+        self.time = None
+
+    def on_iteration_start(self, macs, x, y, val_data, iteration):
+        print(f'-------------------- ITERATION: {iteration:02} --------------------')
+        self.time = time.time()
+
+    def on_iteration_end(self, macs, x, y, val_data, iteration):
+        print(f'Time: {time.time() - self.time:.4f} s')
+        self.time = None
 
 
 class AnalysisCallback(Callback):
@@ -220,7 +235,7 @@ class CarsAdjustments(AnalysisCallback):
             for i in range(self.data.shape[0]):
                 plt.plot([x[i], x[i]], [y[i], adj[i]], c='black', alpha=al)
         elif self.plot_kind == 'scatter':
-            sw = self.data[f'sw {iteration}']
+            sw = self.data[f'sw {iteration}'].values
             sw[np.array(s) == 'label'] = 0.4
             sns.scatterplot(x=x, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=sn, color='blue', alpha=al)
         sns.lineplot(x=x, y=pred, color='red')
