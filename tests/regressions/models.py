@@ -27,7 +27,7 @@ class Learner(MTLearner):
 
 
 class UnsupervisedMaster(MTMaster):
-    weight_methods = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step']
+    weight_methods = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same']
     beta_methods = ['none', 'standard', 'proportional']
     pert_methods = ['none', 'loss', 'constraint']
 
@@ -78,37 +78,51 @@ class UnsupervisedMaster(MTMaster):
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         adj_y = super(UnsupervisedMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        _, pred = model_info
         if self.weight_method == 'uniform':
             # no sample weights
             return adj_y
-        if self.weight_method == 'gamma':
+        elif self.weight_method == 'gamma':
             # each ground sample is weighted 1.0, while each augmented sample is weighted 1.0 / gamma
             # (if gamma is the number of augmented samples, the totality of them is weighted as the original one)
-            return adj_y, {'sample_weight': np.ones_like(y) / self.gamma}
-        if self.weight_method in ['distance', 'feasibility-prop', 'feasibility-step']:
-            _, pred = model_info
-            mask = np.isnan(y)
-            # COMPUTATION
+            sample_weight = np.ones_like(y) / self.gamma
+        elif self.weight_method == 'distance':
+            # sample weights are directly proportional to the distance from the adjusted target to the prediction
+            # (if adj_y == p then that sample is pretty useless)
+            sample_weight = np.abs(adj_y - pred)
+            sample_weight = self.normalize(sample_weight, np.isnan(y))
+        elif 'feasibility' in self.weight_method:
             sample_weight = np.zeros_like(pred)
-            if self.weight_method == 'distance':
-                # sample weights are directly proportional to the distance from the adjusted target to the prediction
-                # (if adj_y == p then that sample is pretty useless)
-                sample_weight = np.abs(adj_y - pred)
+            diffs = pred[self.lower_indices] - pred[self.higher_indices]
+            if self.weight_method == 'feasibility-same':
+                # in case of feasibility-same, the augmented points get a value of 1 / gamma independently from the
+                # number and the value of the violations
+                for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
+                    sample_weight[hi] = 1.0 / self.gamma
+                    sample_weight[li] = 1.0 / self.gamma
+                # in case of feasibility, assign 1 / gamma to each sample
+                if sample_weight[np.isnan(y)].max() == 0.0:
+                    sample_weight = np.ones_like(np.isnan(y)) / self.gamma
+                sample_weight[~np.isnan(y)] = 1.0
             else:
-                vls = np.maximum(0.0, pred[self.lower_indices] - pred[self.higher_indices])
-                vls = vls if self.weight_method == 'feasibility-prop' else np.where(vls == 0.0, 0.0, 1.0 / self.gamma)
-                for vl, hi, li in zip(vls, self.higher_indices, self.lower_indices):
-                    sample_weight[hi] += vl
-                    sample_weight[li] += vl
-            # NORMALIZATION
-            if sample_weight[mask].max() == 0.0:
-                # if the maximum is zero, adopt gamma policy
-                sample_weight = np.ones_like(y) / self.gamma
-            else:
-                # if the maximum is non-zero, normalize into [min_weight, 1]
-                sample_weight = sample_weight / sample_weight[mask].max()
-                sample_weight = (1 - self.min_weight) * sample_weight + self.min_weight
-            # give total weight to original samples
-            sample_weight[~mask] = 1.0
-            return adj_y, {'sample_weight': sample_weight}
-        return NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
+                # differently from feasibility-prop, in case of feasibility-step the increase is constant (1 / gamma)
+                if self.weight_method == 'feasibility-step':
+                    diffs = np.where(diffs > 0, 1 / self.gamma, 0.0)
+                for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
+                    sample_weight[hi] += df
+                    sample_weight[li] += df
+                sample_weight = self.normalize(sample_weight, np.isnan(y))
+        else:
+            raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
+        return adj_y, {'sample_weight': sample_weight}
+
+    def normalize(self, sw, mask):
+        if sw[mask].max() == 0.0:
+            # if the maximum is zero, adopt gamma policy
+            sw = np.ones_like(sw) / self.gamma
+        else:
+            # if the maximum is non-zero, normalize into [min_weight, 1]
+            sw = sw / sw[mask].max()
+            sw = (1 - self.min_weight) * sw + self.min_weight
+        sw[~mask] = 1.0
+        return sw

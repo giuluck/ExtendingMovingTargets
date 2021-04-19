@@ -6,8 +6,8 @@ from src.models import MT
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
-from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments, \
-    SyntheticResponse, PuzzlesResponse, ConsoleLogger
+from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments2D, \
+    SyntheticAdjustments3D, SyntheticResponse, PuzzlesResponse, ConsoleLogger
 from tests.regressions.models import Learner, UnsupervisedMaster
 from tests.util.experiments import setup
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         # FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='a'),
-        # SyntheticAdjustments(data['scalers'], num_columns=3, sorting_attributes='a'),
+        # SyntheticAdjustments3D(data['scalers'], num_columns=3, sorting_attributes=None),
         # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
@@ -72,8 +72,8 @@ if __name__ == '__main__':
     mt = MT(
         learner=Learner(backend='keras', optimizer='adam', warm_start=False, verbose=False),
         master=UnsupervisedMaster(monotonicities=mono, loss_fn='mae', alpha=1.0, beta=1.0, beta_method='none',
-                                  gamma=15, min_weight=0.0, weight_method='uniform',
-                                  perturbation_method='constraint', perturbation=0.03),
+                                  gamma=1, min_weight=None, weight_method='feasibility-same',
+                                  perturbation_method='none', perturbation=None),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
@@ -95,8 +95,8 @@ if __name__ == '__main__':
         'metrics/train_mse',
         'metrics/train_mae',
         'metrics/validation_r2',
-        # 'master/pct. violation',
-        'master/method',
+        'master/pct. violation',
+        # 'master/method',
         'master/adj. mse',
         'master/adj. mae',
         'metrics/test_r2',

@@ -36,14 +36,16 @@ if __name__ == '__main__':
             dict(perturbation_method='constraint', perturbation=0.1),
         ],
         weights_args=[
-            dict(weight_method='uniform', gamma=None, min_weight=None),
-            dict(weight_method='gamma', gamma=15, min_weight=None),
-            dict(weight_method='distance', gamma=15, min_weight=0.0),
-            dict(weight_method='distance', gamma=15, min_weight='gamma'),
-            dict(weight_method='feasibility-prop', gamma=15, min_weight=0.0),
-            dict(weight_method='feasibility-prop', gamma=15, min_weight='gamma'),
-            dict(weight_method='feasibility-step', gamma=15, min_weight=0.0),
-            dict(weight_method='feasibility-step', gamma=15, min_weight='gamma')
+            # dict(weight_method='uniform', gamma=None, min_weight=None),
+            # dict(weight_method='gamma', gamma=15, min_weight=None),
+            # dict(weight_method='distance', gamma=15, min_weight=0.0),
+            # dict(weight_method='distance', gamma=15, min_weight='gamma'),
+            # dict(weight_method='feasibility-prop', gamma=15, min_weight=0.0),
+            # dict(weight_method='feasibility-prop', gamma=15, min_weight='gamma'),
+            # dict(weight_method='feasibility-step', gamma=15, min_weight=0.0),
+            # dict(weight_method='feasibility-step', gamma=15, min_weight='gamma'),
+            dict(weight_method='feasibility-same', gamma=1, min_weight=None),
+            dict(weight_method='feasibility-same', gamma=15, min_weight=None)
         ])
     master_args = [{k: v for d in ma.values() for k, v in d.items()} for ma in master_args]
 

@@ -46,7 +46,7 @@ class AnalysisCallback(Callback):
 
     def on_pretraining_end(self, macs, x, y, val_data):
         self.on_training_end(macs, x, y, val_data, PRETRAINING)
-        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, PRETRAINING, )
+        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, PRETRAINING)
         self.on_iteration_end(macs, x, y, val_data, PRETRAINING)
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
@@ -152,13 +152,13 @@ class BoundsAnalysis(AnalysisCallback):
         return f'{iteration}) ' + ', '.join([f'{k} bound = {v:.2f}' for k, v in avg_bound.items()])
 
 
-class SyntheticAdjustments(AnalysisCallback):
+class SyntheticAdjustments2D(AnalysisCallback):
     label_size = 0.3
     max_size = 100
     alpha = 0.4
 
     def on_process_start(self, macs, x, y, val_data):
-        super(SyntheticAdjustments, self).on_process_start(macs, x, y, val_data)
+        super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data)
         self.data['ground'] = synthetic_function(self.data['a'], self.data['b'])
 
     def on_training_end(self, macs, x, y, val_data, iteration):
@@ -168,7 +168,7 @@ class SyntheticAdjustments(AnalysisCallback):
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         self.data[f'adj {iteration}'] = self.y_scaler.invert(adjusted_y)
         self.data[f'adj err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
-        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments.label_size * np.ones_like(y))
+        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments2D.label_size * np.ones_like(y))
 
     def plot_function(self, iteration):
         def synthetic_inverse(column):
@@ -177,7 +177,7 @@ class SyntheticAdjustments(AnalysisCallback):
 
         a, sw, pred = self.data['a'], self.data[f'sw {iteration}'], synthetic_inverse(f'pred {iteration}')
         s, m = ['aug' if b else 'label' for b in np.isnan(self.data['label'])], dict(aug='o', label='X')
-        ls, ms, al = SyntheticAdjustments.label_size, SyntheticAdjustments.max_size, SyntheticAdjustments.alpha
+        ls, ms, al = SyntheticAdjustments2D.label_size, SyntheticAdjustments2D.max_size, SyntheticAdjustments2D.alpha
         sns.lineplot(x=self.data['a'], y=synthetic_inverse('ground'), color='green')
         sns.scatterplot(x=a, y=pred, color='red', alpha=al, s=ls * ms / 2)
         if iteration == PRETRAINING:
@@ -187,6 +187,49 @@ class SyntheticAdjustments(AnalysisCallback):
         sw[np.array(s) == 'label'] = ls
         sns.scatterplot(x=a, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=(0, ms), color=color, alpha=al)
         plt.legend(['ground', 'predictions', 'labels' if iteration == PRETRAINING else 'adjusted'])
+
+
+class SyntheticAdjustments3D(AnalysisCallback):
+    label_size = 0.3
+    max_size = 100
+
+    def __init__(self, scalers, res=100, **kwargs):
+        super(SyntheticAdjustments3D, self).__init__(scalers=scalers, **kwargs)
+        assert self.sorting_attributes is None, 'sorting_attributes must be None'
+        self.res = res
+        self.val = None
+
+    def on_process_start(self, macs, x, y, val_data):
+        super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data)
+        # swap values and data in order to print the grid
+        self.val = self.data.copy()
+        a, b = np.meshgrid(np.linspace(-1, 1, self.res), np.linspace(-1, 1, self.res))
+        self.data = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
+
+    def on_training_end(self, macs, x, y, val_data, iteration):
+        self.val[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(x))
+        self.data[f'z {iteration}'] = self.y_scaler.invert(macs.predict(self.x_scaler.transform(self.data[['a', 'b']])))
+
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+        self.val[f'adj {iteration}'] = self.y_scaler.invert(adjusted_y)
+        self.val[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments3D.label_size * np.ones_like(y))
+
+    def plot_function(self, iteration):
+        # plot 3D response
+        ga = self.data['a'].values.reshape(self.res, self.res)
+        gb = self.data['b'].values.reshape(self.res, self.res)
+        gz = self.data[f'z {iteration}'].values.reshape(self.res, self.res)
+        plt.pcolor(ga, gb, gz, shading='auto', cmap='viridis', vmin=gz.min(), vmax=gz.max())
+        # plot sample weights
+        m, s = np.isnan(self.val['label']), (0, SyntheticAdjustments3D.max_size)
+        a, b, pred, sw = self.val['a'], self.val['b'], self.val[f'pred {iteration}'], self.val[f'sw {iteration}'][m]
+        ls = SyntheticAdjustments3D.label_size * SyntheticAdjustments3D.max_size
+        sns.scatterplot(x=a[~m], y=b[~m], s=ls, size_norm=(0, 1), sizes=s, color='black', marker='X', legend=False)
+        if iteration == PRETRAINING:
+            plt.legend(['ground', 'label'])
+        else:
+            sns.scatterplot(x=a[m], y=b[m], size=sw, size_norm=(0, 1), sizes=s, color='black', marker='o', legend=False)
+            plt.legend(['ground', 'label', 'adjusted'])
 
 
 class SyntheticResponse(AnalysisCallback):
