@@ -39,7 +39,7 @@ class UnsupervisedMaster(MTMaster):
         super(UnsupervisedMaster, self).__init__(monotonicities=monotonicities, alpha=alpha, beta=beta, loss_fn=loss_fn)
         self.weight_method = weight_method
         self.gamma = gamma
-        self.min_weight = (1.0 / gamma) if min_weight == 'gamma' else min_weight
+        self.min_weight = (0.0 if gamma is None else 1.0 / gamma) if min_weight == 'gamma' else min_weight
         self.base_beta = self.beta
         self.beta_method = beta_method
         self.perturbation_method = perturbation_method
@@ -49,10 +49,11 @@ class UnsupervisedMaster(MTMaster):
         var, pred = super(UnsupervisedMaster, self).build_model(macs, model, x, y, iteration)
         if self.perturbation_method == 'constraint':
             # for each variable/prediction pair, we force them to be at least randomly distant from the model prediction
-            _, var, pred = filter_vectors(self.mask_value, y, var, pred)
-            for v, p in zip(var, pred):
-                distance = abs(np.random.normal(scale=self.perturbation))
-                model.add(model.abs(v - p) >= distance)
+            absolute_perturbation = (y.max() - y.min()) * self.perturbation
+            _, vv, pp = filter_vectors(self.mask_value, y, var, pred)
+            dd = np.abs(np.random.normal(scale=absolute_perturbation, size=len(pp)))
+            for v, p, d in zip(vv, pp, dd):
+                model.add(model.abs(v - p) >= d)
         return var, pred
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
@@ -65,7 +66,8 @@ class UnsupervisedMaster(MTMaster):
         var, pred = model_info
         if self.perturbation_method == 'loss':
             # before computing the loss, we perturb the predictions
-            pred = pred + np.random.normal(scale=self.perturbation, size=len(pred))
+            absolute_perturbation = (y.max() - y.min()) * self.perturbation
+            pred = pred + np.random.normal(scale=absolute_perturbation, size=len(pred))
         return 0.0 if pred is None else self.loss_fn(model, pred, var)
 
     def is_feasible(self, macs, model, model_info, x, y, iteration):

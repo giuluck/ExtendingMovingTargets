@@ -4,6 +4,8 @@ from moving_targets.callbacks.logger import Logger
 
 
 class WandBLogger(Logger):
+    instance = wandb
+
     def __init__(self, project, entity, run_name, **kwargs):
         super(WandBLogger, self).__init__()
         self.config = dict(project=project, entity=entity, name=run_name, config=kwargs)

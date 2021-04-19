@@ -60,7 +60,7 @@ if __name__ == '__main__':
         # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
-        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes=None, plot_kind='scatter', file_signature='temp/cars_adj'),
+        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
@@ -72,8 +72,8 @@ if __name__ == '__main__':
     mt = MT(
         learner=Learner(backend='keras', optimizer='adam', warm_start=False, verbose=False),
         master=UnsupervisedMaster(monotonicities=mono, loss_fn='mae', alpha=1.0, beta=1.0, beta_method='none',
-                                  gamma=15, min_weight=0.0, weight_method='feasibility-step',
-                                  perturbation_method='none', perturbation=None),
+                                  gamma=15, min_weight=0.0, weight_method='uniform',
+                                  perturbation_method='constraint', perturbation=0.03),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
