@@ -45,9 +45,11 @@ class AnalysisCallback(Callback):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x, y, m), axis=1)
 
+    def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
+        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, PRETRAINING, **kwargs)
+
     def on_pretraining_end(self, macs, x, y, val_data):
         self.on_training_end(macs, x, y, val_data, PRETRAINING)
-        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, PRETRAINING)
         self.on_iteration_end(macs, x, y, val_data, PRETRAINING)
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
@@ -185,7 +187,11 @@ class SyntheticAdjustments2D(AnalysisCallback):
             adj, color = synthetic_inverse('label'), 'black'
         else:
             adj, color = synthetic_inverse(f'adj {iteration}'), 'blue'
-        sw[s == 'label'] = ls
+        # rescale in case of uniform values
+        if np.allclose(sw, 1.0):
+            sw *= ls
+        else:
+            sw[s == 'label'] = ls
         sns.scatterplot(x=a, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=(0, ms), color=color, alpha=al)
         plt.legend(['ground', 'predictions', 'labels' if iteration == PRETRAINING else 'adjusted'])
 
@@ -223,14 +229,12 @@ class SyntheticAdjustments3D(AnalysisCallback):
         plt.pcolor(ga, gb, gz, shading='auto', cmap='viridis', vmin=gz.min(), vmax=gz.max())
         # plot sample weights
         m, s = self.val['mask'].values == 'aug', (0, SyntheticAdjustments3D.max_size)
-        a, b, pred, sw = self.val['a'], self.val['b'], self.val[f'pred {iteration}'], self.val[f'sw {iteration}'][m]
+        a, b, pred, sw = self.val['a'], self.val['b'], self.val[f'pred {iteration}'], self.val[f'sw {iteration}'].values
         ls = SyntheticAdjustments3D.label_size * SyntheticAdjustments3D.max_size
         sns.scatterplot(x=a[~m], y=b[~m], s=ls, size_norm=(0, 1), sizes=s, color='black', marker='X', legend=False)
-        if iteration == PRETRAINING:
-            plt.legend(['ground', 'label'])
-        else:
-            sns.scatterplot(x=a[m], y=b[m], size=sw, size_norm=(0, 1), sizes=s, color='black', marker='o', legend=False)
-            plt.legend(['ground', 'label', 'adjusted'])
+        sw = sw[m] * SyntheticAdjustments3D.label_size if np.allclose(sw, 1.0) else sw[m]
+        sns.scatterplot(x=a[m], y=b[m], size=sw, size_norm=(0, 1), sizes=s, color='black', marker='o', legend=False)
+        plt.legend(['ground', 'label', 'adjusted'])
 
 
 class SyntheticResponse(AnalysisCallback):
@@ -269,20 +273,23 @@ class CarsAdjustments(AnalysisCallback):
 
     def plot_function(self, iteration):
         x, y = self.data['price'].values, self.data['sales'].values
-        s, m = self.data['mask'], dict(aug='o', label='X')
-        ls, sn, al = CarsAdjustments.label_size, (0, CarsAdjustments.max_size), CarsAdjustments.alpha
-        pred, adj = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'],
+        s, m = np.array(self.data['mask']), dict(aug='o', label='X')
+        sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha
+        p, adj, sw = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'],  self.data[f'sw {iteration}'].values
+        # rescale in case of uniform values
+        if np.allclose(sw, 1.0):
+            sw *= CarsAdjustments.label_size
+        else:
+            sw[s == 'label'] = CarsAdjustments.label_size
         if iteration == PRETRAINING:
-            sns.scatterplot(x=x, y=y, style=s, markers=m, size=ls, size_norm=(0, 1), sizes=sn, color='black', alpha=al)
+            sns.scatterplot(x=x, y=y, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=sn, color='black', alpha=al)
         elif self.plot_kind == 'line':
             sns.lineplot(x=x, y=adj, color='blue')
             for i in range(self.data.shape[0]):
                 plt.plot([x[i], x[i]], [y[i], adj[i]], c='black', alpha=al)
         elif self.plot_kind == 'scatter':
-            sw = self.data[f'sw {iteration}'].values
-            sw[np.array(s) == 'label'] = 0.4
             sns.scatterplot(x=x, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=sn, color='blue', alpha=al)
-        sns.lineplot(x=x, y=pred, color='red')
+        sns.lineplot(x=x, y=p, color='red')
         plt.legend(['predictions', 'labels' if iteration == PRETRAINING else 'adjusted'])
         return f'{iteration}) adj. mae = {np.abs((adj - y).fillna(0)).mean():.4f}'
 

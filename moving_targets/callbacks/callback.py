@@ -8,9 +8,9 @@ class Callback:
     def on_process_end(self, macs, x, y, val_data):
         pass
 
-    def on_pretraining_start(self, macs, x, y, val_data):
+    def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
         self.on_iteration_start(macs, x, y, val_data, 0)
-        self.on_training_start(macs, x, y, val_data, 0)
+        self.on_training_start(macs, x, y, val_data, 0, **kwargs)
 
     def on_pretraining_end(self, macs, x, y, val_data):
         self.on_training_end(macs, x, y, val_data, 0)
@@ -22,7 +22,7 @@ class Callback:
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         pass
 
-    def on_training_start(self, macs, x, y, val_data, iteration):
+    def on_training_start(self, macs, x, y, val_data, iteration, **kwargs):
         pass
 
     def on_training_end(self, macs, x, y, val_data, iteration):

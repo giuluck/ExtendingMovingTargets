@@ -26,13 +26,13 @@ class Learner(MTLearner):
 
 
 class Master(MTMaster):
-    weight_methods = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same']
+    weight_method = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same']
     beta_methods = ['none', 'standard', 'proportional']
     pert_methods = ['none', 'loss', 'constraint']
 
     def __init__(self, monotonicities, augmented_mask, weight_method='uniform', gamma=None, min_weight='gamma',
-                 beta_method='standard', perturbation_method='none', perturbation=None, **kwargs):
-        assert weight_method in self.weight_methods, f'sample_weight should be in {self.weight_methods}'
+                 master_weights=1.0, beta_method='standard', perturbation_method='none', perturbation=None, **kwargs):
+        assert weight_method in self.weight_method, f'sample_weight should be in {self.weight_method}'
         assert beta_method in self.beta_methods, f'beta_method should be in {self.beta_methods}'
         assert perturbation_method in self.pert_methods, f'perturbation_method should be in {self.pert_methods}'
         super(Master, self).__init__(monotonicities=monotonicities, **kwargs)
@@ -40,6 +40,7 @@ class Master(MTMaster):
         self.weight_method = weight_method
         self.gamma = gamma
         self.min_weight = (0.0 if gamma is None else 1.0 / gamma) if min_weight == 'gamma' else min_weight
+        self.master_weights = master_weights if isinstance(master_weights, tuple) else (master_weights, master_weights)
         self.base_beta = self.beta
         self.beta_method = beta_method
         self.perturbation_method = perturbation_method
@@ -56,18 +57,22 @@ class Master(MTMaster):
         return var, pred
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
-        y_loss = super(Master, self).y_loss(macs, model, model_info, x, y, iteration)
-        if self.beta_method is 'proportional':
+        sw = np.where(self.augmented_mask, 1.0, self.master_weights[0])
+        var, _ = model_info
+        mask = ~np.isnan(y)
+        y_loss = self.loss_fn(model, y[mask], var[mask], sample_weight=sw[mask])
+        if self.beta_method == 'proportional':
             self.beta = self.base_beta * y_loss
         return y_loss
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
+        sw = np.where(self.augmented_mask, self.master_weights[1], 1)
         var, pred = model_info
         if self.perturbation_method == 'loss':
             # before computing the loss, we perturb the predictions
             absolute_perturbation = (y.max() - y.min()) * self.perturbation
             pred = pred + np.random.normal(scale=absolute_perturbation, size=len(pred))
-        return super(Master, self).p_loss(macs, model, (var, pred), x, y, iteration)
+        return 0.0 if pred is None else self.loss_fn(model, pred, var, sample_weight=sw)
 
     def is_feasible(self, macs, model, model_info, x, y, iteration):
         feasible = super(Master, self).is_feasible(macs, model, model_info, x, y, iteration)
@@ -84,12 +89,12 @@ class Master(MTMaster):
         elif self.weight_method == 'gamma':
             # each ground sample is weighted 1.0, while each augmented sample is weighted 1.0 / gamma
             # (if gamma is the number of augmented samples, the totality of them is weighted as the original one)
-            sample_weight = np.ones_like(y) / self.gamma
+            sample_weight = np.where(self.augmented_mask, 1.0 / self.gamma, 1.0)
         elif self.weight_method == 'distance':
             # sample weights are directly proportional to the distance from the adjusted target to the prediction
             # (if adj_y == p then that sample is pretty useless)
             sample_weight = np.abs(adj_y - pred)
-            sample_weight = self.normalize(sample_weight, self.augmented_mask)
+            sample_weight = self.normalize(sample_weight)
         elif 'feasibility' in self.weight_method:
             sample_weight = np.zeros_like(pred)
             diffs = pred[self.lower_indices] - pred[self.higher_indices]
@@ -99,10 +104,9 @@ class Master(MTMaster):
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
                     sample_weight[hi] = 1.0 / self.gamma
                     sample_weight[li] = 1.0 / self.gamma
-                # in case of feasibility, assign 1 / gamma to each sample
+                # in case of feasibility, adopt gamma policy
                 if sample_weight[self.augmented_mask].max() == 0.0:
-                    sample_weight = np.ones_like(self.augmented_mask) / self.gamma
-                sample_weight[~self.augmented_mask] = 1.0
+                    sample_weight = np.where(self.augmented_mask, 1.0 / self.gamma, 1.0)
             else:
                 # differently from feasibility-prop, in case of feasibility-step the increase is constant (1 / gamma)
                 if self.weight_method == 'feasibility-step':
@@ -110,18 +114,18 @@ class Master(MTMaster):
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
                     sample_weight[hi] += df
                     sample_weight[li] += df
-                sample_weight = self.normalize(sample_weight, self.augmented_mask)
+                sample_weight = self.normalize(sample_weight)
         else:
             raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
         return adj_y, {'sample_weight': sample_weight}
 
-    def normalize(self, sw, m):
-        if sw[m].max() == 0.0:
+    def normalize(self, sw):
+        if sw[self.augmented_mask].max() == 0.0:
             # if the maximum is zero, adopt gamma policy
             sw = np.ones_like(sw) / self.gamma
         else:
             # if the maximum is non-zero, normalize into [min_weight, 1]
-            sw = sw / sw[m].max()
+            sw = sw / sw[self.augmented_mask].max()
             sw = (1 - self.min_weight) * sw + self.min_weight
-        sw[~m] = 1.0
+        sw[~self.augmented_mask] = 1.0
         return sw

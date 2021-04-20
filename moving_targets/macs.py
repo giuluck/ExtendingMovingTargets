@@ -15,7 +15,7 @@ class MACS(Logger):
         self.fitted = False
         self.time = None
 
-    def fit(self, x, y, iterations=1, val_data=None, callbacks=None, verbose=True):
+    def fit(self, x, y, iterations=1, val_data=None, callbacks=None, verbose=True, **kwargs):
         # check user input
         assert iterations >= 0, 'The number of iterations should be non-negative'
         assert iterations > 0 or self.init_step == 'pretraining', 'If projection, iterations should be a positive value'
@@ -29,9 +29,9 @@ class MACS(Logger):
 
         # handle pretraining
         if self.init_step == 'pretraining':
-            self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, x, y, val_data))
+            self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, x, y, val_data, **kwargs))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self.learner.fit(self, x, y, iteration='pretraining')
+            self.learner.fit(self, x, y, iteration='pretraining', **kwargs)
             self.fitted = True
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
             self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self, x, y, val_data))
@@ -44,9 +44,10 @@ class MACS(Logger):
             yj, kws = self.master.adjust_targets(self, x, y, iteration), {}
             if isinstance(yj, tuple):
                 yj, kws = yj
+            kws.update({k: v for k, v in kwargs.items() if k not in kws.keys()})
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
             self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, x, y, yj, val_data, iteration, **kws))
-            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data, iteration))
+            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data, iteration, **kws))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
             self.learner.fit(self, x, y=yj, iteration=iteration, **kws)
             self.fitted = True
