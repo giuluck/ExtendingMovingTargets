@@ -22,10 +22,10 @@ if __name__ == '__main__':
             dict(loss_fn='mae', alpha=1.0)
         ],
         beta_args=[
-            dict(beta_method='standard', beta=1.0),
-            dict(beta_method='standard', beta=0.1),
-            dict(beta_method='standard', beta=0.01),
-            dict(beta_method='proportional', beta=1.0),
+            # dict(beta_method='standard', beta=1.0),
+            # dict(beta_method='standard', beta=0.1),
+            # dict(beta_method='standard', beta=0.01),
+            # dict(beta_method='proportional', beta=1.0),
             dict(beta_method='none', beta=1.0)
         ],
         perturbation_args=[
@@ -36,22 +36,22 @@ if __name__ == '__main__':
             dict(perturbation_method='constraint', perturbation=0.1),
         ],
         weights_args=[
-            # dict(weight_method='uniform', gamma=None, min_weight=None),
-            # dict(weight_method='gamma', gamma=15, min_weight=None),
-            # dict(weight_method='distance', gamma=15, min_weight=0.0),
-            # dict(weight_method='distance', gamma=15, min_weight='gamma'),
-            # dict(weight_method='feasibility-prop', gamma=15, min_weight=0.0),
-            # dict(weight_method='feasibility-prop', gamma=15, min_weight='gamma'),
-            # dict(weight_method='feasibility-step', gamma=15, min_weight=0.0),
-            # dict(weight_method='feasibility-step', gamma=15, min_weight='gamma'),
+            dict(weight_method='uniform', gamma=None, min_weight=None),
+            dict(weight_method='gamma', gamma=15, min_weight=None),
+            dict(weight_method='distance', gamma=15, min_weight=0.0),
+            dict(weight_method='distance', gamma=15, min_weight='gamma'),
+            dict(weight_method='feasibility-prop', gamma=15, min_weight=0.0),
+            dict(weight_method='feasibility-prop', gamma=15, min_weight='gamma'),
+            dict(weight_method='feasibility-step', gamma=15, min_weight=0.0),
+            dict(weight_method='feasibility-step', gamma=15, min_weight='gamma'),
             dict(weight_method='feasibility-same', gamma=1, min_weight=None),
             dict(weight_method='feasibility-same', gamma=15, min_weight=None)
         ])
     master_args = [{k: v for d in ma.values() for k, v in d.items()} for ma in master_args]
 
     study = cartesian_product(
-        dataset=['cars', 'synthetic'],
-        monotonicity=['ground', 'group'],
+        dataset=['puzzles'],
+        mono=['ground', 'group'],
         learner_args=[dict(backend='keras', optimizer='adam', warm_start=False)],
         master_args=master_args
     )
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     for i, p in enumerate(study):
         start_time = time.time()
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
-        x_aug, y_aug, mono, data, _ = retrieve(p['dataset'], p['monotonicity'], aug=None, ground=None)
+        x_aug, y_aug, mono, data, _, _ = retrieve(p['dataset'], p['mono'], aug=None, ground=None, supervised=False)
         mt = MT(
             learner=Learner(**p['learner_args']),
             master=UnsupervisedMaster(monotonicities=mono, **p['master_args']),
@@ -68,7 +68,7 @@ if __name__ == '__main__':
             metrics=[MAE(), MSE(), R2()]
         )
         try:
-            config = {'monotonicity': p['monotonicity'], **p['learner_args'], **p['master_args']}
+            config = {'monotonicity': p['mono'], **p['learner_args'], **p['master_args']}
             mt.fit(
                 x=x_aug,
                 y=y_aug,

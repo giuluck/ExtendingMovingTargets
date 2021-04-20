@@ -42,7 +42,8 @@ class AnalysisCallback(Callback):
     def on_process_start(self, macs, x, y, val_data):
         x = self.x_scaler.invert(x)
         y = self.y_scaler.invert(y)
-        self.data = pd.concat((x, y), axis=1)
+        m = pd.Series(['aug' if m else 'label' for m in macs.master.mask(y)], name='mask')
+        self.data = pd.concat((x, y, m), axis=1)
 
     def on_pretraining_end(self, macs, x, y, val_data):
         self.on_training_end(macs, x, y, val_data, PRETRAINING)
@@ -95,7 +96,7 @@ class DistanceAnalysis(AnalysisCallback):
     def on_process_end(self, macs, x, y, val_data):
         self.y = y.name
         if self.ground_only:
-            self.data = self.data[~np.isnan(y)]
+            self.data = self.data[self.data['mask'] == 'label']
         super(DistanceAnalysis, self).on_process_end(macs, x, y, val_data)
 
     def plot_function(self, iteration):
@@ -103,14 +104,14 @@ class DistanceAnalysis(AnalysisCallback):
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         sns.scatterplot(x=x, y=y, color='black', alpha=0.6).set_xticks([])
         sns.scatterplot(x=x, y=p, color='red', alpha=0.6)
-        s, m = ['aug' if b else 'label' for b in np.isnan(y)], dict(aug='o', label='X')
+        s, m = self.data['mask'], dict(aug='o', label='X')
         sns.scatterplot(x=x, y=j, style=s, markers=m, color='blue', alpha=0.8, s=50)
         plt.legend(['labels', 'predictions', 'adjusted'])
         for i in x:
             plt.plot([i, i], [p[i], j[i]], c='red')
             plt.plot([i, i], [y[i], j[i]], c='black')
         avg_pred_distance = np.abs(p - j).mean()
-        avg_label_distance = np.abs(y[~np.isnan(y)] - j[~np.isnan(y)]).mean()
+        avg_label_distance = np.abs(y[s == 'label'] - j[s == 'label']).mean()
         return f'{iteration}) pred. distance = {avg_pred_distance:.4f}, label distance = {avg_label_distance:.4f}'
 
 
@@ -175,8 +176,8 @@ class SyntheticAdjustments2D(AnalysisCallback):
             b = np.sin(np.pi * (self.data['b'] - 0.01)) ** 2 + 1
             return (self.data[column] - b) * b
 
-        a, sw, pred = self.data['a'], self.data[f'sw {iteration}'], synthetic_inverse(f'pred {iteration}')
-        s, m = ['aug' if b else 'label' for b in np.isnan(self.data['label'])], dict(aug='o', label='X')
+        a, sw, pred = self.data['a'], self.data[f'sw {iteration}'].values, synthetic_inverse(f'pred {iteration}')
+        s, m = self.data['mask'].values, dict(aug='o', label='X')
         ls, ms, al = SyntheticAdjustments2D.label_size, SyntheticAdjustments2D.max_size, SyntheticAdjustments2D.alpha
         sns.lineplot(x=self.data['a'], y=synthetic_inverse('ground'), color='green')
         sns.scatterplot(x=a, y=pred, color='red', alpha=al, s=ls * ms / 2)
@@ -184,7 +185,7 @@ class SyntheticAdjustments2D(AnalysisCallback):
             adj, color = synthetic_inverse('label'), 'black'
         else:
             adj, color = synthetic_inverse(f'adj {iteration}'), 'blue'
-        sw[np.array(s) == 'label'] = ls
+        sw[s == 'label'] = ls
         sns.scatterplot(x=a, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=(0, ms), color=color, alpha=al)
         plt.legend(['ground', 'predictions', 'labels' if iteration == PRETRAINING else 'adjusted'])
 
@@ -221,7 +222,7 @@ class SyntheticAdjustments3D(AnalysisCallback):
         gz = self.data[f'z {iteration}'].values.reshape(self.res, self.res)
         plt.pcolor(ga, gb, gz, shading='auto', cmap='viridis', vmin=gz.min(), vmax=gz.max())
         # plot sample weights
-        m, s = np.isnan(self.val['label']), (0, SyntheticAdjustments3D.max_size)
+        m, s = self.val['mask'].values == 'aug', (0, SyntheticAdjustments3D.max_size)
         a, b, pred, sw = self.val['a'], self.val['b'], self.val[f'pred {iteration}'], self.val[f'sw {iteration}'][m]
         ls = SyntheticAdjustments3D.label_size * SyntheticAdjustments3D.max_size
         sns.scatterplot(x=a[~m], y=b[~m], s=ls, size_norm=(0, 1), sizes=s, color='black', marker='X', legend=False)
@@ -268,7 +269,7 @@ class CarsAdjustments(AnalysisCallback):
 
     def plot_function(self, iteration):
         x, y = self.data['price'].values, self.data['sales'].values
-        s, m = ['aug' if b else 'label' for b in np.isnan(y)], dict(aug='o', label='X')
+        s, m = self.data['mask'], dict(aug='o', label='X')
         ls, sn, al = CarsAdjustments.label_size, (0, CarsAdjustments.max_size), CarsAdjustments.alpha
         pred, adj = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'],
         if iteration == PRETRAINING:

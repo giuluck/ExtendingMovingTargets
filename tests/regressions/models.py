@@ -45,6 +45,9 @@ class UnsupervisedMaster(MTMaster):
         self.perturbation_method = perturbation_method
         self.perturbation = perturbation
 
+    def mask(self, reference_vector):
+        return np.isnan(reference_vector) if np.isnan(self.mask_value) else reference_vector == self.mask_value
+
     def build_model(self, macs, model, x, y, iteration):
         var, pred = super(UnsupervisedMaster, self).build_model(macs, model, x, y, iteration)
         if self.perturbation_method == 'constraint':
@@ -90,7 +93,7 @@ class UnsupervisedMaster(MTMaster):
             # sample weights are directly proportional to the distance from the adjusted target to the prediction
             # (if adj_y == p then that sample is pretty useless)
             sample_weight = np.abs(adj_y - pred)
-            sample_weight = self.normalize(sample_weight, np.isnan(y))
+            sample_weight = self.normalize(sample_weight, self.mask(y))
         elif 'feasibility' in self.weight_method:
             sample_weight = np.zeros_like(pred)
             diffs = pred[self.lower_indices] - pred[self.higher_indices]
@@ -101,9 +104,9 @@ class UnsupervisedMaster(MTMaster):
                     sample_weight[hi] = 1.0 / self.gamma
                     sample_weight[li] = 1.0 / self.gamma
                 # in case of feasibility, assign 1 / gamma to each sample
-                if sample_weight[np.isnan(y)].max() == 0.0:
-                    sample_weight = np.ones_like(np.isnan(y)) / self.gamma
-                sample_weight[~np.isnan(y)] = 1.0
+                if sample_weight[self.mask(y)].max() == 0.0:
+                    sample_weight = np.ones_like(self.mask(y)) / self.gamma
+                sample_weight[~self.mask(y)] = 1.0
             else:
                 # differently from feasibility-prop, in case of feasibility-step the increase is constant (1 / gamma)
                 if self.weight_method == 'feasibility-step':
@@ -111,18 +114,27 @@ class UnsupervisedMaster(MTMaster):
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
                     sample_weight[hi] += df
                     sample_weight[li] += df
-                sample_weight = self.normalize(sample_weight, np.isnan(y))
+                sample_weight = self.normalize(sample_weight, self.mask(y))
         else:
             raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
         return adj_y, {'sample_weight': sample_weight}
 
-    def normalize(self, sw, mask):
-        if sw[mask].max() == 0.0:
+    def normalize(self, sw, m):
+        if sw[m].max() == 0.0:
             # if the maximum is zero, adopt gamma policy
             sw = np.ones_like(sw) / self.gamma
         else:
             # if the maximum is non-zero, normalize into [min_weight, 1]
-            sw = sw / sw[mask].max()
+            sw = sw / sw[m].max()
             sw = (1 - self.min_weight) * sw + self.min_weight
-        sw[~mask] = 1.0
+        sw[~m] = 1.0
         return sw
+
+
+class SupervisedMaster(UnsupervisedMaster):
+    def __init__(self, mask, monotonicities, **kwargs):
+        super(SupervisedMaster, self).__init__(monotonicities=monotonicities, **kwargs)
+        self.mask_vector = mask
+
+    def mask(self, reference_vector):
+        return self.mask_vector
