@@ -1,3 +1,4 @@
+import numpy as np
 from docplex.mp.model import Model as CPModel
 
 from moving_targets.masters.master import Master
@@ -31,8 +32,8 @@ class CplexMaster(Master):
 
         # algorithm core: check for feasibility and behave depending on that
         is_feasible = self.is_feasible(macs, model, model_info, x, y, iteration)
-        p_loss = self.p_loss(macs, model, model_info, x, y, iteration)
         y_loss = self.y_loss(macs, model, model_info, x, y, iteration)
+        p_loss = self.p_loss(macs, model, model_info, x, y, iteration)
         if is_feasible:
             model.add(p_loss <= self.beta)
             model.minimize(y_loss)
@@ -46,19 +47,37 @@ class CplexMaster(Master):
         return self.return_solutions(macs, solution, model_info, x, y, iteration)
 
     @staticmethod
-    def sae_loss(model, numeric_variables, model_variables):
-        losses = [model.abs(nv - mv) for nv, mv in zip(numeric_variables, model_variables)]
-        return model.sum(losses)
+    def custom_loss(model, loss, numeric_variables, model_variables, sample_weight=None):
+        if sample_weight is None:
+            sample_weight = np.ones_like(numeric_variables)
+        return model.sum([sw * loss(nv, mv) for nv, mv, sw in zip(numeric_variables, model_variables, sample_weight)])
 
     @staticmethod
-    def sse_loss(model, numeric_variables, model_variables):
-        losses = [(nv - mv) ** 2 for nv, mv in zip(numeric_variables, model_variables)]
-        return model.sum(losses)
+    def sae_loss(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.custom_loss(model=model,
+                                       loss=lambda nv, mv: model.abs(nv - mv),
+                                       numeric_variables=numeric_variables,
+                                       model_variables=model_variables,
+                                       sample_weight=sample_weight)
 
     @staticmethod
-    def mae_loss(model, numeric_variables, model_variables):
-        return CplexMaster.sae_loss(model, numeric_variables, model_variables) / len(numeric_variables)
+    def sse_loss(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.custom_loss(model=model,
+                                       loss=lambda nv, mv: (nv - mv) ** 2,
+                                       numeric_variables=numeric_variables,
+                                       model_variables=model_variables,
+                                       sample_weight=sample_weight)
 
     @staticmethod
-    def mse_loss(model, numeric_variables, model_variables):
-        return CplexMaster.sse_loss(model, numeric_variables, model_variables) / len(numeric_variables)
+    def mae_loss(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.sae_loss(model=model,
+                                    numeric_variables=numeric_variables,
+                                    model_variables=model_variables,
+                                    sample_weight=sample_weight) / len(numeric_variables)
+
+    @staticmethod
+    def mse_loss(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.sse_loss(model=model,
+                                    numeric_variables=numeric_variables,
+                                    model_variables=model_variables,
+                                    sample_weight=sample_weight) / len(numeric_variables)

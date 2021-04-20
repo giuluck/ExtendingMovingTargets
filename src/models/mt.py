@@ -5,24 +5,26 @@ from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
 from src.models.model import Model
-from src.util.augmentation import filter_vectors
 
 
 class MTLearner(Learner):
-    def __init__(self, build_model, warm_start=False, mask_value=np.nan, **kwargs):
+    def __init__(self, build_model, warm_start=False, **kwargs):
         super(MTLearner, self).__init__()
         self.build_model = build_model
         self.warm_start = warm_start
-        self.mask_value = mask_value
         self.fit_args = kwargs
         self.model = build_model()
 
-    def fit(self, macs, x, y, iteration, **kwargs):
+    def fit(self, macs, x, y, iteration, sample_weight=None, **kwargs):
         start_time = time.time()
-        y, x = filter_vectors(self.mask_value, y, x)
+        # re-instantiate model if no warm start
         if not self.warm_start:
             self.model = self.build_model()
-        fit = self.model.fit(x, y, **self.fit_args, **kwargs)
+        # mask values with nan label or sample_weight == 0.0 and fit the model
+        if sample_weight is None:
+            sample_weight = np.ones_like(y)
+        mask = ~np.logical_or(sample_weight == 0.0, np.isnan(y))
+        fit = self.model.fit(x[mask], y[mask], **self.fit_args, sample_weight=sample_weight[mask], **kwargs)
         # retrieve number of epochs and last loss depending on the model
         if 'keras' in str(type(fit)):
             epochs, loss = fit.epoch[-1] + 1, fit.history['loss'][-1]
@@ -42,13 +44,12 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., mask_value=np.nan, time_limit=30):
+    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
         assert loss_fn in ['mae', 'mse', 'sae', 'sse'], "Loss should be one in ['mae', 'mse', 'sae', 'sse']"
         self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
-        self.mask_value = mask_value
 
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
@@ -76,8 +77,8 @@ class MTMaster(CplexMaster):
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         var, _ = model_info
-        y_masked, var_masked = filter_vectors(self.mask_value, y, var)
-        return self.loss_fn(model, y_masked, var_masked)
+        mask = ~np.isnan(y)
+        return self.loss_fn(model, y[mask], var[mask])
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         var, pred = model_info
@@ -85,15 +86,14 @@ class MTMaster(CplexMaster):
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         var, _ = model_info
-        adj_y = np.array([vy.solution_value for vy in var])
-        ground, adj_ground = filter_vectors(self.mask_value, y, adj_y)
+        adj = np.array([vy.solution_value for vy in var])
+        mask = ~np.isnan(y)
         macs.log(**{
-            'master/adj. mae': np.abs(adj_ground - ground).mean(),
-            'master/adj. mse': np.mean((adj_ground - ground) ** 2),
+            'master/adj. mae': np.abs(adj[mask] - y[mask]).mean(),
+            'master/adj. mse': np.mean((adj[mask] - y[mask]) ** 2),
             'time/master': solution.solve_details.time
         })
-        # TODO: compute sample weights and return adjusted labels and sample weights
-        return adj_y
+        return adj
 
 
 class MT(MACS, Model):

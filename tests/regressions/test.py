@@ -13,7 +13,7 @@ from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
 from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments2D, \
     SyntheticAdjustments3D, SyntheticResponse, PuzzlesResponse, ConsoleLogger
-from tests.regressions.models import Learner, UnsupervisedMaster, SupervisedMaster
+from tests.regressions.models import Learner, Master
 from tests.util.experiments import setup
 
 
@@ -49,30 +49,25 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, supervised=False)
         compute_monotonicities=lambda samples, references: reg.compute_monotonicities(samples, references, dirs)
     )
     yag = yag[yag.columns[0]]
+    mask = np.isnan(yag)
     if supervised:
-        yag, mask = build_fake_labels(yag, mn)
-        return xag, yag, mn, dt, fn, lambda **kwargs: SupervisedMaster(mask=mask, **kwargs)
-    else:
-        return xag, yag, mn, dt, fn, UnsupervisedMaster
-
-
-def build_fake_labels(aug, monotonicities):
-    mask = np.isnan(aug)
-    aug[mask] = np.random.uniform(low=aug[~mask].min(), high=aug[~mask].max(), size=len(aug[mask]))
-    # basically a pretraining step in which we force the original data not to be changed
-    model = CPModel()
-    var = np.array(model.continuous_var_list(keys=len(aug), name='y'))
-    model.add_constraints([var[hi] >= var[li] for hi, li in monotonicities])
-    model.add_constraints([v == y for v, y in zip(var[~mask], aug[~mask])])
-    model.minimize(CplexMaster.mae_loss(model, aug, var))
-    model.solve()
-    adj = np.array([vy.solution_value for vy in var])
-    return pd.Series(adj, name=aug.name), mask
+        # assign random values to unlabeled data
+        yag[mask] = np.random.uniform(low=yag[~mask].min(), high=yag[~mask].max(), size=len(yag[mask]))
+        # basically a pretraining step in which we force the original data not to be changed
+        model = CPModel()
+        var = np.array(model.continuous_var_list(keys=len(yag), name='y'))
+        model.add_constraints([var[hi] >= var[li] for hi, li in mn])
+        model.add_constraints([v == y for v, y in zip(var[~mask], yag[~mask])])
+        model.minimize(CplexMaster.mae_loss(model, yag, var))
+        model.solve()
+        # retrieve the optimal values and use it as labels
+        yag = pd.Series(np.array([vy.solution_value for vy in var]), name=yag.name)
+    return xag, yag, mn, dt, mask, fn
 
 
 if __name__ == '__main__':
     setup()
-    x_aug, y_aug, mono, data, summary, Master = retrieve('puzzles', 'group', aug=None, ground=None, supervised=False)
+    x_aug, y_aug, mono, data, aug_mask, summary, = retrieve('cars', 'group', aug=None, ground=None, supervised=False)
 
     callbacks = [
         ConsoleLogger(),
@@ -84,20 +79,21 @@ if __name__ == '__main__':
         # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
-        # CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter')
+        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter')
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
-        PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
-        PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
-        PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews')
+        # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
+        # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
+        # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews')
     ]
 
     # moving targets
     mt = MT(
         learner=Learner(backend='keras', optimizer='adam', warm_start=False, verbose=False),
-        master=Master(monotonicities=mono, loss_fn='mae', alpha=10.0, beta=1.0, beta_method='none',
-                      gamma=15, min_weight=None, weight_method='gamma',
-                      perturbation_method='none', perturbation=None),
+        master=Master(monotonicities=mono, augmented_mask=aug_mask,
+                      loss_fn='mae', alpha=1.0, beta=1.0, beta_method='none',
+                      weight_method='uniform', gamma=15, min_weight=0.0,
+                      perturbation_method='none', perturbation=0.0),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )

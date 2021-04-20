@@ -25,12 +25,8 @@ class TestMTL(MTLearner):
 
 
 class TestMTM(MTMaster):
-    def __init__(self, monotonicities, alpha=1., beta=1., gamma=1., mask_value=np.nan, time_limit=30):
-        super(TestMTM, self).__init__(monotonicities=monotonicities,
-                                      alpha=alpha,
-                                      beta=beta,
-                                      mask_value=mask_value,
-                                      time_limit=time_limit)
+    def __init__(self, monotonicities, gamma=1.0, **kwargs):
+        super(TestMTM, self).__init__(monotonicities=monotonicities, **kwargs)
         self.gamma = gamma
 
     def build_model(self, macs, model, x, y, iteration):

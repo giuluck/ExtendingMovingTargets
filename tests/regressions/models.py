@@ -3,7 +3,6 @@ from sklearn.neural_network import MLPRegressor
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from src.models import MTLearner, MLP, MTMaster
-from src.util.augmentation import filter_vectors
 
 
 class Learner(MTLearner):
@@ -26,17 +25,18 @@ class Learner(MTLearner):
             raise ValueError("backend should be either 'keras' or 'scikit'")
 
 
-class UnsupervisedMaster(MTMaster):
+class Master(MTMaster):
     weight_methods = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same']
     beta_methods = ['none', 'standard', 'proportional']
     pert_methods = ['none', 'loss', 'constraint']
 
-    def __init__(self, monotonicities, alpha=1.0, beta=1.0, loss_fn='mae', weight_method='uniform', gamma=None,
-                 min_weight='gamma', beta_method='standard', perturbation_method='none', perturbation=None):
+    def __init__(self, monotonicities, augmented_mask, weight_method='uniform', gamma=None, min_weight='gamma',
+                 beta_method='standard', perturbation_method='none', perturbation=None, **kwargs):
         assert weight_method in self.weight_methods, f'sample_weight should be in {self.weight_methods}'
         assert beta_method in self.beta_methods, f'beta_method should be in {self.beta_methods}'
         assert perturbation_method in self.pert_methods, f'perturbation_method should be in {self.pert_methods}'
-        super(UnsupervisedMaster, self).__init__(monotonicities=monotonicities, alpha=alpha, beta=beta, loss_fn=loss_fn)
+        super(Master, self).__init__(monotonicities=monotonicities, **kwargs)
+        self.augmented_mask = augmented_mask
         self.weight_method = weight_method
         self.gamma = gamma
         self.min_weight = (0.0 if gamma is None else 1.0 / gamma) if min_weight == 'gamma' else min_weight
@@ -45,22 +45,18 @@ class UnsupervisedMaster(MTMaster):
         self.perturbation_method = perturbation_method
         self.perturbation = perturbation
 
-    def mask(self, reference_vector):
-        return np.isnan(reference_vector) if np.isnan(self.mask_value) else reference_vector == self.mask_value
-
     def build_model(self, macs, model, x, y, iteration):
-        var, pred = super(UnsupervisedMaster, self).build_model(macs, model, x, y, iteration)
+        var, pred = super(Master, self).build_model(macs, model, x, y, iteration)
         if self.perturbation_method == 'constraint':
             # for each variable/prediction pair, we force them to be at least randomly distant from the model prediction
             absolute_perturbation = (y.max() - y.min()) * self.perturbation
-            _, vv, pp = filter_vectors(self.mask_value, y, var, pred)
-            dd = np.abs(np.random.normal(scale=absolute_perturbation, size=len(pp)))
-            for v, p, d in zip(vv, pp, dd):
+            distances = np.abs(np.random.normal(scale=absolute_perturbation, size=len(pred[self.augmented_mask])))
+            for v, p, d in zip(var[self.augmented_mask], pred[self.augmented_mask], distances):
                 model.add(model.abs(v - p) >= d)
         return var, pred
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
-        y_loss = super(UnsupervisedMaster, self).y_loss(macs, model, model_info, x, y, iteration)
+        y_loss = super(Master, self).y_loss(macs, model, model_info, x, y, iteration)
         if self.beta_method is 'proportional':
             self.beta = self.base_beta * y_loss
         return y_loss
@@ -71,16 +67,16 @@ class UnsupervisedMaster(MTMaster):
             # before computing the loss, we perturb the predictions
             absolute_perturbation = (y.max() - y.min()) * self.perturbation
             pred = pred + np.random.normal(scale=absolute_perturbation, size=len(pred))
-        return 0.0 if pred is None else self.loss_fn(model, pred, var)
+        return super(Master, self).p_loss(macs, model, (var, pred), x, y, iteration)
 
     def is_feasible(self, macs, model, model_info, x, y, iteration):
-        feasible = super(UnsupervisedMaster, self).is_feasible(macs, model, model_info, x, y, iteration)
+        feasible = super(Master, self).is_feasible(macs, model, model_info, x, y, iteration)
         feasible = False if self.beta_method is 'none' else feasible
         macs.log(**{'master/method': int(feasible)})
         return feasible
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
-        adj_y = super(UnsupervisedMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        adj_y = super(Master, self).return_solutions(macs, solution, model_info, x, y, iteration)
         _, pred = model_info
         if self.weight_method == 'uniform':
             # no sample weights
@@ -93,7 +89,7 @@ class UnsupervisedMaster(MTMaster):
             # sample weights are directly proportional to the distance from the adjusted target to the prediction
             # (if adj_y == p then that sample is pretty useless)
             sample_weight = np.abs(adj_y - pred)
-            sample_weight = self.normalize(sample_weight, self.mask(y))
+            sample_weight = self.normalize(sample_weight, self.augmented_mask)
         elif 'feasibility' in self.weight_method:
             sample_weight = np.zeros_like(pred)
             diffs = pred[self.lower_indices] - pred[self.higher_indices]
@@ -104,9 +100,9 @@ class UnsupervisedMaster(MTMaster):
                     sample_weight[hi] = 1.0 / self.gamma
                     sample_weight[li] = 1.0 / self.gamma
                 # in case of feasibility, assign 1 / gamma to each sample
-                if sample_weight[self.mask(y)].max() == 0.0:
-                    sample_weight = np.ones_like(self.mask(y)) / self.gamma
-                sample_weight[~self.mask(y)] = 1.0
+                if sample_weight[self.augmented_mask].max() == 0.0:
+                    sample_weight = np.ones_like(self.augmented_mask) / self.gamma
+                sample_weight[~self.augmented_mask] = 1.0
             else:
                 # differently from feasibility-prop, in case of feasibility-step the increase is constant (1 / gamma)
                 if self.weight_method == 'feasibility-step':
@@ -114,7 +110,7 @@ class UnsupervisedMaster(MTMaster):
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
                     sample_weight[hi] += df
                     sample_weight[li] += df
-                sample_weight = self.normalize(sample_weight, self.mask(y))
+                sample_weight = self.normalize(sample_weight, self.augmented_mask)
         else:
             raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
         return adj_y, {'sample_weight': sample_weight}
@@ -129,12 +125,3 @@ class UnsupervisedMaster(MTMaster):
             sw = (1 - self.min_weight) * sw + self.min_weight
         sw[~m] = 1.0
         return sw
-
-
-class SupervisedMaster(UnsupervisedMaster):
-    def __init__(self, mask, monotonicities, **kwargs):
-        super(SupervisedMaster, self).__init__(monotonicities=monotonicities, **kwargs)
-        self.mask_vector = mask
-
-    def mask(self, reference_vector):
-        return self.mask_vector

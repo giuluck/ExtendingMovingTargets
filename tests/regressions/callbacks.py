@@ -42,7 +42,7 @@ class AnalysisCallback(Callback):
     def on_process_start(self, macs, x, y, val_data):
         x = self.x_scaler.invert(x)
         y = self.y_scaler.invert(y)
-        m = pd.Series(['aug' if m else 'label' for m in macs.master.mask(y)], name='mask')
+        m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x, y, m), axis=1)
 
     def on_pretraining_end(self, macs, x, y, val_data):
