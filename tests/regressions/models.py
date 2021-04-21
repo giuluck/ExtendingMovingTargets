@@ -26,7 +26,8 @@ class Learner(MTLearner):
 
 
 class Master(MTMaster):
-    weight_method = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same']
+    weight_method = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same',
+                     'memory-prop', 'memory-step', 'memory-same']
     beta_methods = ['none', 'standard', 'proportional']
     pert_methods = ['none', 'loss', 'constraint']
 
@@ -45,6 +46,7 @@ class Master(MTMaster):
         self.beta_method = beta_method
         self.perturbation_method = perturbation_method
         self.perturbation = perturbation
+        self.weights_memory = np.zeros(len(augmented_mask))
 
     def build_model(self, macs, model, x, y, iteration):
         var, pred = super(Master, self).build_model(macs, model, x, y, iteration)
@@ -57,7 +59,7 @@ class Master(MTMaster):
         return var, pred
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
-        sw = np.where(self.augmented_mask, 1.0, self.master_weights[0])
+        sw = np.where(self.augmented_mask, 1.0 / self.master_weights[0], 1.0)
         var, _ = model_info
         mask = ~np.isnan(y)
         y_loss = self.loss_fn(model, y[mask], var[mask], sample_weight=sw[mask])
@@ -95,28 +97,31 @@ class Master(MTMaster):
             # (if adj_y == p then that sample is pretty useless)
             sample_weight = np.abs(adj_y - pred)
             sample_weight = self.normalize(sample_weight)
-        elif 'feasibility' in self.weight_method:
-            sample_weight = np.zeros_like(pred)
+        elif 'feasibility' in self.weight_method or 'memory' in self.weight_method:
+            if 'memory' not in self.weight_method:
+                self.weights_memory = np.zeros_like(pred)
             diffs = pred[self.lower_indices] - pred[self.higher_indices]
-            if self.weight_method == 'feasibility-same':
+            if 'same' in self.weight_method:
                 # in case of feasibility-same, the augmented points get a value of 1 / gamma independently from the
                 # number and the value of the violations
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
-                    sample_weight[hi] = 1.0 / self.gamma
-                    sample_weight[li] = 1.0 / self.gamma
+                    self.weights_memory[hi] = 1.0 / self.gamma
+                    self.weights_memory[li] = 1.0 / self.gamma
+                sample_weight = self.weights_memory.copy()
                 # in case of feasibility, adopt gamma policy
                 if sample_weight[self.augmented_mask].max() == 0.0:
-                    sample_weight = np.where(self.augmented_mask, 1.0 / self.gamma, 1.0)
+                    sample_weight = np.ones_like(y) / self.gamma
             else:
                 # differently from feasibility-prop, in case of feasibility-step the increase is constant (1 / gamma)
-                if self.weight_method == 'feasibility-step':
+                if 'step' in self.weight_method:
                     diffs = np.where(diffs > 0, 1 / self.gamma, 0.0)
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
-                    sample_weight[hi] += df
-                    sample_weight[li] += df
-                sample_weight = self.normalize(sample_weight)
+                    self.weights_memory[hi] += df
+                    self.weights_memory[li] += df
+                sample_weight = self.normalize(self.weights_memory.copy())
         else:
             raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
+        sample_weight[~self.augmented_mask] = 1.0
         return adj_y, {'sample_weight': sample_weight}
 
     def normalize(self, sw):
@@ -127,5 +132,4 @@ class Master(MTMaster):
             # if the maximum is non-zero, normalize into [min_weight, 1]
             sw = sw / sw[self.augmented_mask].max()
             sw = (1 - self.min_weight) * sw + self.min_weight
-        sw[~self.augmented_mask] = 1.0
         return sw

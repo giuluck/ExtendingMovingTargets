@@ -67,7 +67,7 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, supervised=False)
 
 if __name__ == '__main__':
     setup()
-    x_aug, y_aug, mono, data, aug_mk, summary, = retrieve('synthetic', 'group', aug=None, ground=None, supervised=True)
+    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('synthetic', 'group', aug=None, ground=None, supervised=False)
 
     callbacks = [
         ConsoleLogger(),
@@ -75,11 +75,13 @@ if __name__ == '__main__':
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='a'),
         SyntheticAdjustments2D(data['scalers'], num_columns=3, sorting_attributes=None),
-        SyntheticAdjustments3D(data['scalers'], num_columns=3, sorting_attributes=None),
+        SyntheticAdjustments2D(data['scalers'], do_plot=False, file_signature='temp/synthetic_analysis'),
+        # SyntheticAdjustments3D(data['scalers'], num_columns=3, sorting_attributes=None),
         # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
         # CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
+        # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
@@ -92,7 +94,7 @@ if __name__ == '__main__':
         learner=Learner(backend='keras', optimizer='adam', warm_start=False, verbose=False),
         master=Master(monotonicities=mono, augmented_mask=aug_mk,
                       loss_fn='mae', alpha=1.0, beta=1.0, beta_method='none',
-                      weight_method='gamma', gamma=15, min_weight=0.0, master_weights=15,
+                      weight_method='memory-same', gamma=7.5, min_weight=0.0, master_weights=1,
                       perturbation_method='none', perturbation=0.0),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
@@ -100,7 +102,7 @@ if __name__ == '__main__':
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=2,
+        iterations=8,
         sample_weight=np.where(aug_mk, 1 / 15, 1),
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,

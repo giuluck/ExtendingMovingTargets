@@ -44,12 +44,13 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., time_limit=30):
+    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., eps=1e-6, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
         assert loss_fn in ['mae', 'mse', 'sae', 'sse'], "Loss should be one in ['mae', 'mse', 'sae', 'sse']"
-        self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
+        self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
+        self.eps = eps
 
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
@@ -66,7 +67,8 @@ class MTMaster(CplexMaster):
         if len(self.higher_indices) == 0 or pred is None:
             violations = np.array([0])
         else:
-            violations = np.maximum(0.0, pred[self.lower_indices] - pred[self.higher_indices])
+            violations = pred[self.lower_indices] - pred[self.higher_indices]
+            violations[violations < self.eps] = 0.0
         satisfied = violations == 0
         macs.log(**{
             'master/avg. violation': np.mean(violations),
