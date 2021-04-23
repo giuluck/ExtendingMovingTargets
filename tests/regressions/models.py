@@ -27,7 +27,7 @@ class Learner(MTLearner):
 
 class Master(MTMaster):
     weight_method = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same',
-                     'memory-prop', 'memory-step', 'memory-same']
+                     'memory-prop', 'memory-step', 'memory-same', 'memory-inc']
     beta_methods = ['none', 'standard', 'proportional']
     pert_methods = ['none', 'loss', 'constraint']
 
@@ -102,17 +102,27 @@ class Master(MTMaster):
                 self.weights_memory = np.zeros_like(pred)
             diffs = pred[self.lower_indices] - pred[self.higher_indices]
             if 'same' in self.weight_method:
-                # in case of feasibility-same, the augmented points get a value of 1 / gamma independently from the
-                # number and the value of the violations
+                # in case of feasibility- or memory-same, the augmented points get a value of 1 / gamma independently
+                # from the number and the value of the violations
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
                     self.weights_memory[hi] = 1.0 / self.gamma
                     self.weights_memory[li] = 1.0 / self.gamma
                 sample_weight = self.weights_memory.copy()
-                # in case of feasibility, adopt gamma policy
+                # if there is no violation, adopt gamma policy
+                if sample_weight[self.augmented_mask].max() == 0.0:
+                    sample_weight = np.ones_like(y) / self.gamma
+            elif 'inc' in self.weight_method:
+                # in case of memory-inc, the augmented points get a value of 1 / gamma independently at each iteration
+                for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
+                    self.weights_memory[hi] += 1.0 / self.gamma
+                    self.weights_memory[li] += 1.0 / self.gamma
+                sample_weight = self.weights_memory.copy()
+                # if there is no violation, adopt gamma policy
                 if sample_weight[self.augmented_mask].max() == 0.0:
                     sample_weight = np.ones_like(y) / self.gamma
             else:
-                # differently from feasibility-prop, in case of feasibility-step the increase is constant (1 / gamma)
+                # differently from feasibility- and memory-prop, in case of feasibility- or memory-step
+                # the increase is constant (1 / gamma)
                 if 'step' in self.weight_method:
                     diffs = np.where(diffs > 0, 1 / self.gamma, 0.0)
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):

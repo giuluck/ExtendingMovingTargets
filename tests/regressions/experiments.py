@@ -27,13 +27,13 @@ if __name__ == '__main__':
         alpha=[0.1, 0.5, 1.0, 2.0, 10.0],
         gamma=[1, 7.5, 15],
         master_weights=[1, 7.5, 15],
-        weight_method=['gamma', 'memory-prop', 'memory-step', 'memory-same']
+        weight_method=['gamma', 'memory-prop', 'memory-step', 'memory-same', 'memory-inc']
     )
     # master_args = [{k: v for d in ma.values() for k, v in d.items()} for ma in master_args]
 
     study = cartesian_product(
-        dataset=['cars', 'synthetic'],
-        mono=['ground', 'group'],
+        dataset=['puzzles'],
+        mono=['ground'],
         learner_args=[dict(backend='keras', optimizer='adam', warm_start=False)],
         master_args=master_args
     )
