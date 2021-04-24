@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 
 
 class Scaler:
-    def __init__(self, data, methods: object = 'std'):
+    def __init__(self, data, methods='std'):
         super(Scaler, self).__init__()
         # handle non-pandas data
         if not isinstance(data, pd.DataFrame):
@@ -47,13 +47,30 @@ class Scaler:
         return Scaler([[0.] * num_features], methods=None)
 
 
-def split_dataset(*data, test_size=0.2, val_size=None, **kwargs):
+def split_dataset(*data, test_size=0.2, val_size=None, extrapolation=None, **kwargs):
     # handle default values
     val_size = test_size if val_size is None else val_size
     val_size = val_size if isinstance(val_size, float) else val_size / len(data[0])
     test_size = test_size if isinstance(test_size, float) else test_size / len(data[0])
     # split train/test
-    splits = train_test_split(*data, test_size=test_size, **kwargs)
+    if extrapolation is None:
+        splits = train_test_split(*data, test_size=test_size, **kwargs)
+    else:
+        x = data[0]
+        if not isinstance(extrapolation, dict):
+            extrapolation = {col: extrapolation for col in x.columns}
+        train_mask, test_mask = np.ones(len(x)).astype(bool), np.ones(len(x)).astype(bool)
+        # removes all the data points at the borders for each feature (lq and uq are the quantile values for test set)
+        for col, ex in extrapolation.items():
+            feat = x[col]
+            lq, uq = ex / 2, 1 - ex / 2 if isinstance(ex, float) else ex
+            train_mask = np.logical_and(train_mask, np.logical_and(feat > feat.quantile(lq), feat < feat.quantile(uq)))
+            test_mask = np.logical_and(test_mask, np.logical_or(feat <= feat.quantile(lq), feat >= feat.quantile(uq)))
+        splits = []
+        # create the splits from the initial data by appending the train and the test partition for each vector
+        for d in data:
+            splits.append(d[train_mask])
+            splits.append(d[test_mask])
     train_data, test_data = splits[::2], (splits[1] if len(data) == 1 else splits[1::2])
     # split val/test only if necessary
     if val_size == 0.0:
