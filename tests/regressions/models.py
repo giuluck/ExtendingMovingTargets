@@ -26,22 +26,22 @@ class Learner(MTLearner):
 
 
 class Master(MTMaster):
-    weight_method = ['uniform', 'distance', 'gamma', 'feasibility-prop', 'feasibility-step', 'feasibility-same',
-                     'memory-prop', 'memory-step', 'memory-same', 'memory-inc']
+    weight_method = ['uniform', 'distance', 'omega', 'feasibility-prop', 'feasibility-step', 'feasibility-omega',
+                     'memory-prop', 'memory-step', 'memory-omega', 'memory-inc']
     beta_methods = ['none', 'standard', 'proportional']
     pert_methods = ['none', 'loss', 'constraint']
 
-    def __init__(self, monotonicities, augmented_mask, weight_method='uniform', gamma=None, min_weight='gamma',
-                 master_weights=1.0, beta_method='standard', perturbation_method='none', perturbation=None, **kwargs):
+    def __init__(self, monotonicities, augmented_mask, weight_method='uniform', omega_learner=1.0, omega_master=None,
+                 min_weight=None, beta_method='standard', perturbation_method='none', perturbation=None, **kwargs):
         assert weight_method in self.weight_method, f'sample_weight should be in {self.weight_method}'
         assert beta_method in self.beta_methods, f'beta_method should be in {self.beta_methods}'
         assert perturbation_method in self.pert_methods, f'perturbation_method should be in {self.pert_methods}'
         super(Master, self).__init__(monotonicities=monotonicities, **kwargs)
         self.augmented_mask = augmented_mask
         self.weight_method = weight_method
-        self.gamma = gamma
-        self.min_weight = (0.0 if gamma is None else 1.0 / gamma) if min_weight == 'gamma' else min_weight
-        self.master_weights = master_weights if isinstance(master_weights, tuple) else (master_weights, master_weights)
+        self.omega_learner = omega_learner
+        self.omega_master = omega_learner if omega_master is None else omega_master
+        self.min_weight = 1.0 / omega_learner if min_weight is None else min_weight
         self.base_beta = self.beta
         self.beta_method = beta_method
         self.perturbation_method = perturbation_method
@@ -59,16 +59,14 @@ class Master(MTMaster):
         return var, pred
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
-        sw = np.where(self.augmented_mask, 1.0 / self.master_weights[0], 1.0)
         var, _ = model_info
-        mask = ~np.isnan(y)
-        y_loss = self.loss_fn(model, y[mask], var[mask], sample_weight=sw[mask])
+        y_loss = self.loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)])
         if self.beta_method == 'proportional':
             self.beta = self.base_beta * y_loss
         return y_loss
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
-        sw = np.where(self.augmented_mask, self.master_weights[1], 1)
+        sw = np.where(self.augmented_mask, self.omega_master, 1)
         var, pred = model_info
         if self.perturbation_method == 'loss':
             # before computing the loss, we perturb the predictions
@@ -88,10 +86,10 @@ class Master(MTMaster):
         if self.weight_method == 'uniform':
             # no sample weights
             return adj_y
-        elif self.weight_method == 'gamma':
-            # each ground sample is weighted 1.0, while each augmented sample is weighted 1.0 / gamma
-            # (if gamma is the number of augmented samples, the totality of them is weighted as the original one)
-            sample_weight = np.where(self.augmented_mask, 1.0 / self.gamma, 1.0)
+        elif self.weight_method == 'omega':
+            # each ground sample is weighted 1.0, while each augmented sample is weighted 1.0 / omega
+            # (if omega is the number of augmented samples, the totality of them is weighted as the original one)
+            sample_weight = np.where(self.augmented_mask, 1.0 / self.omega_learner, 1.0)
         elif self.weight_method == 'distance':
             # sample weights are directly proportional to the distance from the adjusted target to the prediction
             # (if adj_y == p then that sample is pretty useless)
@@ -101,34 +99,36 @@ class Master(MTMaster):
             if 'memory' not in self.weight_method:
                 self.weights_memory = np.zeros_like(pred)
             diffs = pred[self.lower_indices] - pred[self.higher_indices]
-            if 'same' in self.weight_method:
-                # in case of feasibility- or memory-same, the augmented points get a value of 1 / gamma independently
+            if 'omega' in self.weight_method:
+                # in case of feasibility- or memory-omega, the augmented points get a value of 1 / omega independently
                 # from the number and the value of the violations
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
-                    self.weights_memory[hi] = 1.0 / self.gamma
-                    self.weights_memory[li] = 1.0 / self.gamma
+                    self.weights_memory[hi] = 1.0 / self.omega_learner
+                    self.weights_memory[li] = 1.0 / self.omega_learner
                 sample_weight = self.weights_memory.copy()
-                # if there is no violation, adopt gamma policy
+                # if there is no violation, adopt omega policy
                 if sample_weight[self.augmented_mask].max() == 0.0:
-                    sample_weight = np.ones_like(y) / self.gamma
+                    sample_weight = np.ones_like(y) / self.omega_learner
             elif 'inc' in self.weight_method:
-                # in case of memory-inc, the augmented points get a value of 1 / gamma independently at each iteration
+                # in case of memory-inc, the augmented points get a value of 1 / omega independently at each iteration
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
-                    self.weights_memory[hi] += 1.0 / self.gamma
-                    self.weights_memory[li] += 1.0 / self.gamma
+                    self.weights_memory[hi] += 1.0 / self.omega_learner
+                    self.weights_memory[li] += 1.0 / self.omega_learner
                 sample_weight = self.weights_memory.copy()
-                # if there is no violation, adopt gamma policy
+                # if there is no violation, adopt omega policy
                 if sample_weight[self.augmented_mask].max() == 0.0:
-                    sample_weight = np.ones_like(y) / self.gamma
-            else:
+                    sample_weight = np.ones_like(y) / self.omega_learner
+            elif 'step' in self.weight_method or 'prop' in self.weight_method:
                 # differently from feasibility- and memory-prop, in case of feasibility- or memory-step
-                # the increase is constant (1 / gamma)
+                # the increase is constant (1 / omega)
                 if 'step' in self.weight_method:
-                    diffs = np.where(diffs > 0, 1 / self.gamma, 0.0)
+                    diffs = np.where(diffs > 0, 1 / self.omega_learner, 0.0)
                 for df, hi, li in zip(diffs[diffs > 0], self.higher_indices[diffs > 0], self.lower_indices[diffs > 0]):
                     self.weights_memory[hi] += df
                     self.weights_memory[li] += df
                 sample_weight = self.normalize(self.weights_memory.copy())
+            else:
+                raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
         else:
             raise NotImplementedError(f'sample_weight {self.weight_method} can not be handled')
         sample_weight[~self.augmented_mask] = 1.0
@@ -136,8 +136,8 @@ class Master(MTMaster):
 
     def normalize(self, sw):
         if sw[self.augmented_mask].max() == 0.0:
-            # if the maximum is zero, adopt gamma policy
-            sw = np.ones_like(sw) / self.gamma
+            # if the maximum is zero, adopt omega policy
+            sw = np.ones_like(sw) / self.omega_learner
         else:
             # if the maximum is non-zero, normalize into [min_weight, 1]
             sw = sw / sw[self.augmented_mask].max()

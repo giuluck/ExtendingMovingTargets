@@ -232,8 +232,9 @@ class SyntheticAdjustments3D(AnalysisCallback):
         a, b, pred, sw = self.val['a'], self.val['b'], self.val[f'pred {iteration}'], self.val[f'sw {iteration}'].values
         ls = SyntheticAdjustments3D.label_size * SyntheticAdjustments3D.max_size
         sns.scatterplot(x=a[~m], y=b[~m], s=ls, size_norm=(0, 1), sizes=s, color='black', marker='X', legend=False)
-        sw = sw[m] * SyntheticAdjustments3D.label_size if np.allclose(sw, 1.0) else sw[m]
-        sns.scatterplot(x=a[m], y=b[m], size=sw, size_norm=(0, 1), sizes=s, color='black', marker='o', legend=False)
+        if iteration != PRETRAINING:
+            sw = sw[m] * SyntheticAdjustments3D.label_size if np.allclose(sw, 1.0) else sw[m]
+            sns.scatterplot(x=a[m], y=b[m], size=sw, size_norm=(0, 1), sizes=s, color='black', marker='o', legend=False)
         plt.legend(['ground', 'label', 'adjusted'])
 
 

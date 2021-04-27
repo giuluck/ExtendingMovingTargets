@@ -17,10 +17,10 @@ from tests.regressions.models import Learner, Master
 from tests.util.experiments import setup
 
 
-def retrieve(dataset, kinds, rand=None, aug=None, ground=None, supervised=False):
+def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supervised=False):
     # dataset without augmentation
     if dataset == 'cars univariate':
-        dt = reg.load_cars('../../res/cars.csv')
+        dt = reg.load_cars('../../res/cars.csv', extrapolation=extra)
         xag, yag = dt['train']
         if ground is not None:
             xag, yag = xag.head(ground), yag.head(ground)
@@ -29,11 +29,14 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, supervised=False)
     # datasets with augmentation
     dt, dirs, nrs, nas, fn = None, None, None, None, None
     if dataset == 'synthetic':
-        dt, dirs, nrs, nas, fn = reg.load_synthetic(), [1, 0], 0, 15, synthetic_summary
+        dt = reg.load_synthetic(extrapolation=extra)
+        dirs, nrs, nas, fn = [1, 0], 0, 15, synthetic_summary
     elif dataset == 'cars':
-        dt, dirs, nrs, nas, fn = reg.load_cars('../../res/cars.csv'), -1, 0, 15, cars_summary
+        dt = reg.load_cars('../../res/cars.csv', extrapolation=extra)
+        dirs, nrs, nas, fn = -1, 0, 15, cars_summary
     elif dataset == 'puzzles':
-        dt, dirs, nrs, nas, fn = reg.load_puzzles('../../res/puzzles.csv'), [-1, 1, 1], 465, [3, 4, 8], puzzles_summary
+        dt = reg.load_puzzles('../../res/puzzles.csv', extrapolation=extra)
+        dirs, nrs, nas, fn = [-1, 1, 1], 465, [3, 4, 8], puzzles_summary
     xag, yag, fag = reg.get_augmented_data(
         x=dt['train'][0],
         y=dt['train'][1],
@@ -67,7 +70,7 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, supervised=False)
 
 if __name__ == '__main__':
     setup()
-    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, supervised=False)
+    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, extra=False)
 
     callbacks = [
         ConsoleLogger(),
@@ -80,7 +83,7 @@ if __name__ == '__main__':
         # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
-        CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
+        # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
         CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
@@ -93,9 +96,9 @@ if __name__ == '__main__':
     mt = MT(
         learner=Learner(backend='keras', optimizer='adam', warm_start=False, verbose=False),
         master=Master(monotonicities=mono, augmented_mask=aug_mk,
-                      loss_fn='mae', alpha=1.0, beta=1.0, beta_method='none',
-                      weight_method='memory-inc', gamma=15, min_weight=0.0, master_weights=1,
-                      perturbation_method='none', perturbation=0.0),
+                      loss_fn='mse', alpha=1.0, beta=1.0, beta_method='none',
+                      weight_method='memory-omega', omega_learner=5, omega_master=5,
+                      min_weight=0.0,  perturbation_method='none', perturbation=0.0),
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2()]
     )
@@ -103,7 +106,6 @@ if __name__ == '__main__':
         x=x_aug,
         y=y_aug,
         iterations=8,
-        sample_weight=np.where(aug_mk, 1 / 15, 1),
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
@@ -126,5 +128,5 @@ if __name__ == '__main__':
         'master/avg. violation'
     ])
 
-    exit()
+    # exit()
     summary(mt, **data)

@@ -25,15 +25,15 @@ class TestMTL(MTLearner):
 
 
 class TestMTM(MTMaster):
-    def __init__(self, monotonicities, gamma=1.0, **kwargs):
+    def __init__(self, monotonicities, omega=1.0, **kwargs):
         super(TestMTM, self).__init__(monotonicities=monotonicities, **kwargs)
-        self.gamma = gamma
+        self.omega = omega
 
     def build_model(self, macs, model, x, y, iteration):
         p = None if iteration == 0 and macs.init_step == 'projection' else macs.predict(x)
         variables = np.array(model.continuous_var_list(keys=len(y), lb=0.0, ub=1.0, name='y'))
         v_higher, v_lower = variables[self.higher_indices], variables[self.lower_indices]
-        model.add_constraints([h >= l for h, l in zip(self.gamma * v_higher, v_lower)])
+        model.add_constraints([h >= l for h, l in zip(self.omega * v_higher, v_lower)])
         return variables, p
 
     def is_feasible(self, macs, model, model_info, x, y, iteration):
@@ -117,7 +117,7 @@ if __name__ == '__main__':
             epochs=200,
             verbose=1
         ),
-        master=TestMTM(mono, alpha=0.01, beta=0.01, gamma=0.9),
+        master=TestMTM(mono, alpha=0.01, beta=0.01, omega=0.9),
         init_step='pretraining',
         metrics=[AUC(name='auc')]
     )
