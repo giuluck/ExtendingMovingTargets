@@ -12,7 +12,7 @@ class CplexMaster(Master):
     def build_model(self, macs, model, x, y, iteration):
         raise NotImplementedError("Please implement method 'build_model'")
 
-    def is_feasible(self, macs, model, model_info, x, y, iteration):
+    def beta_step(self, macs, model, model_info, x, y, iteration):
         return False
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
@@ -31,10 +31,10 @@ class CplexMaster(Master):
         model_info = self.build_model(macs, model, x, y, iteration)
 
         # algorithm core: check for feasibility and behave depending on that
-        is_feasible = self.is_feasible(macs, model, model_info, x, y, iteration)
+        beta_step = self.beta_step(macs, model, model_info, x, y, iteration)
         y_loss = self.y_loss(macs, model, model_info, x, y, iteration)
         p_loss = self.p_loss(macs, model, model_info, x, y, iteration)
-        if is_feasible:
+        if beta_step:
             model.add(p_loss <= self.beta)
             model.minimize(y_loss)
         else:

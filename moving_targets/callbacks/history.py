@@ -34,7 +34,7 @@ class History(Logger):
                 plt.subplot(n_rows, n_columns, idx + 1)
                 p = sns.lineplot(x=self.history.index, y=self.history[col])
                 p.set(title=col, xlabel='', ylabel='')
-                p.set_xticks(self.history.index)
+                # p.set_xticks(self.history.index)
         # show plots
         if show:
             plt.show()

@@ -36,10 +36,10 @@ class TestMTM(MTMaster):
         model.add_constraints([h >= l for h, l in zip(self.omega * v_higher, v_lower)])
         return variables, p
 
-    def is_feasible(self, macs, model, model_info, x, y, iteration):
-        is_feasible = super().is_feasible(macs, model, model_info, x, y, iteration)
-        macs.cache.update(FEASIBLE=is_feasible)
-        return is_feasible
+    def beta_step(self, macs, model, model_info, x, y, iteration):
+        alpha_step = super().beta_step(macs, model, model_info, x, y, iteration)
+        macs.cache.update(FEASIBLE=alpha_step)
+        return alpha_step
 
     # noinspection DuplicatedCode
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
@@ -121,13 +121,9 @@ if __name__ == '__main__':
         init_step='pretraining',
         metrics=[AUC(name='auc')]
     )
-    mt.fit(
-        x=x_aug.values,
-        y=y_aug['clicked'].values,
-        iterations=1,
-        val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
-        callbacks=[FileLogger('log.txt', sort_keys=False)]
-    )
+    mt.fit(x=x_aug.values, y=y_aug['clicked'].values, iterations=1,
+           val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
+           callbacks=[FileLogger('log.txt', sort_keys=False)])
     # noinspection PyUnresolvedReferences
     mt.evaluation_summary(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test))
     plt.show()

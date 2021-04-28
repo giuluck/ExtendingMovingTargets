@@ -8,35 +8,25 @@ from src.models.model import Model
 
 
 class MTLearner(Learner):
-    def __init__(self, build_model, warm_start=False, **kwargs):
+    def __init__(self, build_model, **kwargs):
         super(MTLearner, self).__init__()
         self.build_model = build_model
-        self.warm_start = warm_start
         self.fit_args = kwargs
-        self.model = build_model()
+        self.model = None
 
-    def fit(self, macs, x, y, iteration, sample_weight=None, **kwargs):
+    def fit(self, macs, x, y, iteration, **kwargs):
         start_time = time.time()
-        # re-instantiate model if no warm start
-        if not self.warm_start:
-            self.model = self.build_model()
-        # mask values with nan label or sample_weight == 0.0 and fit the model
-        if sample_weight is None:
-            sample_weight = np.ones_like(y)
-        mask = ~np.logical_or(sample_weight == 0.0, np.isnan(y))
-        fit = self.model.fit(x[mask], y[mask], **self.fit_args, sample_weight=sample_weight[mask], **kwargs)
-        # retrieve number of epochs and last loss depending on the model
-        if 'keras' in str(type(fit)):
-            epochs, loss = fit.epoch[-1] + 1, fit.history['loss'][-1]
-        elif 'sklearn' in str(type(fit)):
-            epochs, loss = fit.n_iter_, fit.loss_
-        else:
-            epochs, loss = np.nan, np.nan
-        # log info
+        # re-initialize model
+        self.model = self.build_model()
+        # fit model
+        fit_args = self.fit_args.copy()
+        fit_args.update(kwargs)
+        fit = self.model.fit(x[~np.isnan(y)], y[~np.isnan(y)], **fit_args)
+        # log statistics
         macs.log(**{
             'time/learner': time.time() - start_time,
-            'learner/epochs': epochs,
-            'learner/loss': loss
+            'learner/epochs': fit.epoch[-1] + 1,
+            'learner/loss': fit.history['loss'][-1]
         })
 
     def predict(self, x):
@@ -44,12 +34,23 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, loss_fn='mae', alpha=1., beta=1., eps=1e-6, time_limit=30):
-        super(MTMaster, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
+    def __init__(self, monotonicities, augmented_mask, loss_fn='mse', alpha=1., learner_weights='all',
+                 learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
+        super(MTMaster, self).__init__(alpha=alpha, beta=1.0, time_limit=time_limit)
         assert loss_fn in ['mae', 'mse', 'sae', 'sse'], "Loss should be one in ['mae', 'mse', 'sae', 'sse']"
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
+        self.augmented_mask = augmented_mask
         self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
+        self.learner_weights = learner_weights
+        if learner_weights == 'all':
+            self.infeasible_mask = np.ones_like(augmented_mask)
+        elif learner_weights == 'infeasible':
+            self.infeasible_mask = np.where(augmented_mask, False, True)
+        else:
+            raise ValueError("augmented_weights should be either 'all' or 'infeasible'")
+        self.learner_omega = learner_omega
+        self.master_omega = learner_omega if master_omega is None else master_omega
         self.eps = eps
 
     def build_model(self, macs, model, x, y, iteration):
@@ -62,7 +63,7 @@ class MTMaster(CplexMaster):
         # return model info
         return var, pred
 
-    def is_feasible(self, macs, model, model_info, x, y, iteration):
+    def beta_step(self, macs, model, model_info, x, y, iteration):
         _, pred = model_info
         if len(self.higher_indices) == 0 or pred is None:
             violations = np.array([0])
@@ -75,19 +76,19 @@ class MTMaster(CplexMaster):
             'master/pct. violation': 1 - np.mean(satisfied),
             'master/is feasible': int(satisfied.all())
         })
-        return satisfied.all()
+        return False
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         var, _ = model_info
-        mask = ~np.isnan(y)
-        return self.loss_fn(model, y[mask], var[mask])
+        return self.loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)])
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         var, pred = model_info
-        return 0.0 if pred is None else self.loss_fn(model, pred, var)
+        sw = np.where(self.augmented_mask, self.master_omega, 1)
+        return 0.0 if pred is None else self.loss_fn(model, pred, var, sample_weight=sw)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
-        var, _ = model_info
+        var, pred = model_info
         adj = np.array([vy.solution_value for vy in var])
         mask = ~np.isnan(y)
         macs.log(**{
@@ -95,7 +96,14 @@ class MTMaster(CplexMaster):
             'master/adj. mse': np.mean((adj[mask] - y[mask]) ** 2),
             'time/master': solution.solve_details.time
         })
-        return adj
+        if self.learner_weights == 'infeasible':
+            diffs = pred[self.lower_indices] - pred[self.higher_indices]
+            higher_mask = np.where(self.higher_indices[diffs > self.eps], True, False)
+            lower_mask = np.where(self.lower_indices[diffs > self.eps], True, False)
+            self.infeasible_mask = np.logical_or(self.infeasible_mask, np.logical_or(higher_mask, lower_mask))
+        sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
+        sample_weight[~self.augmented_mask] = 1.0
+        return adj, {'sample_weight': sample_weight}
 
 
 class MT(MACS, Model):

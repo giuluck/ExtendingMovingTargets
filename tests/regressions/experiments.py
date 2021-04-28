@@ -15,48 +15,35 @@ from tests.regressions.test import retrieve
 from tests.util.experiments import setup
 
 if __name__ == '__main__':
-    setup()
-
-    fixed_parameters = dict(
-        mono='ground',
-        learner_args=dict(backend='keras', optimizer='adam', warm_start=False),
-        master_args=dict(beta_method='none', min_weight=0.0, perturbation_method='none', loss_fn='mse')
+    study = cartesian_product(
+        alpha=[0.01, 0.1, 1.0, 10.0],
+        master_omega=[1, 10, 100, 1000],
+        learner_omega=[1, 10, 100, 1000],
+        learner_weights=['all'],
+        dataset=['cars univariate', 'cars', 'synthetic', 'puzzles'],
     )
-    study_parameters = cartesian_product(
-        dataset=['cars', 'synthetic', 'puzzles'],
-        weight_method=['omega', 'memory-omega'],
-        alpha=[0.1, 0.2, 1.0, 0.5, 10.0],
-        omega=[1, 5, 10, 15],
-        master_weights=[1, 5, 10, 15],
-    )
-    study = []
-    for sp in study_parameters:
-        fp = fixed_parameters.copy()
-        fp['dataset'] = sp['dataset']
-        del sp['dataset']
-        fp['master_args'] = {**fp['master_args'], **sp}
-        study.append(fp)
 
     # begin study
     for i, p in enumerate(study):
+        setup()
         start_time = time.time()
-        print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
-        x_aug, y_aug, mono, data, aug_mk, _ = retrieve(p['dataset'], p['mono'], aug=None, ground=None, supervised=False)
+        print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}:', end='')
+        dataset = p['dataset']
+        config = {k: v for k, v in p.items() if k != 'dataset'}
+        x_aug, y_aug, mono, data, aug_mk, _ = retrieve(dataset, 'group', aug=None, ground=None, supervised=False)
         mt = MT(
-            learner=Learner(**p['learner_args']),
-            master=Master(monotonicities=mono, augmented_mask=aug_mk, **p['master_args']),
+            learner=Learner(),
+            master=Master(monotonicities=mono, augmented_mask=aug_mk, **config),
             init_step='pretraining',
             metrics=[MAE(), MSE(), R2()]
         )
         try:
-            config = {'monotonicity': p['mono'], **p['learner_args'], **p['master_args']}
             mt.fit(
                 x=x_aug,
                 y=y_aug,
                 iterations=50,
-                # sample_weight=np.where(aug_mk, 1 / 15, 1),
                 val_data={k: v for k, v in data.items() if k != 'scalers'},
-                callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=p['dataset'], **config)],
+                callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=dataset, **config)],
                 verbose=False
             )
             print(' -- elapsed time:', time.time() - start_time)

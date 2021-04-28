@@ -41,7 +41,7 @@ class BalancedCounts(CplexMaster):
         # return model info
         return variables, pred, prob, max_count
 
-    def is_feasible(self, macs, model, model_info, x, y, iteration):
+    def beta_step(self, macs, model, model_info, x, y, iteration):
         _, pred, _, max_count = model_info
         _, pred_classes_counts = np.unique(pred, return_counts=True)
         return np.all(pred_classes_counts <= max_count)

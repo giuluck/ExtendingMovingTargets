@@ -66,12 +66,8 @@ if __name__ == '__main__':
             init_step='pretraining',
             metrics=[AUC(name='auc')]
         )
-        mt.fit(
-            x=x_aug.values,
-            y=y_aug['clicked'].values,
-            iterations=10,
-            val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
-            callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)]
-        )
+        mt.fit(x=x_aug.values, y=y_aug['clicked'].values, iterations=10,
+               val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
+               callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)])
         print(f' -- elapsed time: {time.time() - start_time}')
     shutil.rmtree('wandb')
