@@ -20,7 +20,7 @@ class History(Logger):
 
     def plot(self, columns=None, n_columns=4, show=True, **kwargs):
         # handle columns and number of rows
-        assert isinstance(self.history, pd.DataFrame), 'Process did not end correctly therefore no dataframe was built'
+        assert isinstance(self.history, pd.DataFrame), 'Process did not end correctly, therefore no dataframe was built'
         columns = self.history.columns if columns is None else columns
         columns = [c for c in columns if c is None or np.issubdtype(self.history[c].dtype, np.number)]
         n_rows = int(np.ceil(len(columns) / n_columns))
@@ -29,12 +29,12 @@ class History(Logger):
         plt_args.update(kwargs)
         plt.figure(**plt_args)
         # plot each column in a subplot
+        ax = None
         for idx, col in enumerate(columns):
             if col is not None:
-                plt.subplot(n_rows, n_columns, idx + 1)
+                ax = plt.subplot(n_rows, n_columns, idx + 1, sharex=ax)
                 p = sns.lineplot(x=self.history.index, y=self.history[col])
                 p.set(title=col, xlabel='', ylabel='')
-                # p.set_xticks(self.history.index)
         # show plots
         if show:
             plt.show()

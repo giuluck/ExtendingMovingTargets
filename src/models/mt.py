@@ -4,6 +4,7 @@ import numpy as np
 from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
+from moving_targets.metrics.constraints import MonotonicViolation
 from src.models.model import Model
 
 
@@ -109,12 +110,19 @@ class MTMaster(CplexMaster):
 class MT(MACS, Model):
     def __init__(self, learner, master, init_step='pretraining', metrics=None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
+        self.violation_metrics = [m for m in self.metrics if isinstance(m, MonotonicViolation)]
+        self.metrics = [m for m in self.metrics if not isinstance(m, MonotonicViolation)]
 
     def on_iteration_end(self, macs, x, y, val_data, iteration):
         iteration = 0 if iteration == 'pretraining' else iteration
         logs = {'iteration': iteration, 'time/iteration': time.time() - self.time}
+        # VIOLATION METRICS (on augmented data)
+        p = self.predict(x)
+        for violation_metric in self.violation_metrics:
+            logs[f'metrics/{violation_metric.__name__}'] = violation_metric(x, y, p)
+        # SCORE METRICS (on original data splits)
         for name, (xx, yy) in val_data.items():
             pp = self.predict(xx)
             for metric in self.metrics:
-                logs[f'metrics/{name}_{metric.__name__}'] = metric(xx, yy, pp)
+                logs[f'metrics/{name} {metric.__name__}'] = metric(xx, yy, pp)
         self.log(**logs)

@@ -3,6 +3,7 @@ import pandas as pd
 from docplex.mp.model import Model as CPModel
 
 from moving_targets.masters import CplexMaster
+from moving_targets.metrics.constraints import MonotonicViolation
 from src import regressions as reg
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
@@ -41,8 +42,8 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
         x=dt['train'][0],
         y=dt['train'][1],
         directions=dirs,
-        num_random_samples=nrs if rand is None else rand,
-        num_augmented_samples=nas if aug is None else aug,
+        num_rand_samples=nrs if rand is None else rand,
+        num_aug_samples=nas if aug is None else aug,
         num_ground_samples=ground
     )
     mn = get_monotonicities_list(
@@ -70,7 +71,7 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
 
 if __name__ == '__main__':
     setup()
-    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars univariate', 'group', aug=None, ground=None, extra=False)
+    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('puzzles', 'group', aug=None, ground=None, extra=False)
 
     callbacks = [
         ConsoleLogger(),
@@ -84,7 +85,7 @@ if __name__ == '__main__':
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
         # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
-        CarsAdjustments(data['scalers'], num_columns=7, sorting_attributes='price', plot_kind='scatter'),
+        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
@@ -97,12 +98,15 @@ if __name__ == '__main__':
         learner=Learner(),
         master=Master(monotonicities=mono, augmented_mask=aug_mk, alpha=0.01, learner_omega=1, master_omega=1),
         init_step='pretraining',
-        metrics=[MSE(), MAE(), R2()]
+        metrics=[MSE(), MAE(), R2(),
+                 MonotonicViolation(monotonicities=mono, aggregation='average', name='avg. violation'),
+                 MonotonicViolation(monotonicities=mono, aggregation='percentage', name='pct. violation'),
+                 MonotonicViolation(monotonicities=mono, aggregation='feasible', name='is feasible')]
     )
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=27,
+        iterations=8,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
@@ -112,16 +116,16 @@ if __name__ == '__main__':
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
         'learner/epochs',
-        'metrics/train_r2',
-        'master/is feasible',
-        'metrics/train_mse',
-        'metrics/train_mae',
-        'metrics/validation_r2',
-        'master/pct. violation',
+        'metrics/train r2',
+        'metrics/is feasible',
+        'metrics/train mse',
+        'metrics/train mae',
+        'metrics/validation r2',
+        'metrics/pct. violation',
         'master/adj. mse',
         'master/adj. mae',
-        'metrics/test_r2',
-        'master/avg. violation'
+        'metrics/test r2',
+        'metrics/avg. violation'
     ])
 
     # exit()

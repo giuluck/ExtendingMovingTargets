@@ -18,7 +18,9 @@ def compute_monotonicities(samples, references, directions, eps=1e-5):
     return monotonicities
 
 
-def get_augmented_data(x, y, directions=1, num_random_samples=0, num_augmented_samples=5, num_ground_samples=None):
+def get_augmented_data(x, y, directions=1, num_rand_samples=0, num_aug_samples=5, num_ground_samples=None, seed=0):
+    rng = np.random.default_rng(seed=seed)
+
     # handle directions
     if isinstance(directions, dict):
         directions = [directions.get(c, 0) for c in x.columns]
@@ -31,11 +33,11 @@ def get_augmented_data(x, y, directions=1, num_random_samples=0, num_augmented_s
         return compute_monotonicities(samples, references, directions)
 
     # handle num samples
-    if isinstance(num_augmented_samples, dict):
-        num_augmented_samples = [num_augmented_samples.get(c, 0) for c in x.columns]
-    elif isinstance(num_augmented_samples, int):
-        num_augmented_samples = [0 if d == 0 else num_augmented_samples for d in directions]
-    num_augmented_samples = np.array(num_augmented_samples)
+    if isinstance(num_aug_samples, dict):
+        num_aug_samples = [num_aug_samples.get(c, 0) for c in x.columns]
+    elif isinstance(num_aug_samples, int):
+        num_aug_samples = [0 if d == 0 else num_aug_samples for d in directions]
+    num_aug_samples = np.array(num_aug_samples)
 
     # handle input samples reduction
     if num_ground_samples is not None:
@@ -43,15 +45,15 @@ def get_augmented_data(x, y, directions=1, num_random_samples=0, num_augmented_s
         y = y.head(num_ground_samples)
 
     # add random unsupervised samples to fill the data space
-    if num_random_samples > 0:
-        x_rnd = np.random.uniform(size=(num_random_samples, len(x.columns)))
-        y_rnd = [np.nan] * num_random_samples
+    if num_rand_samples > 0:
+        x_rnd = rng.uniform(size=(num_rand_samples, len(x.columns)))
+        y_rnd = [np.nan] * num_rand_samples
         x = pd.concat((x, pd.DataFrame(x_rnd, columns=x.columns)), ignore_index=True)
         y = pd.concat((y, pd.Series(y_rnd, name=y.name)), ignore_index=True)
 
     # augment data
     aug_data, aug_info = augment_data(x, compute_monotonicities=monotonicities, sampling_functions={
-        c: (n, lambda s: np.random.uniform(0, 1, size=s)) for n, c in zip(num_augmented_samples, x.columns)
+        c: (n, lambda s: rng.uniform(0, 1, size=s)) for n, c in zip(num_aug_samples, x.columns)
     })
     x_aug = pd.concat((x, aug_data)).reset_index(drop=True)
     y_aug = pd.concat((y, aug_info)).rename({0: y.name}, axis=1).reset_index(drop=True)
