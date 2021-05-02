@@ -18,12 +18,6 @@ from src.util.combinatorial import cartesian_product
 from tests.util.experiments import setup
 
 
-def get_model(h_units, scaler):
-    model = MLP(output_act='sigmoid', h_units=h_units, scaler=scaler)
-    model.compile(optimizer='adam', loss='mse')
-    return model
-
-
 def on_training_end(model, macs, x, y, val_data, iteration):
     model.log(**{'learner/ground_r2': model.compute_ground_r2()})
 

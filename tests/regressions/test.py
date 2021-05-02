@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from docplex.mp.model import Model as CPModel
+from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.masters import CplexMaster
 from moving_targets.metrics.constraints import MonotonicViolation
@@ -8,13 +9,14 @@ from src import regressions as reg
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
-from src.models import MT
+from src.models import MT, MTMaster, MTLearner, MLP
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary, import_extension_methods
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
-from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments2D, \
-    SyntheticAdjustments3D, SyntheticResponse, PuzzlesResponse, ConsoleLogger
-from tests.regressions.models import Learner, Master
+from tests.regressions.callbacks import CarsAdjustments, SyntheticAdjustments2D, SyntheticAdjustments3D, \
+    SyntheticResponse, PuzzlesResponse
+# noinspection PyUnresolvedReferences
+from tests.util.callbacks import BoundsAnalysis, DistanceAnalysis
 from tests.util.experiments import setup
 
 
@@ -69,17 +71,26 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
     return xag, yag, mn, dt, mask, fn
 
 
+def neural_model():
+    m = MLP(output_act=None, h_units=[16] * 4)
+    m.compile(optimizer='adam', loss='mse')
+    return m
+
+
 if __name__ == '__main__':
-    setup(seed=0)
+    setup(seed=1)
     import_extension_methods()
     x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, extra=False)
-    iterations = 8
-    num_col = int(np.ceil(np.sqrt(iterations + 1)))
-    master = Master(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mse', alpha=0.1,
-                    learner_y='augmented', learner_weights='all', learner_omega=5, master_omega=1)
 
+    # similar to the default behaviour of the scikit MLP (tol = 1e-4, n_iter_no_change = 10, max_iter = 200)
+    es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
+    learner = MTLearner(neural_model, epochs=200, callbacks=[es], verbose=False)
+    master = MTMaster(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mse', alpha=1.0,
+                      learner_y='original', learner_weights='all', learner_omega=30, master_omega=1)
+    iterations = 8
+
+    num_col = int(np.ceil(np.sqrt(iterations + 1)))
     callbacks = [
-        ConsoleLogger(),
         # FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute='a'),
@@ -90,7 +101,7 @@ if __name__ == '__main__':
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute='price'),
         CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
-        # CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
+        CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=num_col, sorting_attribute='word_count'),
@@ -100,7 +111,7 @@ if __name__ == '__main__':
 
     # moving targets
     mt = MT(
-        learner=Learner(),
+        learner=learner,
         master=master,
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2(),
@@ -114,10 +125,10 @@ if __name__ == '__main__':
         iterations=iterations,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
-        verbose=0
+        verbose=1
     )
 
-    exit()
+    # exit()
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
         'learner/epochs',

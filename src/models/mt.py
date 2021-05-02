@@ -31,18 +31,23 @@ class MTLearner(Learner):
         })
 
     def predict(self, x):
-        return self.model.predict(x).reshape(-1, )
+        return self.model.predict(x).flatten()
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, augmented_mask, loss_fn='mse', alpha=1., learner_weights='all',
-                 learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
+    losses = ['mae', 'mse', 'sae', 'sse']
+    learners = ['original', 'augmented', 'adjusted']
+
+    def __init__(self, monotonicities, augmented_mask, loss_fn='mse', alpha=1., learner_y='original',
+                 learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=1.0, time_limit=time_limit)
-        assert loss_fn in ['mae', 'mse', 'sae', 'sse'], "Loss should be one in ['mae', 'mse', 'sae', 'sse']"
+        assert loss_fn in MTMaster.losses, f'loss_fn should be in {MTMaster.losses}'
+        assert learner_y in MTMaster.learners, f'learner_y should be in {MTMaster.learners}'
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
         self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
+        self.learner_y = learner_y
         self.learner_weights = learner_weights
         if learner_weights == 'all':
             self.infeasible_mask = np.where(augmented_mask, True, True)
@@ -97,7 +102,12 @@ class MTMaster(CplexMaster):
             self.infeasible_mask[self.lower_indices[infeasible_mask]] = True
         sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
         sample_weight[~self.augmented_mask] = 1.0
-        return adj, {'sample_weight': sample_weight}
+        learner_y = y.copy()
+        if self.learner_y == 'augmented':
+            learner_y[self.augmented_mask] = adj[self.augmented_mask]
+        elif self.learner_y == 'adjusted':
+            learner_y = adj.copy()
+        return adj, {'y': learner_y, 'sample_weight': sample_weight}
 
 
 class MT(MACS, Model):

@@ -1,6 +1,6 @@
 import time
 
-from moving_targets.callbacks import Logger, FileLogger, History
+from moving_targets.callbacks import Logger, FileLogger, History, ConsoleLogger
 
 
 class MACS(Logger):
@@ -15,16 +15,21 @@ class MACS(Logger):
         self.fitted = False
         self.time = None
 
-    def fit(self, x, y, iterations=1, val_data=None, callbacks=None, verbose=True):
+    def fit(self, x, y, iterations=1, val_data=None, callbacks=None, verbose=2):
         # check user input
         assert iterations >= 0, 'the number of iterations should be non-negative'
         assert iterations > 0 or self.init_step == 'pretraining', 'if projection, iterations should be a positive value'
+        assert isinstance(verbose, bool) or (isinstance(verbose, int) and verbose in [0, 1, 2]), 'unknown verbosity'
         val_data = {} if val_data is None else (val_data if isinstance(val_data, dict) else {'val': val_data})
 
         # handle callbacks and verbosity
         callbacks = [] if callbacks is None else callbacks
-        if verbose:
-            callbacks = [FileLogger()] + callbacks
+        print_callback = []
+        if isinstance(verbose, int):
+            print_callback = [FileLogger()] if verbose == 2 else ([ConsoleLogger()] if verbose == 1 else [])
+        elif isinstance(verbose, bool):
+            print_callback = [FileLogger()] if verbose else []
+        callbacks = print_callback + callbacks
         self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x=x, y=y, val_data=val_data))
 
         # handle pretraining

@@ -1,25 +1,6 @@
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-
-
-def plot_ctr(ctr_estimate, title=None, figsize=(14, 3), res=100):
-    def color_bar():
-        # noinspection PyUnresolvedReferences
-        bar = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(0, 1, True), cmap="viridis")
-        bar.set_array([0, 1])
-        return bar
-
-    avg_ratings, num_reviews = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res))
-    fig, axes = plt.subplots(1, 4, figsize=figsize, sharey='all')
-    for idx, rating in enumerate(['D', 'DD', 'DDD', 'DDDD']):
-        ctr = ctr_estimate(avg_ratings.flatten(), num_reviews.flatten(), [rating] * (res ** 2))
-        axes[idx].pcolor(avg_ratings, num_reviews, ctr.reshape(res, res), shading='auto', vmin=0, vmax=1)
-        axes[idx].set(title=rating, xlabel='Average Rating', ylabel=None if idx > 0 else 'Number of Reviews')
-    fig.colorbar(color_bar(), cax=fig.add_axes([0.92, 0.15, 0.01, 0.7]))
-    fig.suptitle(title)
-    plt.show()
 
 
 def plot_histograms(figsize=(10, 8), tight_layout=True, **kwargs):
@@ -43,13 +24,20 @@ def plot_distributions(figsize=(10, 8), tight_layout=True, **kwargs):
     plt.show()
 
 
-def plot_conclusions(models, figsize=(10, 10), res=100):
+def plot_conclusions(models, figsize=(10, 10), res=100, orient_columns=True):
     avg_ratings, num_reviews = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res))
-    _, axes = plt.subplots(4, len(models), figsize=figsize, sharex='all', sharey='all', tight_layout=True)
-    axes = axes.reshape((4, -1))
+    rows, cols = (4, len(models)) if orient_columns else (len(models), 4)
+    _, axes = plt.subplots(rows, cols, figsize=figsize, sharex='all', sharey='all', tight_layout=True)
+    axes = axes.reshape((rows, cols))
+
     for i, rating in enumerate(['D', 'DD', 'DDD', 'DDDD']):
         for j, (title, model) in enumerate(models.items()):
             ctr = model.ctr_estimate(avg_ratings.flatten(), num_reviews.flatten(), [rating] * (res ** 2))
-            axes[i, j].pcolor(avg_ratings, num_reviews, ctr.reshape(100, 100), shading='auto', vmin=0, vmax=1)
-            axes[i, j].set(title=title if i == 0 else None, xlabel=None, ylabel=rating if j == 0 else None)
+            if orient_columns:
+                axes[i, j].pcolor(avg_ratings, num_reviews, ctr.reshape(res, res), shading='auto', vmin=0, vmax=1)
+                axes[i, j].set(title=title if i == 0 else None, xlabel=None, ylabel=rating if j == 0 else None)
+            else:
+                axes[j, i].pcolor(avg_ratings, num_reviews, ctr.reshape(res, res), shading='auto', vmin=0, vmax=1)
+                axes[j, i].set(title=rating if j == 0 else None, xlabel=None, ylabel=title if i == 0 else None)
+
     plt.show()

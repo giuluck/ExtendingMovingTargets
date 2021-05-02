@@ -44,4 +44,8 @@ def load_data():
     train_data = sample_dataset(1000, rng, testing_set=False)
     val_data = sample_dataset(600, rng, testing_set=False)
     test_data = sample_dataset(600, rng, testing_set=True)
-    return process(train_data), process(val_data), process(test_data)
+    return {
+        'train': process(train_data),
+        'validation': process(val_data),
+        'test': process(test_data)
+    }

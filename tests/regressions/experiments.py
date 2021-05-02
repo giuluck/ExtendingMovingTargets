@@ -1,5 +1,7 @@
 import os
 
+from tensorflow.python.keras.callbacks import EarlyStopping
+
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -8,28 +10,25 @@ import time
 
 from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import R2, MSE, MAE
-from src.models import MT
+from src.models import MT, MTMaster, MTLearner
 from src.util.combinatorial import cartesian_product
-from tests.regressions.models import Learner, Master
-from tests.regressions.test import retrieve
+from tests.regressions.test import retrieve, neural_model
 from tests.util.experiments import setup
 
 if __name__ == '__main__':
     study = cartesian_product(
-        seed=[0, 1, 2, 3, 4],
+        seed=[0, 1, 2],
         alpha=[0.01, 0.1, 1.0, 10.0],
         dataset=['cars_univariate'],
     ) + cartesian_product(
-        seed=[0, 1, 2, 3, 4],
-        alpha=[0.01, 0.1, 1.0, 10.0],
-        master_omega=[1, 10, 100, 1000],
-        learner_omega=[1, 10, 100, 1000],
-        learner_y=['original', 'augmented'],
+        seed=[0, 1, 2],
+        alpha=[0.01, 0.1, 1.0],
+        master_omega=[1, 10, 100],
+        learner_omega=[1, 10, 100],
+        learner_y=['original', 'augmented', 'adjusted'],
         learner_weights=['all', 'memory'],
         dataset=['cars', 'synthetic', 'puzzles'],
     )
-    print(len(study))
-    exit()
 
     # begin study
     for i, p in enumerate(study):
@@ -39,9 +38,10 @@ if __name__ == '__main__':
         dataset = p['dataset']
         config = {k: v for k, v in p.items() if k not in ['seed', 'dataset']}
         x_aug, y_aug, mono, data, aug_mk, _ = retrieve(dataset, 'group', aug=None, ground=None, supervised=False)
+        es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
         mt = MT(
-            learner=Learner(),
-            master=Master(monotonicities=mono, augmented_mask=aug_mk, **config),
+            learner=MTLearner(neural_model, epochs=200, callbacks=[es], verbose=False),
+            master=MTMaster(monotonicities=mono, augmented_mask=aug_mk, **config),
             init_step='pretraining',
             metrics=[MAE(), MSE(), R2()]
         )

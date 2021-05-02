@@ -18,17 +18,18 @@ def compute_ground_r2(model):
     return r2_score(model.ground_truths, pred)
 
 
-def evaluation_summary(model, figsize=(14, 3), **kwargs):
+def evaluation_summary(model, figsize=(14, 7), **kwargs):
     for title, (x, y) in kwargs.items():
         print(f'{roc_auc_score(y, model.predict(x)):.4} ({title} auc)', end=', ')
     print(f'{model.compute_ground_r2():.4} (ground r2)')
-    plot.plot_ctr(model.ctr_estimate, title='Estimated CTR', figsize=figsize)
-    plot.plot_ctr(data.ctr_estimate, title='Real CTR', figsize=figsize)
+    models = {'Estimated CTR': model, 'Real CTR': data}
+    plot.plot_conclusions(models=models, figsize=figsize, res=model.res, orient_columns=False)
 
 
 def import_extension_methods(res=100):
     ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res), ['D', 'DD', 'DDD', 'DDDD'])
 
+    Model.res = res
     Model.avg_ratings = ar.flatten()
     Model.num_reviews = nr.flatten()
     Model.dollar_ratings = dr.flatten()
