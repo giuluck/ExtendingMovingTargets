@@ -48,14 +48,14 @@ class BalancedCounts(CplexMaster):
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _, _, _ = model_info
-        return model.sum([BalancedCounts._indicator_loss(vv, vy) for vv, vy in zip(variables, y)]) / len(variables)
+        return CplexMaster.categorical_indicator(model=model, numeric_variables=y, model_variables=variables)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         variables, pred, prob, _ = model_info
         if prob is None:
-            return model.sum([self._indicator_loss(vv, vp) for vv, vp in zip(variables, pred)]) / len(variables)
+            return CplexMaster.categorical_indicator(model=model, numeric_variables=pred, model_variables=variables)
         else:
-            return model.sum([self._crossentropy_loss(vv, vp) for vv, vp in zip(variables, prob)]) / len(variables)
+            return CplexMaster.categorical_crossentropy(model=model, numeric_variables=prob, model_variables=variables)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         variables, _, _, _ = model_info

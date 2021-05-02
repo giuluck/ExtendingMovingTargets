@@ -48,12 +48,15 @@ class CplexMaster(Master):
 
     @staticmethod
     def custom_loss(model, loss, numeric_variables, model_variables, sample_weight=None):
+        # use uniform weights if none are passed, otherwise normalize the weights so that they sum to len(samples)
         if sample_weight is None:
-            sample_weight = np.ones_like(numeric_variables)
+            sample_weight = np.ones(len(numeric_variables))
+        else:
+            sample_weight = len(sample_weight) * np.array(sample_weight) / np.sum(sample_weight)
         return model.sum([sw * loss(nv, mv) for nv, mv, sw in zip(numeric_variables, model_variables, sample_weight)])
 
     @staticmethod
-    def sae_loss(model, numeric_variables, model_variables, sample_weight=None):
+    def sum_of_absolute_errors(model, numeric_variables, model_variables, sample_weight=None):
         return CplexMaster.custom_loss(model=model,
                                        loss=lambda nv, mv: model.abs(nv - mv),
                                        numeric_variables=numeric_variables,
@@ -61,7 +64,7 @@ class CplexMaster(Master):
                                        sample_weight=sample_weight)
 
     @staticmethod
-    def sse_loss(model, numeric_variables, model_variables, sample_weight=None):
+    def sum_of_squared_errors(model, numeric_variables, model_variables, sample_weight=None):
         return CplexMaster.custom_loss(model=model,
                                        loss=lambda nv, mv: (nv - mv) ** 2,
                                        numeric_variables=numeric_variables,
@@ -69,15 +72,49 @@ class CplexMaster(Master):
                                        sample_weight=sample_weight)
 
     @staticmethod
-    def mae_loss(model, numeric_variables, model_variables, sample_weight=None):
-        return CplexMaster.sae_loss(model=model,
-                                    numeric_variables=numeric_variables,
-                                    model_variables=model_variables,
-                                    sample_weight=sample_weight) / len(numeric_variables)
+    def mean_absolute_error(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.sum_of_absolute_errors(model=model,
+                                                  numeric_variables=numeric_variables,
+                                                  model_variables=model_variables,
+                                                  sample_weight=sample_weight) / len(numeric_variables)
 
     @staticmethod
-    def mse_loss(model, numeric_variables, model_variables, sample_weight=None):
-        return CplexMaster.sse_loss(model=model,
-                                    numeric_variables=numeric_variables,
-                                    model_variables=model_variables,
-                                    sample_weight=sample_weight) / len(numeric_variables)
+    def mean_squared_error(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.sum_of_squared_errors(model=model,
+                                                 numeric_variables=numeric_variables,
+                                                 model_variables=model_variables,
+                                                 sample_weight=sample_weight) / len(numeric_variables)
+
+    @staticmethod
+    def binary_crossentropy(model, numeric_variables, model_variables, sample_weight=None, eps=1e-3):
+        numeric_variables = np.clip(numeric_variables, a_min=eps, a_max=1 - eps)
+        return CplexMaster.custom_loss(model=model,
+                                       loss=lambda nv, mv: -(mv * np.log(nv) + (1 - mv) * np.log(1 - nv)),
+                                       numeric_variables=numeric_variables,
+                                       model_variables=model_variables,
+                                       sample_weight=sample_weight) / len(numeric_variables)
+
+    @staticmethod
+    def binary_indicator(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.custom_loss(model=model,
+                                       loss=lambda nv, mv: nv * mv + (1 - nv) * mv,
+                                       numeric_variables=numeric_variables,
+                                       model_variables=model_variables,
+                                       sample_weight=sample_weight) / len(numeric_variables)
+
+    @staticmethod
+    def categorical_crossentropy(model, numeric_variables, model_variables, sample_weight=None, eps=1e-3):
+        numeric_variables = np.clip(numeric_variables, a_min=eps, a_max=1 - eps)
+        return CplexMaster.custom_loss(model=model,
+                                       loss=lambda nv, mv: -model.sum(mv * np.log(nv)),
+                                       numeric_variables=numeric_variables,
+                                       model_variables=model_variables,
+                                       sample_weight=sample_weight) / len(numeric_variables)
+
+    @staticmethod
+    def categorical_indicator(model, numeric_variables, model_variables, sample_weight=None):
+        return CplexMaster.custom_loss(model=model,
+                                       loss=lambda nv, mv: 1 - mv[nv],
+                                       numeric_variables=numeric_variables,
+                                       model_variables=model_variables,
+                                       sample_weight=sample_weight) / len(numeric_variables)
