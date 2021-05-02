@@ -19,31 +19,31 @@ class FileLogger(Logger):
         if self.filepath is not None:
             open(filepath, 'w').close()
 
-    def on_process_start(self, macs, x, y, val_data):
+    def on_process_start(self, macs, x, y, val_data, **kwargs):
         self._write_on_file('START PROCESS', 'on_process_start')
 
-    def on_process_end(self, macs, x, y, val_data):
+    def on_process_end(self, macs, val_data, **kwargs):
         self._write_on_file('END PROCESS', 'on_process_end')
 
     def on_pretraining_start(self, macs, x, y, val_data):
         self._write_on_file('START PRETRAINING', 'on_pretraining_start')
 
-    def on_pretraining_end(self, macs, x, y, val_data):
+    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
         self._write_on_file('END PRETRAINING', 'on_pretraining_end')
 
-    def on_iteration_start(self, macs, x, y, val_data, iteration):
+    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
         self._write_on_file(f'START ITERATION', 'on_iteration_start')
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
+    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
         self._write_on_file(f'END ITERATION', 'on_iteration_end')
 
     def on_training_start(self, macs, x, y, val_data, iteration):
         self._write_on_file('START TRAINING', 'on_training_start')
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         self._write_on_file('END TRAINING', 'on_training_end')
 
-    def on_adjustment_start(self, macs, x, y, val_data, iteration):
+    def on_adjustment_start(self, macs, x, y, val_data, iteration, **kwargs):
         self._write_on_file('START ADJUSTMENT', 'on_adjustment_start')
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):

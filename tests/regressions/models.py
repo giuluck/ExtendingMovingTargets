@@ -16,4 +16,15 @@ class Learner(MTLearner):
 
 
 class Master(MTMaster):
-    pass
+    def __init__(self, monotonicities, augmented_mask, learner_y='original', **kwargs):
+        assert learner_y in ['original', 'augmented'], "learner_y should be either 'original' or 'augmented'"
+        super(Master, self).__init__(monotonicities=monotonicities, augmented_mask=augmented_mask, **kwargs)
+        self.learner_y = learner_y
+
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj, kwargs = super(Master, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        if self.learner_y == 'augmented':
+            learner_y = adj.copy()
+            learner_y[~self.augmented_mask] = y[~self.augmented_mask]
+            kwargs['y'] = learner_y
+        return adj, kwargs

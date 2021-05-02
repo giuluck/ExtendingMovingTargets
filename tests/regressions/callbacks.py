@@ -16,22 +16,22 @@ class ConsoleLogger(Callback):
         super(ConsoleLogger, self).__init__()
         self.time = None
 
-    def on_iteration_start(self, macs, x, y, val_data, iteration):
+    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
         print(f'-------------------- ITERATION: {iteration:02} --------------------')
         self.time = time.time()
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
+    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
         print(f'Time: {time.time() - self.time:.4f} s')
         self.time = None
 
 
 class AnalysisCallback(Callback):
-    def __init__(self, scalers, num_columns=5, sorting_attributes=None, file_signature=None, do_plot=True, **kwargs):
+    def __init__(self, scalers, num_columns=5, sorting_attribute=None, file_signature=None, do_plot=True, **kwargs):
         super(AnalysisCallback, self).__init__()
         self.x_scaler = scalers[0]
         self.y_scaler = scalers[1]
         self.num_columns = num_columns
-        self.sorting_attributes = sorting_attributes
+        self.sorting_attribute = sorting_attribute
         self.file_signature = file_signature
         self.do_plot = do_plot
         self.plot_kwargs = {'figsize': (20, 10), 'tight_layout': True}
@@ -39,26 +39,31 @@ class AnalysisCallback(Callback):
         self.data = None
         self.iterations = []
 
-    def on_process_start(self, macs, x, y, val_data):
+    def on_process_start(self, macs, x, y, val_data, **kwargs):
         x = self.x_scaler.invert(x)
         y = self.y_scaler.invert(y)
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x, y, m), axis=1)
 
     def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
-        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, PRETRAINING, **kwargs)
+        kwargs['iteration'] = PRETRAINING
+        self.on_iteration_start(macs, x, y, val_data, **kwargs)
+        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, **kwargs)
+        self.on_training_start(macs, x, y, val_data, **kwargs)
 
-    def on_pretraining_end(self, macs, x, y, val_data):
-        self.on_training_end(macs, x, y, val_data, PRETRAINING)
-        self.on_iteration_end(macs, x, y, val_data, PRETRAINING)
+    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
+        kwargs['iteration'] = PRETRAINING
+        self.on_training_end(macs, x, y, val_data, **kwargs)
+        self.on_iteration_end(macs, x, y, val_data, **kwargs)
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
+    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
         self.iterations.append(iteration)
+        self.data[f'y {iteration}'] = self.y_scaler.invert(y)
 
-    def on_process_end(self, macs, x, y, val_data):
+    def on_process_end(self, macs, val_data, **kwargs):
         # sort values
-        if self.sorting_attributes is not None:
-            self.data = self.data.sort_values(self.sorting_attributes)
+        if self.sorting_attribute is not None:
+            self.data = self.data.sort_values(self.sorting_attribute)
         # write on files
         if self.file_signature is not None:
             self.data.to_csv(self.file_signature + '.csv', index_label='index')
@@ -86,20 +91,19 @@ class DistanceAnalysis(AnalysisCallback):
         self.ground_only = ground_only
         self.y = None
 
-    def on_pretraining_end(self, macs, x, y, val_data):
-        pass
+    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
+        self.y = y.name
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         self.data[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(x))
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         self.data[f'adj {iteration}'] = self.y_scaler.invert(adjusted_y)
 
-    def on_process_end(self, macs, x, y, val_data):
-        self.y = y.name
+    def on_process_end(self, macs, val_data, **kwargs):
         if self.ground_only:
             self.data = self.data[self.data['mask'] == 'label']
-        super(DistanceAnalysis, self).on_process_end(macs, x, y, val_data)
+        super(DistanceAnalysis, self).on_process_end(macs, val_data)
 
     def plot_function(self, iteration):
         x = np.arange(len(self.data))
@@ -121,16 +125,16 @@ class BoundsAnalysis(AnalysisCallback):
     def __init__(self, scalers, num_columns=1, **kwargs):
         super(BoundsAnalysis, self).__init__(scalers=scalers, num_columns=num_columns, **kwargs)
 
-    def on_process_start(self, macs, x, y, val_data):
-        super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data)
+    def on_process_start(self, macs, x, y, val_data, **kwargs):
+        super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **kwargs)
         hi, li = macs.master.higher_indices, macs.master.lower_indices
         self.data['lower'] = self.data.index.map(lambda i: li[hi == i])
         self.data['higher'] = self.data.index.map(lambda i: hi[li == i])
 
-    def on_pretraining_end(self, macs, x, y, val_data):
+    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
         pass
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         self._insert_bounds(self.y_scaler.invert(macs.predict(x)), 'pred', iteration)
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
@@ -160,11 +164,11 @@ class SyntheticAdjustments2D(AnalysisCallback):
     max_size = 100
     alpha = 0.4
 
-    def on_process_start(self, macs, x, y, val_data):
-        super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data)
+    def on_process_start(self, macs, x, y, val_data, **kwargs):
+        super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data, **kwargs)
         self.data['ground'] = synthetic_function(self.data['a'], self.data['b'])
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         self.data[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(x))
         self.data[f'pred err {iteration}'] = self.data[f'pred {iteration}'] - self.data['ground']
 
@@ -202,18 +206,18 @@ class SyntheticAdjustments3D(AnalysisCallback):
 
     def __init__(self, scalers, res=100, **kwargs):
         super(SyntheticAdjustments3D, self).__init__(scalers=scalers, **kwargs)
-        assert self.sorting_attributes is None, 'sorting_attributes must be None'
+        assert self.sorting_attribute is None, 'sorting_attribute must be None'
         self.res = res
         self.val = None
 
-    def on_process_start(self, macs, x, y, val_data):
-        super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data)
+    def on_process_start(self, macs, x, y, val_data, **kwargs):
+        super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data, **kwargs)
         # swap values and data in order to print the grid
         self.val = self.data.copy()
         a, b = np.meshgrid(np.linspace(-1, 1, self.res), np.linspace(-1, 1, self.res))
         self.data = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         self.val[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(x))
         self.data[f'z {iteration}'] = self.y_scaler.invert(macs.predict(self.x_scaler.transform(self.data[['a', 'b']])))
 
@@ -245,7 +249,7 @@ class SyntheticResponse(AnalysisCallback):
         self.grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.fader = ColorFader('red', 'blue', bounds=(-1, 1))
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         input_grid = self.x_scaler.transform(self.grid[['a', 'b']])
         self.grid[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(input_grid))
 
@@ -265,7 +269,7 @@ class CarsAdjustments(AnalysisCallback):
         assert plot_kind in ['line', 'scatter'], "plot_kind should be either 'line' or 'scatter'"
         self.plot_kind = plot_kind
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         self.data[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(x))
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
@@ -276,7 +280,7 @@ class CarsAdjustments(AnalysisCallback):
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha
-        p, adj, sw = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'],  self.data[f'sw {iteration}'].values
+        p, adj, sw = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'], self.data[f'sw {iteration}'].values
         # rescale in case of uniform values
         if np.allclose(sw, 1.0):
             sw *= CarsAdjustments.label_size
@@ -305,7 +309,7 @@ class PuzzlesResponse(AnalysisCallback):
         self.grid = self.x_scaler.invert(pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(self.features, grid)}))
         self.feature = feature
 
-    def on_training_end(self, macs, x, y, val_data, iteration):
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
         input_grid = self.x_scaler.transform(self.grid[self.features])
         self.grid[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(input_grid))
 

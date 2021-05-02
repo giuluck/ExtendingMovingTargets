@@ -11,11 +11,11 @@ class History(Logger):
         super(History, self).__init__()
         self.history = []
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
+    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
         self.history.append(pd.DataFrame([self.cache.values()], columns=self.cache.keys(), index=[iteration]))
         self.cache = {}
 
-    def on_process_end(self, macs, x, y, val_data):
+    def on_process_end(self, macs, val_data, **kwargs):
         self.history = pd.concat(self.history)
 
     def plot(self, columns=None, n_columns=4, show=True, **kwargs):

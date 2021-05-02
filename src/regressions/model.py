@@ -127,17 +127,3 @@ def import_extension_methods(synthetic_res=80, cars_res=700, puzzles_res=20):
     Model.synthetic_summary = synthetic_summary
     Model.cars_summary = cars_summary
     Model.puzzles_summary = puzzles_summary
-
-
-if __name__ == '__main__':
-    from src.models import MLP
-    from src.regressions.data import load_cars
-
-    import_extension_methods(synthetic_res=5, cars_res=5, puzzles_res=5)
-    data = load_cars('../../res/cars.csv')
-    x_train, y_train = data['train']
-
-    mlp = MLP(output_act=None, h_units=[16] * 4)
-    mlp.compile(optimizer='adam', loss='mse')
-    mlp.fit(x_train, y_train, epochs=500)
-    mlp.cars_summary(**data)

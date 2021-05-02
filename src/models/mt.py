@@ -45,13 +45,18 @@ class MTMaster(CplexMaster):
         self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
         self.learner_weights = learner_weights
         if learner_weights == 'all':
-            self.infeasible_mask = np.ones_like(augmented_mask)
+            self.infeasible_mask = np.where(augmented_mask, True, True)
         elif learner_weights == 'infeasible':
-            self.infeasible_mask = np.where(augmented_mask, False, True)
+            self.infeasible_mask = np.where(augmented_mask, False, False)
         else:
-            raise ValueError("augmented_weights should be either 'all' or 'infeasible'")
+            raise ValueError("learner_weights should be either 'all' or 'infeasible'")
         self.learner_omega = learner_omega
-        self.master_omega = learner_omega if master_omega is None else master_omega
+        if master_omega is None:
+            self.master_omega_y, self.master_omega_p = learner_omega, learner_omega
+        elif isinstance(master_omega, tuple):
+            self.master_omega_y, self.master_omega_p = master_omega
+        else:
+            self.master_omega_y, self.master_omega_p = master_omega, master_omega
         self.eps = eps
 
     def build_model(self, macs, model, x, y, iteration):
@@ -65,27 +70,16 @@ class MTMaster(CplexMaster):
         return var, pred
 
     def beta_step(self, macs, model, model_info, x, y, iteration):
-        _, pred = model_info
-        if len(self.higher_indices) == 0 or pred is None:
-            violations = np.array([0])
-        else:
-            violations = pred[self.lower_indices] - pred[self.higher_indices]
-            violations[violations < self.eps] = 0.0
-        satisfied = violations == 0
-        macs.log(**{
-            'master/avg. violation': np.mean(violations),
-            'master/pct. violation': 1 - np.mean(satisfied),
-            'master/is feasible': int(satisfied.all())
-        })
         return False
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         var, _ = model_info
-        return self.loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)])
+        sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
+        return self.loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         var, pred = model_info
-        sw = np.where(self.augmented_mask, self.master_omega, 1)
+        sw = np.where(self.augmented_mask, self.master_omega_p, 1)
         return 0.0 if pred is None else self.loss_fn(model, pred, var, sample_weight=sw)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
@@ -98,10 +92,9 @@ class MTMaster(CplexMaster):
             'time/master': solution.solve_details.time
         })
         if self.learner_weights == 'infeasible':
-            diffs = pred[self.lower_indices] - pred[self.higher_indices]
-            higher_mask = np.where(self.higher_indices[diffs > self.eps], True, False)
-            lower_mask = np.where(self.lower_indices[diffs > self.eps], True, False)
-            self.infeasible_mask = np.logical_or(self.infeasible_mask, np.logical_or(higher_mask, lower_mask))
+            infeasible_mask = (pred[self.lower_indices] - pred[self.higher_indices]) > self.eps
+            self.infeasible_mask[self.higher_indices[infeasible_mask]] = True
+            self.infeasible_mask[self.lower_indices[infeasible_mask]] = True
         sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
         sample_weight[~self.augmented_mask] = 1.0
         return adj, {'sample_weight': sample_weight}
@@ -113,7 +106,7 @@ class MT(MACS, Model):
         self.violation_metrics = [m for m in self.metrics if isinstance(m, MonotonicViolation)]
         self.metrics = [m for m in self.metrics if not isinstance(m, MonotonicViolation)]
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
+    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
         iteration = 0 if iteration == 'pretraining' else iteration
         logs = {'iteration': iteration, 'time/iteration': time.time() - self.time}
         # VIOLATION METRICS (on augmented data)

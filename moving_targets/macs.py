@@ -25,36 +25,38 @@ class MACS(Logger):
         callbacks = [] if callbacks is None else callbacks
         if verbose:
             callbacks = [FileLogger()] + callbacks
-        self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x, y, val_data))
+        self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x=x, y=y, val_data=val_data))
 
         # handle pretraining
+        kwargs = dict(x=x, y=y, val_data=val_data, iteration=0)
         if self.init_step == 'pretraining':
-            self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, x, y, val_data))
+            self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, **kwargs))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
             self.learner.fit(self, x, y, iteration='pretraining')
             self.fitted = True
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self, x, y, val_data))
+            self._update_callbacks(callbacks, lambda c: c.on_pretraining_end(self, **kwargs))
 
         # algorithm core
         for iteration in range(1, iterations + 1):
-            self._update_callbacks(callbacks, lambda c: c.on_iteration_start(self, x, y, val_data, iteration))
-            self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, x, y, val_data, iteration))
+            kwargs['iteration'] = iteration
+            self._update_callbacks(callbacks, lambda c: c.on_iteration_start(self, **kwargs))
+            self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, **kwargs))
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
-            yj, kw = self.master.adjust_targets(self, x, y, iteration), {}
+            yj, kw = self.master.adjust_targets(self, x=kwargs['x'], y=kwargs['y'], iteration=iteration), {}
             if isinstance(yj, tuple):
                 yj, kw = yj
+                kwargs.update(kw)
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, x, y, yj, val_data, iteration, **kw))
-            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, x, y, val_data, iteration, **kw))
+            self._update_callbacks(callbacks, lambda c: c.on_adjustment_end(self, adjusted_y=yj, **kwargs))
+            self._update_callbacks(callbacks, lambda c: c.on_training_start(self, **kwargs))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self.learner.fit(self, x, yj, iteration=iteration, **kw)
+            self.learner.fit(self, y=yj, **{k: v for k, v in kwargs.items() if k not in ['val_data', 'y']})
             self.fitted = True
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
-            self._update_callbacks(callbacks, lambda c: c.on_training_end(self, x, y, val_data, iteration))
-            self._update_callbacks(callbacks, lambda c: c.on_iteration_end(self, x, y, val_data, iteration))
-        self._update_callbacks(callbacks, lambda c: c.on_process_end(self, x, y, val_data))
-
+            self._update_callbacks(callbacks, lambda c: c.on_training_end(self, **kwargs))
+            self._update_callbacks(callbacks, lambda c: c.on_iteration_end(self, **kwargs))
+        self._update_callbacks(callbacks, lambda c: c.on_process_end(self, val_data=val_data))
         return self.history
 
     def predict(self, x):
@@ -65,10 +67,10 @@ class MACS(Logger):
         p = self.predict(x)
         return {metric.__name__: metric(x, y, p) for metric in self.metrics}
 
-    def on_iteration_start(self, macs, x, y, val_data, iteration):
+    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
         self.time = time.time()
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration):
+    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
         logs = {'iteration': iteration, 'elapsed time': time.time() - self.time}
         # log metrics on training data
         p = self.predict(x)

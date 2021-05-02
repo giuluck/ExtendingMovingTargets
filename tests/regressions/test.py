@@ -9,7 +9,7 @@ from src import regressions as reg
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE
 from src.models import MT
-from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary
+from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary, import_extension_methods
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
 from tests.regressions.callbacks import BoundsAnalysis, CarsAdjustments, DistanceAnalysis, SyntheticAdjustments2D, \
@@ -70,33 +70,38 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
 
 
 if __name__ == '__main__':
-    setup()
-    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('puzzles', 'group', aug=None, ground=None, extra=False)
+    setup(seed=0)
+    import_extension_methods()
+    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, extra=False)
+    iterations = 8
+    num_col = int(np.ceil(np.sqrt(iterations + 1)))
+    master = Master(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mse', alpha=0.1,
+                    learner_y='augmented', learner_weights='all', learner_omega=5, master_omega=1)
 
     callbacks = [
         ConsoleLogger(),
         # FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='a'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute='a'),
         # SyntheticAdjustments2D(data['scalers'], do_plot=False, file_signature='temp/synthetic_analysis'),
-        # SyntheticAdjustments2D(data['scalers'], num_columns=3, sorting_attributes=None),
-        # SyntheticAdjustments3D(data['scalers'], num_columns=3, sorting_attributes=None),
-        # SyntheticResponse(data['scalers'], num_columns=3, sorting_attributes='a'),
+        # SyntheticAdjustments2D(data['scalers'], num_columns=num_col, sorting_attribute=None),
+        # SyntheticAdjustments3D(data['scalers'], num_columns=num_col, sorting_attribute=None),
+        # SyntheticResponse(data['scalers'], num_columns=num_col, sorting_attribute='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes='price'),
-        # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
-        CarsAdjustments(data['scalers'], num_columns=3, sorting_attributes='price', plot_kind='scatter'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute='price'),
+        CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
+        # CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attributes=None),
-        # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=3, sorting_attributes='word_count'),
-        # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=3, sorting_attributes='star_rating'),
-        # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=3, sorting_attributes='num_reviews')
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute=None),
+        # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=num_col, sorting_attribute='word_count'),
+        # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=num_col, sorting_attribute='star_rating'),
+        # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=num_col, sorting_attribute='num_reviews')
     ]
 
     # moving targets
     mt = MT(
         learner=Learner(),
-        master=Master(monotonicities=mono, augmented_mask=aug_mk, alpha=0.01, learner_omega=1, master_omega=1),
+        master=master,
         init_step='pretraining',
         metrics=[MSE(), MAE(), R2(),
                  MonotonicViolation(monotonicities=mono, aggregation='average', name='avg. violation'),
@@ -106,13 +111,13 @@ if __name__ == '__main__':
     history = mt.fit(
         x=x_aug,
         y=y_aug,
-        iterations=8,
+        iterations=iterations,
         val_data={k: v for k, v in data.items() if k != 'scalers'},
         callbacks=callbacks,
         verbose=0
     )
 
-    # exit()
+    exit()
     history.plot(figsize=(20, 10), n_columns=4, columns=[
         'learner/loss',
         'learner/epochs',
@@ -129,4 +134,5 @@ if __name__ == '__main__':
     ])
 
     # exit()
+    print('-------------------------------------------------------')
     summary(mt, **data)
