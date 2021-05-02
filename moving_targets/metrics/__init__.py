@@ -1,4 +1,4 @@
 from moving_targets.metrics.classification import Accuracy, AUC, ClassificationMetric, F1, Precision, Recall
-from moving_targets.metrics.constraints import ClassFrequenciesStd
+from moving_targets.metrics.constraints import ClassFrequenciesStd, MonotonicViolation
 from moving_targets.metrics.metric import Metric
 from moving_targets.metrics.regression import MAE, MSE, R2, RegressionMetric

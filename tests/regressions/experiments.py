@@ -9,7 +9,7 @@ import shutil
 import time
 
 from moving_targets.callbacks import WandBLogger
-from moving_targets.metrics import R2, MSE, MAE
+from moving_targets.metrics import R2, MSE, MAE, MonotonicViolation
 from src.models import MT, MTMaster, MTLearner
 from src.util.combinatorial import cartesian_product
 from tests.regressions.test import retrieve, neural_model
@@ -32,8 +32,8 @@ if __name__ == '__main__':
 
     # begin study
     for i, p in enumerate(study):
-        setup(seed=p['seed'])
         start_time = time.time()
+        setup(seed=p['seed'])
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}:', end='')
         dataset = p['dataset']
         config = {k: v for k, v in p.items() if k not in ['seed', 'dataset']}
@@ -43,7 +43,10 @@ if __name__ == '__main__':
             learner=MTLearner(neural_model, epochs=200, callbacks=[es], verbose=False),
             master=MTMaster(monotonicities=mono, augmented_mask=aug_mk, **config),
             init_step='pretraining',
-            metrics=[MAE(), MSE(), R2()]
+            metrics=[MAE(), MSE(), R2(),
+                     MonotonicViolation(monotonicities=mono, aggregation='average', name='avg. violation'),
+                     MonotonicViolation(monotonicities=mono, aggregation='percentage', name='pct. violation'),
+                     MonotonicViolation(monotonicities=mono, aggregation='feasible', name='is feasible')]
         )
         try:
             mt.fit(

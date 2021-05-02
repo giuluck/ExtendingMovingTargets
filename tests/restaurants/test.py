@@ -1,6 +1,5 @@
 import os
 
-from moving_targets.metrics.constraints import MonotonicViolation
 
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -16,7 +15,7 @@ from src.util.augmentation import get_monotonicities_list
 from src.util.preprocessing import Scaler
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger, ConsoleLogger
-from moving_targets.metrics import AUC, MAE, MSE
+from moving_targets.metrics import AUC, MAE, MSE, MonotonicViolation
 # noinspection PyUnresolvedReferences
 from tests.util.callbacks import DistanceAnalysis, BoundsAnalysis
 from tests.util.experiments import setup
@@ -49,8 +48,8 @@ if __name__ == '__main__':
 
     callbacks = [
         # FileLogger('temp/log.txt', routines=['on_iteration_end']),
-        DistanceAnalysis(scalers, ground_only=True, num_columns=2, sorting_attribute=None),
-        DistanceAnalysis(scalers, do_plot=False, sorting_attribute=None, file_signature='temp/distance_analysis')
+        # DistanceAnalysis(scalers, do_plot=False, sorting_attribute=None, file_signature='temp/distance_analysis'),
+        DistanceAnalysis(scalers, ground_only=True, num_columns=2, sorting_attribute=None)
     ]
 
     # moving targets

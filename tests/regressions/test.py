@@ -4,11 +4,10 @@ from docplex.mp.model import Model as CPModel
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.masters import CplexMaster
-from moving_targets.metrics.constraints import MonotonicViolation
 from src import regressions as reg
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
-from moving_targets.metrics import R2, MSE, MAE
+from moving_targets.metrics import R2, MSE, MAE, MonotonicViolation
 from src.models import MT, MTMaster, MTLearner, MLP
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary, import_extension_methods
 from src.util.augmentation import get_monotonicities_list

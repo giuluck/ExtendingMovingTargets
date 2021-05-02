@@ -5,63 +5,76 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import time
 import shutil
+import numpy as np
 from tensorflow.keras.callbacks import EarlyStopping
 
 from src import restaurants
 from moving_targets.callbacks import WandBLogger
-from moving_targets.metrics import AUC
-from src.models import MLP, MT, MTLearner, MTMaster
+from moving_targets.metrics import AUC, MAE, MSE, MonotonicViolation
+from src.models import MT, MTLearner, MTMaster
 from src.restaurants import compute_monotonicities
 from src.restaurants.augmentation import get_augmented_data
 from src.util.augmentation import get_monotonicities_list
 from src.util.combinatorial import cartesian_product
+from tests.restaurants.test import neural_model
 from tests.util.experiments import setup
 
 
+# noinspection PyUnusedLocal
 def on_training_end(model, macs, x, y, val_data, iteration):
-    model.log(**{'learner/ground_r2': model.compute_ground_r2()})
+    model.log(**{'metrics/ground_r2': model.compute_ground_r2()})
 
 
 if __name__ == '__main__':
-    # set random seeds and import extension methods
-    setup()
+    # import extension methods and ground_r2 log method
     restaurants.import_extension_methods()
     MT.on_training_end = on_training_end
 
     # load and prepare data
-    (x_train, y_train), (x_val, y_val), (x_test, y_test) = restaurants.load_data()
-    x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(x_train, y_train)
-    monotonicities = get_monotonicities_list(full_aug, compute_monotonicities, 'clicked', ['ground', 'group', 'all'])
+    data = restaurants.load_data()
+    x_aug, y_aug, full_aug, aug_scaler = get_augmented_data(data['train'][0], data['train'][1])
+    aug_mask = np.isnan(y_aug['clicked'])
+    mono = get_monotonicities_list(full_aug, compute_monotonicities, 'clicked', 'group')
 
     # create study list
     study = cartesian_product(
-        # init_step=['pretraining', 'projection'],
-        h_units=[[16, 8, 8]],
-        restart_fit=[True],
-        alpha=[0.1],
-        beta=[0.1],
-        monotonicities=['group']
+        seed=[0, 1, 2],
+        alpha=[0.01, 0.1, 1.0],
+        master_omega=[1, 10, 100],
+        learner_omega=[1, 10, 100],
+        learner_y=['original', 'augmented', 'adjusted'],
+        learner_weights=['all', 'memory']
     )
 
     # begin study
-    for i, params in enumerate(study):
+    for i, p in enumerate(study):
         start_time = time.time()
+        setup(seed=p['seed'])
+        config = {k: v for k, v in p.items() if k not in ['seed']}
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
+        es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
         mt = MT(
-            learner=MTLearner(
-                build_model=lambda: get_model(params['h_units'], aug_scaler),
-                restart_fit=params['restart_fit'],
-                validation_data=(x_val, y_val),
-                callbacks=[EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)],
-                epochs=0,
-                verbose=0
-            ),
-            master=MTMaster(monotonicities[params['monotonicities']], alpha=params['alpha'], beta=params['beta']),
+            learner=MTLearner(lambda: neural_model([16, 8, 8], aug_scaler), epochs=200, callbacks=[es], verbose=False),
+            master=MTMaster(monotonicities=mono, augmented_mask=aug_mask, **config),
             init_step='pretraining',
-            metrics=[AUC(name='auc')]
+            metrics=[MAE(), MSE(), AUC(),
+                     MonotonicViolation(monotonicities=mono, aggregation='average', name='avg. violation'),
+                     MonotonicViolation(monotonicities=mono, aggregation='percentage', name='pct. violation'),
+                     MonotonicViolation(monotonicities=mono, aggregation='feasible', name='is feasible')]
         )
-        mt.fit(x=x_aug.values, y=y_aug['clicked'].values, iterations=10,
-               val_data=dict(train=(x_train, y_train), val=(x_val, y_val), test=(x_test, y_test)),
-               callbacks=[WandBLogger('shape_constraints', 'giuluck', 'restaurants', **params)])
+        try:
+            mt.fit(
+                x=x_aug,
+                y=y_aug,
+                iterations=10,
+                val_data={k: v for k, v in data.items() if k != 'scalers'},
+                callbacks=[WandBLogger(project='sc', entity='giuluck', run_name='restaurants', **config)],
+                verbose=False
+            )
+            print(' -- elapsed time:', time.time() - start_time)
+        except RuntimeError:
+            print(' -- unsolvable')
+            WandBLogger.instance.config.update({'crashed': True})
+            WandBLogger.instance.finish()
         print(f' -- elapsed time: {time.time() - start_time}')
     shutil.rmtree('wandb')
