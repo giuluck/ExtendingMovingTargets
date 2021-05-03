@@ -8,7 +8,7 @@ from src import regressions as reg
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE, MonotonicViolation
-from src.models import MT, MTMaster, MTLearner, MLP
+from src.models import MT, MTRegressionMaster, MTLearner, MLP
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary, import_extension_methods
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
@@ -63,7 +63,7 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
         var = np.array(model.continuous_var_list(keys=len(yag), name='y'))
         model.add_constraints([var[hi] >= var[li] for hi, li in mn])
         model.add_constraints([v == y for v, y in zip(var[~mask], yag[~mask])])
-        model.minimize(CplexMaster.mae_loss(model, yag, var))
+        model.minimize(CplexMaster.mean_squared_error(model, yag, var))
         model.solve()
         # retrieve the optimal values and use it as labels
         yag = pd.Series(np.array([vy.solution_value for vy in var]), name=yag.name)
@@ -77,32 +77,32 @@ def neural_model():
 
 
 if __name__ == '__main__':
-    setup(seed=1)
+    setup()
     import_extension_methods()
     x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, extra=False)
 
     # similar to the default behaviour of the scikit MLP (tol = 1e-4, n_iter_no_change = 10, max_iter = 200)
     es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
     learner = MTLearner(neural_model, epochs=200, callbacks=[es], verbose=False)
-    master = MTMaster(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mse', alpha=1.0,
-                      learner_y='original', learner_weights='all', learner_omega=30, master_omega=1)
+    master = MTRegressionMaster(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mean_squared_error', alpha=1.0,
+                                learner_y='original', learner_weights='all', learner_omega=30, master_omega=1)
     iterations = 8
 
     num_col = int(np.ceil(np.sqrt(iterations + 1)))
     callbacks = [
         # FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute='a'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute='a'),
         # SyntheticAdjustments2D(data['scalers'], do_plot=False, file_signature='temp/synthetic_analysis'),
         # SyntheticAdjustments2D(data['scalers'], num_columns=num_col, sorting_attribute=None),
         # SyntheticAdjustments3D(data['scalers'], num_columns=num_col, sorting_attribute=None),
         # SyntheticResponse(data['scalers'], num_columns=num_col, sorting_attribute='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute='price'),
-        CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
-        CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute='price'),
+        # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
+        # CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=2, sorting_attribute=None),
+        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=num_col, sorting_attribute='word_count'),
         # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=num_col, sorting_attribute='star_rating'),
         # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=num_col, sorting_attribute='num_reviews')
@@ -143,6 +143,6 @@ if __name__ == '__main__':
         'metrics/avg. violation'
     ])
 
-    # exit()
+    exit()
     print('-------------------------------------------------------')
     summary(mt, **data)

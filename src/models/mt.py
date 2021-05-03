@@ -35,18 +35,17 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    losses = ['mae', 'mse', 'sae', 'sse']
     learners = ['original', 'augmented', 'adjusted']
 
-    def __init__(self, monotonicities, augmented_mask, loss_fn='mse', alpha=1., learner_y='original',
+    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1., learner_y='original',
                  learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=1.0, time_limit=time_limit)
-        assert loss_fn in MTMaster.losses, f'loss_fn should be in {MTMaster.losses}'
         assert learner_y in MTMaster.learners, f'learner_y should be in {MTMaster.learners}'
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
-        self.loss_fn = getattr(CplexMaster, f'{loss_fn}_loss')
+        self.y_loss_fn = getattr(CplexMaster, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
+        self.p_loss_fn = getattr(CplexMaster, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         self.learner_y = learner_y
         self.learner_weights = learner_weights
         if learner_weights == 'all':
@@ -64,11 +63,17 @@ class MTMaster(CplexMaster):
             self.master_omega_y, self.master_omega_p = master_omega, master_omega
         self.eps = eps
 
+    def build_variables(self, model, y):
+        raise NotImplementedError("Please implement method 'build variables'")
+
+    def build_predictions(self, macs, x):
+        return macs.predict(x)
+
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
-        pred = None if not macs.fitted else macs.predict(x)
+        pred = None if not macs.fitted else self.build_predictions(macs, x)
         # create variables and impose constraints for each monotonicity
-        var = np.array(model.continuous_var_list(keys=len(y), name='y'))
+        var = np.array(self.build_variables(model, y))
         if len(self.higher_indices):
             model.add_constraints([h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])])
         # return model info
@@ -80,22 +85,17 @@ class MTMaster(CplexMaster):
     def y_loss(self, macs, model, model_info, x, y, iteration):
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
-        return self.loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
+        return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         var, pred = model_info
         sw = np.where(self.augmented_mask, self.master_omega_p, 1)
-        return 0.0 if pred is None else self.loss_fn(model, pred, var, sample_weight=sw)
+        return 0.0 if pred is None else self.p_loss_fn(model, pred, var, sample_weight=sw)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         var, pred = model_info
         adj = np.array([vy.solution_value for vy in var])
-        mask = ~np.isnan(y)
-        macs.log(**{
-            'master/adj. mae': np.abs(adj[mask] - y[mask]).mean(),
-            'master/adj. mse': np.mean((adj[mask] - y[mask]) ** 2),
-            'time/master': solution.solve_details.time
-        })
+        macs.log(**{'time/master': solution.solve_details.time})
         if self.learner_weights == 'infeasible':
             infeasible_mask = (pred[self.lower_indices] - pred[self.higher_indices]) > self.eps
             self.infeasible_mask[self.higher_indices[infeasible_mask]] = True
@@ -108,6 +108,58 @@ class MTMaster(CplexMaster):
         elif self.learner_y == 'adjusted':
             learner_y = adj.copy()
         return adj, {'y': learner_y, 'sample_weight': sample_weight}
+
+
+class MTRegressionMaster(MTMaster):
+    losses = ['mean_absolute_error', 'mean_squared_error', 'sum_of_absolute_errors', 'sum_of_squared_errors']
+
+    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', **kwargs):
+        assert loss_fn in MTRegressionMaster.losses, f'loss_fn should be in {MTRegressionMaster.losses}'
+        super(MTRegressionMaster, self).__init__(
+            monotonicities=monotonicities,
+            augmented_mask=augmented_mask,
+            loss_fn=loss_fn,
+            **kwargs
+        )
+
+    def build_variables(self, model, y):
+        return model.continuous_var_list(keys=len(y), name='y')
+
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj, kwargs = super(MTRegressionMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        mask = ~np.isnan(y)
+        macs.log(**{
+            'master/adj. mae': np.abs(adj[mask] - y[mask]).mean(),
+            'master/adj. mse': np.mean((adj[mask] - y[mask]) ** 2)
+        })
+        return adj, kwargs
+
+
+class MTClassificationMaster(MTMaster):
+    def __init__(self, monotonicities, augmented_mask, use_prob=True, **kwargs):
+        # noinspection PyTypeChecker
+        super(MTClassificationMaster, self).__init__(
+            monotonicities=monotonicities,
+            augmented_mask=augmented_mask,
+            loss_fn=('binary_indicator', 'binary_crossentropy' if use_prob else 'binary_indicator'),
+            **kwargs
+        )
+        self.use_prob = use_prob
+
+    def build_variables(self, model, y):
+        return model.binary_var_list(keys=len(y), name='y')
+
+    def build_predictions(self, macs, x):
+        return macs.predict(x) if self.use_prob else macs.predict(x).round()
+
+    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+        adj, kwargs = super(MTClassificationMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
+        mask = ~np.isnan(y)
+        macs.log(**{
+            'master/avg. flips': np.abs(adj[mask] - y[mask]).mean(),
+            'master/tot. flips': np.abs(adj[mask] - y[mask]).sum(),
+        })
+        return adj, kwargs
 
 
 class MT(MACS, Model):

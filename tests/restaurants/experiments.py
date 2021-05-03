@@ -11,7 +11,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from src import restaurants
 from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import AUC, MAE, MSE, MonotonicViolation
-from src.models import MT, MTLearner, MTMaster
+from src.models import MT, MTLearner, MTClassificationMaster
 from src.restaurants import compute_monotonicities
 from src.restaurants.augmentation import get_augmented_data
 from src.util.augmentation import get_monotonicities_list
@@ -55,7 +55,7 @@ if __name__ == '__main__':
         es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
         mt = MT(
             learner=MTLearner(lambda: neural_model([16, 8, 8], aug_scaler), epochs=200, callbacks=[es], verbose=False),
-            master=MTMaster(monotonicities=mono, augmented_mask=aug_mask, **config),
+            master=MTClassificationMaster(monotonicities=mono, augmented_mask=aug_mask, **config),
             init_step='pretraining',
             metrics=[MAE(), MSE(), AUC(),
                      MonotonicViolation(monotonicities=mono, aggregation='average', name='avg. violation'),

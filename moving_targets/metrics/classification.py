@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score, log_loss
 
 from moving_targets.metrics.metric import Metric
 
@@ -18,6 +18,14 @@ class ClassificationMetric(Metric):
         return self.metric_function(y, p)
 
 
+class CrossEntropy(ClassificationMetric):
+    def __init__(self, classes=None, eps=1e-3, name='crossentropy'):
+        def crossentropy(y_true, y_pred):
+            return log_loss(y_true, y_pred, eps=eps)
+
+        super(CrossEntropy, self).__init__(metric_function=crossentropy, classes=classes, name=name)
+
+
 class Precision(ClassificationMetric):
     def __init__(self, classes=None, name='precision'):
         super(Precision, self).__init__(metric_function=precision_score, classes=classes, name=name)
@@ -29,7 +37,7 @@ class Recall(ClassificationMetric):
 
 
 class F1(ClassificationMetric):
-    def __init__(self, classes=None, name='f1'):
+    def __init__(self, classes=None, name='f1_score'):
         super(F1, self).__init__(metric_function=f1_score, classes=classes, name=name)
 
 
