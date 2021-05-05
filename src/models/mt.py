@@ -10,7 +10,7 @@ from src.models.model import Model
 
 
 class MTLearner(Learner):
-    def __init__(self, output_act=None, h_units=None, optimizer='adam', loss='mse', warm_start=False, **kwargs):
+    def __init__(self, loss, optimizer='adam', output_act=None, h_units=None, scalers=None, warm_start=False, **kwargs):
         super(MTLearner, self).__init__()
         self.output_act = output_act
         self.h_units = h_units
@@ -18,7 +18,7 @@ class MTLearner(Learner):
         self.loss = loss
         self.warm_start = warm_start
         self.fit_args = kwargs
-        self.model = MLP(output_act=self.output_act, h_units=self.h_units)
+        self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=scalers)
 
     def fit(self, macs, x, y, iteration, **kwargs):
         start_time = time.time()

@@ -3,13 +3,12 @@ import pandas as pd
 from docplex.mp.model import Model as CPModel
 from tensorflow.python.keras.callbacks import EarlyStopping
 
+from datasets import Cars, Synthetic, Puzzles
 from moving_targets.masters import CplexMaster
-from src import regressions as reg
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE, MonotonicViolation
 from src.models import MT, MTRegressionMaster, MTLearner
-from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary, import_extension_methods
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
 from tests.regressions.callbacks import CarsAdjustments, SyntheticAdjustments2D, SyntheticAdjustments3D, \
@@ -22,36 +21,40 @@ from tests.util.experiments import setup
 def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supervised=False):
     # dataset without augmentation
     if dataset == 'cars univariate':
-        dt = reg.load_cars('../../res/cars.csv', extrapolation=extra)
+        ds, sc = Cars()
+        dt = ds.load_data(filepath='../../res/cars.csv', extrapolation=extra)
         xag, yag = dt['train']
         if ground is not None:
             xag, yag = xag.head(ground), yag.head(ground)
-        mn = get_monotonicities_list(xag, lambda s, r: reg.compute_monotonicities(s, r, -1), 'sales', 'all', 'ignore')
-        return xag, yag, mn, dt, np.zeros(len(yag)).astype(bool), cars_summary
+        mn = get_monotonicities_list(xag, lambda s, r: ds.compute_monotonicities(s, r), 'sales', 'all', 'ignore')
+        return xag, yag, mn, dt, sc, np.zeros(len(yag)).astype(bool), ds.evaluation_summary
     # datasets with augmentation
-    dt, dirs, nrs, nas, fn = None, None, None, None, None
     if dataset == 'synthetic':
-        dt = reg.load_synthetic(extrapolation=extra)
-        dirs, nrs, nas, fn = [1, 0], 0, 15, synthetic_summary
+        ds = Synthetic()
+        dt, _ = ds.load_data(extrapolation=extra)
+        nrs, nas, fn = 0, 15, ds.evaluation_summary
     elif dataset == 'cars':
-        dt = reg.load_cars('../../res/cars.csv', extrapolation=extra)
-        dirs, nrs, nas, fn = -1, 0, 15, cars_summary
+        ds = Cars()
+        dt, _ = ds.load_data(filepath='../../res/cars.csv', extrapolation=extra)
+        nrs, nas, fn = 0, 15, ds.evaluation_summary
     elif dataset == 'puzzles':
-        dt = reg.load_puzzles('../../res/puzzles.csv', extrapolation=extra)
-        dirs, nrs, nas, fn = [-1, 1, 1], 465, [3, 4, 8], puzzles_summary
-    xag, yag, fag = reg.get_augmented_data(
+        ds = Puzzles()
+        dt, _ = ds.load_data(filepath='../../res/puzzles.csv', extrapolation=extra)
+        nrs, nas, fn = 465, [3, 4, 8], ds.evaluation_summary
+    else:
+        raise ValueError(f"'{dataset}' is not a valid dataset")
+    (xag, yag), sc = ds.get_augmented_data(
         x=dt['train'][0],
         y=dt['train'][1],
-        directions=dirs,
-        rand_samples=nrs if rand is None else rand,
-        aug_samples=nas if aug is None else aug,
-        ground_samples=ground
+        num_augmented=nas if aug is None else aug,
+        num_random=nrs if rand is None else rand,
+        num_ground=ground
     )
     mn = get_monotonicities_list(
-        data=fag,
+        data=pd.concat((xag, yag), axis=1),
         kind=kinds,
         label=yag.columns[0],
-        compute_monotonicities=lambda samples, references: reg.compute_monotonicities(samples, references, dirs)
+        compute_monotonicities=lambda samples, references: ds.compute_monotonicities(samples, references)
     )
     yag = yag[yag.columns[0]]
     mask = np.isnan(yag)
@@ -67,17 +70,17 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
         model.solve()
         # retrieve the optimal values and use it as labels
         yag = pd.Series(np.array([vy.solution_value for vy in var]), name=yag.name)
-    return xag, yag, mn, dt, mask, fn
+    return xag, yag, mn, dt, sc, mask, fn
 
 
 if __name__ == '__main__':
-    setup(seed=0)
-    import_extension_methods()
-    x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, extra=False)
+    setup(seed=1)
+    x_aug, y_aug, mono, data, scalers, aug_mk, summary = retrieve('cars', 'group', aug=None, extra=False)
 
     # similar to the default behaviour of the scikit MLP (tol = 1e-4, n_iter_no_change = 10, max_iter = 200)
-    learner = MTLearner(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=False, epochs=200,
-                        callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)], verbose=False)
+    es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
+    learner = MTLearner(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', scalers=scalers,
+                        warm_start=False, epochs=200, callbacks=[es], verbose=False)
     master = MTRegressionMaster(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mean_squared_error', alpha=0.01,
                                 learner_y='original', learner_weights='all', learner_omega=1, master_omega=1)
     iterations = 8
@@ -86,20 +89,20 @@ if __name__ == '__main__':
     callbacks = [
         # FileLogger('temp/log.txt', routines=['on_iteration_end']),
         # ------------------------------------------------ SYNTHETIC ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute='a'),
-        # SyntheticAdjustments2D(data['scalers'], do_plot=False, file_signature='temp/synthetic_analysis'),
-        # SyntheticAdjustments2D(data['scalers'], num_columns=num_col, sorting_attribute=None),
-        # SyntheticAdjustments3D(data['scalers'], num_columns=num_col, sorting_attribute=None),
-        # SyntheticResponse(data['scalers'], num_columns=num_col, sorting_attribute='a'),
+        # DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='a'),
+        # SyntheticAdjustments2D(do_plot=False, file_signature='temp/synthetic_analysis'),
+        # SyntheticAdjustments2D(num_columns=num_col, sorting_attribute=None),
+        # SyntheticAdjustments3D(num_columns=num_col, sorting_attribute=None),
+        # SyntheticResponse(num_columns=num_col, sorting_attribute='a'),
         # ------------------------------------------------    CARS   ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute='price'),
-        # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
-        CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
+        # DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='price'),
+        # CarsAdjustments(do_plot=False, file_signature='temp/cars_analysis'),
+        CarsAdjustments(num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
-        # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute=None),
-        # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=num_col, sorting_attribute='word_count'),
-        # PuzzlesResponse(data['scalers'], feature='star_rating', num_columns=num_col, sorting_attribute='star_rating'),
-        # PuzzlesResponse(data['scalers'], feature='num_reviews', num_columns=num_col, sorting_attribute='num_reviews')
+        # DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute=None),
+        # PuzzlesResponse(feature='word_count', num_columns=num_col, sorting_attribute='word_count'),
+        # PuzzlesResponse(feature='star_rating', num_columns=num_col, sorting_attribute='star_rating'),
+        # PuzzlesResponse(feature='num_reviews', num_columns=num_col, sorting_attribute='num_reviews')
     ]
 
     # moving targets

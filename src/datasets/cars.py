@@ -6,50 +6,55 @@ from sklearn.metrics import r2_score
 
 from src.datasets.dataset import Dataset
 from src.util.preprocessing import split_dataset
+from util.augmentation import compute_numeric_monotonicities
 
 
 class Cars(Dataset):
-    def __init__(self, x_scaling='std', y_scaling='norm', res=700):
+    def __init__(self, x_scaling='std', y_scaling='norm', bound=(0, 100), res=700):
         super(Cars, self).__init__(
-            x_columns={'price': (0, 100)},
+            x_columns=['price'],
             x_scaling=x_scaling,
             y_column='sales',
             y_scaling=y_scaling,
             metric=r2_score,
-            res=res,
-            directions=[-1]
+            grid=pd.DataFrame.from_dict({'price': np.linspace(bound[0], bound[1], res)}),
+            data_kwargs=dict(figsize=(14, 4), tight_layout=True),
+            augmented_kwargs=dict(figsize=(10, 4)),
+            summary_kwargs=dict(figsize=(10, 4), res=100, ylim=(-5, 125))
         )
+        self.bound = bound
 
-    def load_data(self, filepath, extrapolation=False):
+    def compute_monotonicities(self, samples, references):
+        return compute_numeric_monotonicities(samples, references, directions=[-1])
+
+    def _load_splits(self, filepath, extrapolation=False):
         # preprocess data
         df = pd.read_csv(filepath).rename(
             columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
         df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
         # split data
         if extrapolation:
-            splits = split_dataset(df[['price']], df['sales'], extrapolation=0.2, val_size=0.2, random_state=0)
+            return split_dataset(df[['price']], df['sales'], extrapolation=0.2, val_size=0.2, random_state=0)
         else:
-            splits = split_dataset(df[['price']], df['sales'], extrapolation=None, test_size=0.2, random_state=0)
-        return splits, self.get_scalers(splits['train'][0], splits['train'][1])
+            return split_dataset(df[['price']], df['sales'], extrapolation=None, test_size=0.2, random_state=0)
 
-    def plot_data(self, figsize=(14, 4), tight_layout=True, **kwargs):
-        info = []
+    def _get_sampling_functions(self, num_augmented, rng):
+        return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}
+
+    def _data_plot(self, figsize, tight_layout, **kwargs):
         _, axes = plt.subplots(1, len(kwargs), sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
         for ax, (title, (x, y)) in zip(axes, kwargs.items()):
-            info.append(f'{len(x)} {title} samples')
             sns.scatterplot(x=x['price'], y=y, ax=ax).set(xlabel='price', ylabel='sales', title=title.capitalize())
-        print(', '.join(info))
-        plt.show()
 
-    def evaluation_summary(self, model, res=100, ylim=(-5, 125), figsize=(10, 4), **kwargs):
-        super(Cars, self).evaluation_summary(model=model, **kwargs)
-        plt.figure(figsize=figsize)
+    def _augmented_plot(self, aug, **kwargs):
+        sns.histplot(data=aug, x='price', hue='Augmented')
+
+    # noinspection PyMethodOverriding
+    def _summary_plot(self, model, res, ylim, figsize, **kwargs):
         for title, (x, y) in kwargs.items():
             sns.scatterplot(x=x['price'], y=y, alpha=0.25, sizes=0.25, label=title.capitalize())
-        x_lower, x_upper = self.x_columns['price']
-        x = np.linspace(x_lower, x_upper, res)
+        x = np.linspace(self.bound[0], self.bound[1], res)
         y = model.predict(x.reshape(-1, 1)).flatten()
         sns.lineplot(x=x, y=y, color='black').set(xlabel='price', ylabel='sales', title='Estimated Function')
-        plt.xlim((x_lower, x_upper))
+        plt.xlim(self.bound)
         plt.ylim(ylim)
-        plt.show()

@@ -9,10 +9,8 @@ PRETRAINING = 'PT'
 
 
 class AnalysisCallback(Callback):
-    def __init__(self, scalers, num_columns=5, sorting_attribute=None, file_signature=None, do_plot=True, **kwargs):
+    def __init__(self, num_columns=5, sorting_attribute=None, file_signature=None, do_plot=True, **kwargs):
         super(AnalysisCallback, self).__init__()
-        self.x_scaler = scalers[0]
-        self.y_scaler = scalers[1]
         self.num_columns = num_columns
         self.sorting_attribute = sorting_attribute
         self.file_signature = file_signature
@@ -23,8 +21,6 @@ class AnalysisCallback(Callback):
         self.iterations = []
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
-        x = self.x_scaler.inverse_transform(x)
-        y = self.y_scaler.inverse_transform(y)
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x, y, m), axis=1)
 
@@ -42,7 +38,7 @@ class AnalysisCallback(Callback):
 
     def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
         self.iterations.append(iteration)
-        self.data[f'y {iteration}'] = self.y_scaler.inverse_transform(y)
+        self.data[f'y {iteration}'] = y
 
     def on_process_end(self, macs, val_data, **kwargs):
         # sort values
@@ -70,8 +66,8 @@ class AnalysisCallback(Callback):
 
 
 class DistanceAnalysis(AnalysisCallback):
-    def __init__(self, scalers, ground_only=True, num_columns=1, **kwargs):
-        super(DistanceAnalysis, self).__init__(scalers=scalers, num_columns=num_columns, **kwargs)
+    def __init__(self, ground_only=True, num_columns=1, **kwargs):
+        super(DistanceAnalysis, self).__init__(num_columns=num_columns, **kwargs)
         self.ground_only = ground_only
         self.y = None
 
@@ -80,10 +76,10 @@ class DistanceAnalysis(AnalysisCallback):
         super(DistanceAnalysis, self).on_pretraining_start(macs, x, y, val_data, **kwargs)
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self.data[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(x))
+        self.data[f'pred {iteration}'] = macs.predict(x)
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self.data[f'adj {iteration}'] = self.y_scaler.inverse_transform(adjusted_y)
+        self.data[f'adj {iteration}'] = adjusted_y
 
     def on_process_end(self, macs, val_data, **kwargs):
         if self.ground_only:
@@ -107,8 +103,8 @@ class DistanceAnalysis(AnalysisCallback):
 
 
 class BoundsAnalysis(AnalysisCallback):
-    def __init__(self, scalers, num_columns=1, **kwargs):
-        super(BoundsAnalysis, self).__init__(scalers=scalers, num_columns=num_columns, **kwargs)
+    def __init__(self, num_columns=1, **kwargs):
+        super(BoundsAnalysis, self).__init__(num_columns=num_columns, **kwargs)
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
         super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **kwargs)
@@ -120,10 +116,10 @@ class BoundsAnalysis(AnalysisCallback):
         pass
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self._insert_bounds(self.y_scaler.inverse_transform(macs.predict(x)), 'pred', iteration)
+        self._insert_bounds(macs.predict(x), 'pred', iteration)
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self._insert_bounds(self.y_scaler.inverse_transform(adjusted_y), 'adj', iteration)
+        self._insert_bounds(adjusted_y, 'adj', iteration)
 
     def _insert_bounds(self, v, label, iteration):
         self.data[f'{label} {iteration}'] = v

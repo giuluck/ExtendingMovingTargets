@@ -3,7 +3,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from src.regressions import synthetic_function
+from datasets import Synthetic
 from src.util.plot import ColorFader
 from tests.util.callbacks import AnalysisCallback, PRETRAINING
 
@@ -15,14 +15,14 @@ class SyntheticAdjustments2D(AnalysisCallback):
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
         super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data, **kwargs)
-        self.data['ground'] = synthetic_function(self.data['a'], self.data['b'])
+        self.data['ground'] = Synthetic.function(self.data['a'], self.data['b'])
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self.data[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(x))
+        self.data[f'pred {iteration}'] = macs.predict(x)
         self.data[f'pred err {iteration}'] = self.data[f'pred {iteration}'] - self.data['ground']
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self.data[f'adj {iteration}'] = self.y_scaler.inverse_transform(adjusted_y)
+        self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'adj err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments2D.label_size * np.ones_like(y))
 
@@ -53,8 +53,8 @@ class SyntheticAdjustments3D(AnalysisCallback):
     label_size = 0.3
     max_size = 100
 
-    def __init__(self, scalers, res=100, **kwargs):
-        super(SyntheticAdjustments3D, self).__init__(scalers=scalers, **kwargs)
+    def __init__(self, res=100, **kwargs):
+        super(SyntheticAdjustments3D, self).__init__(**kwargs)
         assert self.sorting_attribute is None, 'sorting_attribute must be None'
         self.res = res
         self.val = None
@@ -67,11 +67,11 @@ class SyntheticAdjustments3D(AnalysisCallback):
         self.data = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self.val[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(x))
-        self.data[f'z {iteration}'] = self.y_scaler.inverse_transform(macs.predict(self.x_scaler.transform(self.data[['a', 'b']])))
+        self.val[f'pred {iteration}'] = macs.predict(x)
+        self.data[f'z {iteration}'] = macs.predict(self.data[['a', 'b']])
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self.val[f'adj {iteration}'] = self.y_scaler.inverse_transform(adjusted_y)
+        self.val[f'adj {iteration}'] = adjusted_y
         self.val[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments3D.label_size * np.ones_like(y))
 
     def plot_function(self, iteration):
@@ -92,15 +92,15 @@ class SyntheticAdjustments3D(AnalysisCallback):
 
 
 class SyntheticResponse(AnalysisCallback):
-    def __init__(self, scalers, res=10, **kwargs):
-        super(SyntheticResponse, self).__init__(scalers=scalers, **kwargs)
+    def __init__(self, res=10, **kwargs):
+        super(SyntheticResponse, self).__init__(**kwargs)
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         self.grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.fader = ColorFader('red', 'blue', bounds=(-1, 1))
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        input_grid = self.x_scaler.transform(self.grid[['a', 'b']])
-        self.grid[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(input_grid))
+        input_grid = self.grid[['a', 'b']]
+        self.grid[f'pred {iteration}'] = macs.predict(input_grid)
 
     def plot_function(self, iteration):
         for idx, group in self.grid.groupby('b'):
@@ -113,16 +113,16 @@ class CarsAdjustments(AnalysisCallback):
     max_size = 100
     alpha = 0.4
 
-    def __init__(self, scalers, plot_kind='scatter', **kwargs):
-        super(CarsAdjustments, self).__init__(scalers=scalers, **kwargs)
+    def __init__(self, plot_kind='scatter', **kwargs):
+        super(CarsAdjustments, self).__init__(**kwargs)
         assert plot_kind in ['line', 'scatter'], "plot_kind should be either 'line' or 'scatter'"
         self.plot_kind = plot_kind
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self.data[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(x))
+        self.data[f'pred {iteration}'] = macs.predict(x)
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self.data[f'adj {iteration}'] = self.y_scaler.inverse_transform(adjusted_y)
+        self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', CarsAdjustments.label_size * np.ones_like(y))
 
     def plot_function(self, iteration):
@@ -151,16 +151,15 @@ class CarsAdjustments(AnalysisCallback):
 class PuzzlesResponse(AnalysisCallback):
     features = ['word_count', 'star_rating', 'num_reviews']
 
-    def __init__(self, scalers, feature, res=5, **kwargs):
-        super(PuzzlesResponse, self).__init__(scalers=scalers, **kwargs)
+    def __init__(self, feature, res=5, **kwargs):
+        super(PuzzlesResponse, self).__init__(**kwargs)
         assert feature in self.features, f"feature should be in {self.features}"
         grid = np.meshgrid(np.linspace(0, 1, res), np.linspace(0, 1, res), np.linspace(0, 1, res))
-        self.grid = self.x_scaler.inverse_transform(pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(self.features, grid)}))
+        self.grid = pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(self.features, grid)})
         self.feature = feature
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        input_grid = self.x_scaler.transform(self.grid[self.features])
-        self.grid[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(input_grid))
+        self.grid[f'pred {iteration}'] = macs.predict(self.grid[self.features])
 
     def plot_function(self, iteration):
         fi, fj = [f for f in self.features if f != self.feature]
