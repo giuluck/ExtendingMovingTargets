@@ -6,27 +6,10 @@ from sklearn.metrics import r2_score
 
 from moving_targets.metrics.constraints import MonotonicViolation
 from src.models import Model
-from src.regressions.augmentation import compute_monotonicities
 from src.regressions.data import synthetic_function
 from src.util.augmentation import get_monotonicities_list
 from src.util.plot import ColorFader
 from src.util.preprocessing import Scaler
-
-
-def metrics_summary(model, y_scaler, **kwargs):
-    summary = []
-    for title, (x, y) in kwargs.items():
-        p = y_scaler.invert(model.predict(x))
-        y = y_scaler.invert(y)
-        summary.append(f'{r2_score(y, p):.4} ({title} r2)')
-    return ', '.join(summary)
-
-
-def violations_summary(model, grid, monotonicities, y_scaler):
-    p = y_scaler.invert(model.predict(grid))
-    avg_violation = MonotonicViolation(monotonicities=monotonicities, aggregation='average', eps=0.0)
-    pct_violation = MonotonicViolation(monotonicities=monotonicities, aggregation='percentage', eps=0.0)
-    return f'{avg_violation(None, None, p):.4} (avg. violation), {pct_violation(None, None, p):.4} (pct. violation)'
 
 
 def synthetic_summary(model, scalers=None, res=50, figsize=(14, 8), tight_layout=True, **kwargs):
@@ -38,7 +21,7 @@ def synthetic_summary(model, scalers=None, res=50, figsize=(14, 8), tight_layout
     # estimated functions
     a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
     grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
-    grid['pred'] = y_scaler.invert(model.predict(x_scaler.transform(grid)))
+    grid['pred'] = y_scaler.inverse_transform(model.predict(x_scaler.transform(grid)))
     grid['label'] = synthetic_function(grid['a'], grid['b'])
     fader = ColorFader('red', 'blue', bounds=(-1, 1))
     _, axes = plt.subplots(2, 3, figsize=figsize, tight_layout=tight_layout)
@@ -57,27 +40,6 @@ def synthetic_summary(model, scalers=None, res=50, figsize=(14, 8), tight_layout
     plt.show()
 
 
-def cars_summary(model, scalers=None, res=100, xlim=(0, 60), ylim=(0, 120), figsize=(10, 4), **kwargs):
-    plt.figure(figsize=figsize)
-    x_scaler, y_scaler = (Scaler.get_default(1), Scaler.get_default(1)) if scalers is None else scalers
-    # compute metrics on kwargs and plot data points
-    violations_grid, mono = model.grids['cars']
-    print(violations_summary(model, grid=violations_grid, monotonicities=mono, y_scaler=y_scaler))
-    print(metrics_summary(model, y_scaler, **kwargs))
-    for title, (x, y) in kwargs.items():
-        x, y = x_scaler.invert(x['price']), y_scaler.invert(y)
-        sns.scatterplot(x=x, y=y, alpha=0.25, sizes=0.25, label=title.capitalize())
-    # estimated function
-    x = np.linspace(x_scaler.transform(xlim)[0], x_scaler.transform(xlim)[1], res)
-    y = model.predict(x.reshape(-1, 1)).flatten()
-    sns.lineplot(x=x_scaler.invert(x), y=y_scaler.invert(y), color='black').set(
-        xlabel='price', ylabel='sales', title='Estimated Function'
-    )
-    plt.xlim(xlim)
-    plt.ylim(ylim)
-    plt.show()
-
-
 def puzzles_summary(model, scalers=None, res=5, figsize=(14, 4), tight_layout=True, **kwargs):
     features = ['word_count', 'star_rating', 'num_reviews']
     fig, axes = plt.subplots(1, 3, sharey='all', tight_layout=tight_layout, figsize=figsize)
@@ -89,8 +51,8 @@ def puzzles_summary(model, scalers=None, res=5, figsize=(14, 4), tight_layout=Tr
     # estimated functions
     grid = np.meshgrid(np.linspace(0, 1, res), np.linspace(0, 1, res), np.linspace(0, 1, res))
     grid = pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(features, grid)})
-    pred = y_scaler.invert(model.predict(grid)).flatten()
-    grid = x_scaler.invert(grid)
+    pred = y_scaler.inverse_transform(model.predict(grid)).flatten()
+    grid = x_scaler.inverse_transform(grid)
     grid['pred'] = pred
     for ax, feat in zip(axes, features):
         # plot predictions for each group of other features
@@ -118,7 +80,7 @@ def import_extension_methods(synthetic_res=80, cars_res=700, puzzles_res=20):
         Model.grids[key] = (
             grid,
             get_monotonicities_list(
-                data=grid, label=None, kinds='all', errors='ignore',
+                data=grid, label=None, kind='all', errors='ignore',
                 compute_monotonicities=lambda s, r: compute_monotonicities(s, r, directions=directions)
             )
         )

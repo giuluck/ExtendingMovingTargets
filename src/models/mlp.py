@@ -6,9 +6,9 @@ from src.models.model import Model
 
 
 class MLP(KerasModel, Model):
-    def __init__(self, output_act=None, h_units=None, scaler=None, input_dim=None):
+    def __init__(self, output_act=None, h_units=None, scalers=None, input_dim=None):
         super(MLP, self).__init__()
-        self.scaler = scaler
+        self.x_scaler, self.y_scaler = (None, None) if scalers is None else scalers
         self.lrs = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]
         self.lrs = self.lrs + [Dense(1, activation=output_act)]
         # handles tensorflow variables (weights) initialization in case input dimension is explicit
@@ -19,7 +19,7 @@ class MLP(KerasModel, Model):
         pass
 
     def call(self, inputs, training=None, mask=None):
-        x = inputs if self.scaler is None else self.scaler.transform(inputs)
+        x = inputs if self.x_scaler is None else self.x_scaler.transform(inputs)
         for layer in self.lrs:
             x = layer(x)
-        return x
+        return x if self.y_scaler is None else self.y_scaler.inverse_transform(x)

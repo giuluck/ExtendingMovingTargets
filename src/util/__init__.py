@@ -1,1 +1,1 @@
-from src.util import augmentation, combinatorial, preprocessing
+from src.util import augmentation, combinatorial, model, plot, preprocessing

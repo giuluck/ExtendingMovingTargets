@@ -11,24 +11,19 @@ from moving_targets.callbacks import WandBLogger
 from moving_targets.metrics import R2, MSE, MAE, MonotonicViolation
 from src.models import MT, MTRegressionMaster, MTLearner
 from src.util.combinatorial import cartesian_product
-from tests.regressions.test import retrieve, neural_model
+from tests.regressions.test import retrieve
 from tests.util.experiments import setup
 
 if __name__ == '__main__':
     study = cartesian_product(
-        seed=[0, 1, 2],
-        alpha=[0.01, 0.1, 1.0, 10.0],
-        dataset=['cars univariate'],
-    ) + cartesian_product(
         seed=[0, 1, 2],
         alpha=[0.01, 0.1, 1.0],
         master_omega=[1, 10, 100],
         learner_omega=[1, 10, 100],
         learner_y=['original', 'augmented', 'adjusted'],
         learner_weights=['all', 'infeasible'],
-        dataset=['cars', 'synthetic', 'puzzles'],
+        dataset=['puzzles'],
     )
-    study = study[538:]
 
     # begin study
     for i, p in enumerate(study):
@@ -39,7 +34,8 @@ if __name__ == '__main__':
         master_args = {k: v for k, v in p.items() if k not in ['seed', 'dataset']}
         es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
         mt = MT(
-            learner=MTLearner(neural_model, epochs=200, callbacks=[es], verbose=False),
+            learner=MTLearner(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=False,
+                              epochs=200, callbacks=[es], verbose=False),
             master=MTRegressionMaster(monotonicities=mono, augmented_mask=aug_mk, **master_args),
             init_step='pretraining',
             metrics=[MAE(), MSE(), R2(),

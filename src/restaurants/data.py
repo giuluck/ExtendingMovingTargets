@@ -41,11 +41,8 @@ def load_data():
         return ds.drop('clicked', axis=1), ds['clicked']
 
     rng = np.random.default_rng(seed=0)
-    train_data = sample_dataset(1000, rng, testing_set=False)
-    val_data = sample_dataset(600, rng, testing_set=False)
-    test_data = sample_dataset(600, rng, testing_set=True)
-    return {
-        'train': process(train_data),
-        'validation': process(val_data),
-        'test': process(test_data)
+    data = {
+        'train': process(sample_dataset(1000, rng, testing_set=False)),
+        'validation': process(sample_dataset(600, rng, testing_set=False)),
+        'test': process(sample_dataset(600, rng, testing_set=True))
     }

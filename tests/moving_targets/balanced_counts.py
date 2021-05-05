@@ -114,8 +114,8 @@ class TestBalancedCounts(unittest.TestCase):
         num_classes = len(np.unique(y))
         # train/val split and scaling
         x_train, x_val, y_train, y_val = train_test_split(x, y)
-        scaler = Scaler(x_train, methods='norm')
-        x_train = scaler.transform(x_train).values
+        scaler = Scaler(methods='norm')
+        x_train = scaler.fit_transform(x_train).values
         x_val = scaler.transform(x_val).values
         # define model pieces
         metrics = [Accuracy(name='acc'), ClassFrequenciesStd(classes=num_classes, name='std')]

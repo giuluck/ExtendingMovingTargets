@@ -48,5 +48,5 @@ def get_augmented_data(x, y, num_augmented_samples=5, num_ground_samples=None):
     y_aug = pd.concat((y, aug_info)).rename({0: 'clicked'}, axis=1).reset_index(drop=True)
     y_aug = y_aug.fillna({'ground_index': pd.Series(y_aug.index), 'monotonicity': 0}).astype({'ground_index': 'int'})
     full_aug = pd.concat((x_aug, y_aug), axis=1)
-    aug_scaler = Scaler(x_aug, methods=dict(avg_rating='std', num_reviews='std'))
+    aug_scaler = Scaler(methods=dict(avg_rating='std', num_reviews='std')).fit(x_aug)
     return x_aug, y_aug, full_aug, aug_scaler

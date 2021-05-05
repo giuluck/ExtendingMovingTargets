@@ -5,20 +5,27 @@ from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
 from moving_targets.metrics.constraints import MonotonicViolation
+from src.models import MLP
 from src.models.model import Model
 
 
 class MTLearner(Learner):
-    def __init__(self, build_model, **kwargs):
+    def __init__(self, output_act=None, h_units=None, optimizer='adam', loss='mse', warm_start=False, **kwargs):
         super(MTLearner, self).__init__()
-        self.build_model = build_model
+        self.output_act = output_act
+        self.h_units = h_units
+        self.optimizer = optimizer
+        self.loss = loss
+        self.warm_start = warm_start
         self.fit_args = kwargs
-        self.model = None
+        self.model = MLP(output_act=self.output_act, h_units=self.h_units)
 
     def fit(self, macs, x, y, iteration, **kwargs):
         start_time = time.time()
-        # re-initialize model
-        self.model = self.build_model()
+        # re-initialize weights if warm start is not enabled, re-initialize optimizer in any case
+        if not self.warm_start:
+            self.model = MLP(output_act=self.output_act, h_units=self.h_units)
+        self.model.compile(optimizer=self.optimizer, loss=self.loss)
         # fit model
         fit_args = self.fit_args.copy()
         fit_args.update(kwargs)

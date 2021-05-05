@@ -8,7 +8,7 @@ from src import regressions as reg
 # noinspection PyUnresolvedReferences
 from moving_targets.callbacks import FileLogger
 from moving_targets.metrics import R2, MSE, MAE, MonotonicViolation
-from src.models import MT, MTRegressionMaster, MTLearner, MLP
+from src.models import MT, MTRegressionMaster, MTLearner
 from src.regressions.model import cars_summary, synthetic_summary, puzzles_summary, import_extension_methods
 from src.util.augmentation import get_monotonicities_list
 # noinspection PyUnresolvedReferences
@@ -43,13 +43,13 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
         x=dt['train'][0],
         y=dt['train'][1],
         directions=dirs,
-        num_rand_samples=nrs if rand is None else rand,
-        num_aug_samples=nas if aug is None else aug,
-        num_ground_samples=ground
+        rand_samples=nrs if rand is None else rand,
+        aug_samples=nas if aug is None else aug,
+        ground_samples=ground
     )
     mn = get_monotonicities_list(
         data=fag,
-        kinds=kinds,
+        kind=kinds,
         label=yag.columns[0],
         compute_monotonicities=lambda samples, references: reg.compute_monotonicities(samples, references, dirs)
     )
@@ -70,22 +70,16 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
     return xag, yag, mn, dt, mask, fn
 
 
-def neural_model():
-    m = MLP(output_act=None, h_units=[16] * 4)
-    m.compile(optimizer='adam', loss='mse')
-    return m
-
-
 if __name__ == '__main__':
-    setup()
+    setup(seed=0)
     import_extension_methods()
     x_aug, y_aug, mono, data, aug_mk, summary = retrieve('cars', 'group', aug=None, ground=None, extra=False)
 
     # similar to the default behaviour of the scikit MLP (tol = 1e-4, n_iter_no_change = 10, max_iter = 200)
-    es = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)
-    learner = MTLearner(neural_model, epochs=200, callbacks=[es], verbose=False)
-    master = MTRegressionMaster(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mean_squared_error', alpha=1.0,
-                                learner_y='original', learner_weights='all', learner_omega=30, master_omega=1)
+    learner = MTLearner(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=False, epochs=200,
+                        callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)], verbose=False)
+    master = MTRegressionMaster(monotonicities=mono, augmented_mask=aug_mk, loss_fn='mean_squared_error', alpha=0.01,
+                                learner_y='original', learner_weights='all', learner_omega=1, master_omega=1)
     iterations = 8
 
     num_col = int(np.ceil(np.sqrt(iterations + 1)))
@@ -100,7 +94,7 @@ if __name__ == '__main__':
         # ------------------------------------------------    CARS   ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute='price'),
         # CarsAdjustments(data['scalers'], do_plot=False, file_signature='temp/cars_analysis'),
-        # CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
+        CarsAdjustments(data['scalers'], num_columns=num_col, sorting_attribute='price', plot_kind='scatter'),
         # ------------------------------------------------  PUZZLES  ------------------------------------------------
         # DistanceAnalysis(data['scalers'], ground_only=True, num_columns=num_col, sorting_attribute=None),
         # PuzzlesResponse(data['scalers'], feature='word_count', num_columns=num_col, sorting_attribute='word_count'),
@@ -143,6 +137,6 @@ if __name__ == '__main__':
         'metrics/avg. violation'
     ])
 
-    exit()
+    # exit()
     print('-------------------------------------------------------')
     summary(mt, **data)

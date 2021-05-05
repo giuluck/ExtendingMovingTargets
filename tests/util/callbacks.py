@@ -23,8 +23,8 @@ class AnalysisCallback(Callback):
         self.iterations = []
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
-        x = self.x_scaler.invert(x)
-        y = self.y_scaler.invert(y)
+        x = self.x_scaler.inverse_transform(x)
+        y = self.y_scaler.inverse_transform(y)
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x, y, m), axis=1)
 
@@ -42,7 +42,7 @@ class AnalysisCallback(Callback):
 
     def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
         self.iterations.append(iteration)
-        self.data[f'y {iteration}'] = self.y_scaler.invert(y)
+        self.data[f'y {iteration}'] = self.y_scaler.inverse_transform(y)
 
     def on_process_end(self, macs, val_data, **kwargs):
         # sort values
@@ -80,10 +80,10 @@ class DistanceAnalysis(AnalysisCallback):
         super(DistanceAnalysis, self).on_pretraining_start(macs, x, y, val_data, **kwargs)
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self.data[f'pred {iteration}'] = self.y_scaler.invert(macs.predict(x))
+        self.data[f'pred {iteration}'] = self.y_scaler.inverse_transform(macs.predict(x))
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self.data[f'adj {iteration}'] = self.y_scaler.invert(adjusted_y)
+        self.data[f'adj {iteration}'] = self.y_scaler.inverse_transform(adjusted_y)
 
     def on_process_end(self, macs, val_data, **kwargs):
         if self.ground_only:
@@ -120,10 +120,10 @@ class BoundsAnalysis(AnalysisCallback):
         pass
 
     def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
-        self._insert_bounds(self.y_scaler.invert(macs.predict(x)), 'pred', iteration)
+        self._insert_bounds(self.y_scaler.inverse_transform(macs.predict(x)), 'pred', iteration)
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
-        self._insert_bounds(self.y_scaler.invert(adjusted_y), 'adj', iteration)
+        self._insert_bounds(self.y_scaler.inverse_transform(adjusted_y), 'adj', iteration)
 
     def _insert_bounds(self, v, label, iteration):
         self.data[f'{label} {iteration}'] = v

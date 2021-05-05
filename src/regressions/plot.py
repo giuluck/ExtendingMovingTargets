@@ -10,13 +10,13 @@ def plot_synthetic(scalers=None, figsize=(12, 10), tight_layout=True, **kwargs):
     x_scaler, y_scaler = (Scaler.get_default(2), Scaler.get_default(1)) if scalers is None else scalers
     _, ax = plt.subplots(len(kwargs), 3, sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
     # hue/size bounds
-    ybn = y_scaler.invert(np.concatenate([[y.min(), y.max()] for _, y in kwargs.values()]))
+    ybn = y_scaler.inverse_transform(np.concatenate([[y.min(), y.max()] for _, y in kwargs.values()]))
     ybn = (ybn.min(), ybn.max())
     abn, bbn = (-1, 1), (-1, 1)
     # plots
     info = []
     for i, (title, (x, y)) in enumerate(kwargs.items()):
-        x, y = x_scaler.invert(x), y_scaler.invert(y)
+        x, y = x_scaler.inverse_transform(x), y_scaler.inverse_transform(y)
         ax[0, i].set(title=title.capitalize())
         sns.scatterplot(x=x['a'], y=y, hue=x['b'], hue_norm=bbn, size=x['b'], size_norm=bbn, ax=ax[0, i], legend=False)
         ax[0, i].legend([f'b {bbn}'], markerscale=0, handlelength=0)
@@ -31,7 +31,7 @@ def plot_synthetic(scalers=None, figsize=(12, 10), tight_layout=True, **kwargs):
 
 def plot_synthetic_augmented(x, y, x_scaler=None, figsize=(10, 4), tight_layout=True):
     scl = Scaler.get_default(2) if x_scaler is None else x_scaler
-    aug = scl.invert(x)
+    aug = scl.inverse_transform(x)
     aug['Augmented'] = np.isnan(y)
     _, axes = plt.subplots(1, 2, sharey='all', figsize=figsize, tight_layout=tight_layout)
     for ax, feature in zip(axes, ['a', 'b']):
@@ -39,33 +39,11 @@ def plot_synthetic_augmented(x, y, x_scaler=None, figsize=(10, 4), tight_layout=
     plt.show()
 
 
-def plot_cars(scalers=None, figsize=(14, 4), tight_layout=True, **kwargs):
-    info = []
-    x_scaler, y_scaler = (Scaler.get_default(1), Scaler.get_default(1)) if scalers is None else scalers
-    _, axes = plt.subplots(1, len(kwargs), sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
-    for ax, (title, (x, y)) in zip(axes, kwargs.items()):
-        info.append(f'{len(x)} {title} samples')
-        x = x_scaler.invert(x['price'])
-        y = y_scaler.invert(y)
-        sns.scatterplot(x=x, y=y, ax=ax).set(xlabel='price', ylabel='sales', title=title.capitalize())
-    print(', '.join(info))
-    plt.show()
-
-
-def plot_cars_augmented(x, y, x_scaler=None, figsize=(10, 4)):
-    scl = Scaler.get_default(1) if x_scaler is None else x_scaler
-    aug = scl.invert(x)
-    aug['Augmented'] = np.isnan(y)
-    plt.figure(figsize=figsize)
-    sns.histplot(data=aug, x='price', hue='Augmented')
-    plt.show()
-
-
 def plot_puzzles(scalers=None, figsize=(12, 10), **kwargs):
     x_scaler, y_scaler = (Scaler.get_default(3), Scaler.get_default(1)) if scalers is None else scalers
     dfs, info = [], []
     for key, (x, y) in kwargs.items():
-        df = pd.concat((x_scaler.invert(x), y_scaler.invert(y)), axis=1)
+        df = pd.concat((x_scaler.inverse_transform(x), y_scaler.inverse_transform(y)), axis=1)
         df['Key'] = key.capitalize()
         dfs.append(df)
         info.append(f'{len(x)} {key} samples')
@@ -78,7 +56,7 @@ def plot_puzzles(scalers=None, figsize=(12, 10), **kwargs):
 
 def plot_puzzles_augmented(x, y, x_scaler=None, figsize=(14, 4), tight_layout=True):
     scl = Scaler.get_default(3) if x_scaler is None else x_scaler
-    aug = scl.invert(x)
+    aug = scl.inverse_transform(x)
     aug['Augmented'] = np.isnan(y)
     _, axes = plt.subplots(1, 3, sharey='all', figsize=figsize, tight_layout=tight_layout)
     for ax, feature in zip(axes, ['word_count', 'star_rating', 'num_reviews']):

@@ -43,8 +43,8 @@ class SBRBatchGenerator(Sequence):
 
 
 class SBR(MLP, Model):
-    def __init__(self, output_act=None, h_units=None, scaler=None, alpha=None, regularizer_act=None, input_dim=None):
-        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scaler=scaler, input_dim=input_dim)
+    def __init__(self, output_act=None, h_units=None, scalers=None, alpha=None, regularizer_act=None, input_dim=None):
+        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scalers=scalers, input_dim=input_dim)
         if alpha is None:
             self.alpha = tf.Variable(0., name='alpha')
             self.alpha_optimizer = Adam()
@@ -120,13 +120,13 @@ class UnivariateSBR(SBR):
                  direction=1,
                  output_act=None,
                  h_units=None,
-                 scaler=None,
+                 scalers=None,
                  alpha=None,
                  regularizer_act=None,
                  input_dim=None):
         super(UnivariateSBR, self).__init__(output_act=output_act,
                                             h_units=h_units,
-                                            scaler=scaler,
+                                            scalers=scalers,
                                             alpha=alpha,
                                             regularizer_act=regularizer_act,
                                             input_dim=input_dim)
