@@ -26,7 +26,7 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
         xag, yag = dt['train']
         if ground is not None:
             xag, yag = xag.head(ground), yag.head(ground)
-        mn = get_monotonicities_list(xag, lambda s, r: ds.compute_monotonicities(s, r), 'sales', 'all', 'ignore')
+        mn = get_monotonicities_list(xag, lambda s, r: ds.compute_monotonicities(s, r, 1e-5), 'sales', 'all', 'ignore')
         return xag, yag, mn, dt, sc, np.zeros(len(yag)).astype(bool), ds.evaluation_summary
     # datasets with augmentation
     if dataset == 'synthetic':
@@ -54,7 +54,7 @@ def retrieve(dataset, kinds, rand=None, aug=None, ground=None, extra=False, supe
         data=pd.concat((xag, yag), axis=1),
         kind=kinds,
         label=yag.columns[0],
-        compute_monotonicities=lambda samples, references: ds.compute_monotonicities(samples, references)
+        compute_monotonicities=lambda samples, references: ds.compute_monotonicities(samples, references, 1e-5)
     )
     yag = yag[yag.columns[0]]
     mask = np.isnan(yag)

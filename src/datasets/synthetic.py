@@ -17,7 +17,8 @@ class Synthetic(Dataset):
         b = np.sin(np.pi * (b - 0.01)) ** 2 + 1
         return a / b + b
 
-    def __init__(self, x_scaling='std', y_scaling='norm', res=80):
+    def __init__(self, noise=0.0, x_scaling='std', y_scaling='norm', res=80):
+        self.noise = noise
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         super(Synthetic, self).__init__(
             x_columns=['a', 'b'],
@@ -31,10 +32,10 @@ class Synthetic(Dataset):
             summary_kwargs=dict(figsize=(14, 8), tight_layout=True, res=50)
         )
 
-    def compute_monotonicities(self, samples, references):
-        return compute_numeric_monotonicities(samples, references, directions=[1, 0])
+    def compute_monotonicities(self, samples, references, eps=1e-5):
+        return compute_numeric_monotonicities(samples, references, directions=[1, 0], eps=eps)
 
-    def _load_splits(self, noise=0.0, extrapolation=False):
+    def _load_splits(self, extrapolation=False):
         # generate and split data
         rng = np.random.default_rng(seed=0)
         if extrapolation:
@@ -45,9 +46,9 @@ class Synthetic(Dataset):
             splits = split_dataset(df, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
         else:
             df = [
-                {'a': rng.normal(scale=0.2, size=150).clip(min=-1, max=1),
+                {'a': rng.normal(scale=0.3, size=150).clip(min=-1, max=1),
                  'b': rng.uniform(low=-1, high=1, size=150)},
-                {'a': rng.normal(scale=0.2, size=50).clip(min=-1, max=1),
+                {'a': rng.normal(scale=0.3, size=50).clip(min=-1, max=1),
                  'b': rng.uniform(low=-1, high=1, size=50)},
                 {'a': rng.uniform(low=-1, high=1, size=500), 'b': rng.uniform(low=-1, high=1, size=500)}
             ]
@@ -55,7 +56,7 @@ class Synthetic(Dataset):
         # assign y values
         outputs = {}
         for s, x in splits.items():
-            y = pd.Series(Synthetic.function(x['a'], x['b']), name='label') + rng.normal(scale=noise, size=len(x))
+            y = pd.Series(Synthetic.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise, size=len(x))
             outputs[s] = (x, y)
         return outputs
 

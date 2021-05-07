@@ -11,9 +11,10 @@ from util.plot import ColorFader
 
 
 class Puzzles(Dataset):
-    def __init__(self, x_scaling='std', y_scaling='norm', res=20, bound=None):
-        self.bound = {'word_count': (0, 180), 'star_rating': (0, 5), 'num_reviews': (0, 60)} if bound is None else bound
-        wc, nr, sr = np.meshgrid(
+    def __init__(self, filepath, x_scaling='std', y_scaling='norm', res=20, bound=None):
+        self.filepath = filepath
+        self.bound = {'word_count': (0, 230), 'star_rating': (0, 5), 'num_reviews': (0, 70)} if bound is None else bound
+        wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),
             np.linspace(self.bound['star_rating'][0], self.bound['star_rating'][1], res),
             np.linspace(self.bound['num_reviews'][0], self.bound['num_reviews'][1], res)
@@ -30,11 +31,11 @@ class Puzzles(Dataset):
             summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=5)
         )
 
-    def compute_monotonicities(self, samples, references):
-        return compute_numeric_monotonicities(samples, references, directions=[-1, 1, 1])
+    def compute_monotonicities(self, samples, references, eps=1e-5):
+        return compute_numeric_monotonicities(samples, references, directions=[-1, 1, 1], eps=eps)
 
-    def _load_splits(self, filepath, extrapolation=False):
-        df = pd.read_csv(filepath)
+    def _load_splits(self, extrapolation=False):
+        df = pd.read_csv(self.filepath)
         for col in df.columns:
             if col not in ['label', 'split']:
                 df[col] = df[col].map(lambda l: l.strip('[]').split(';')).map(lambda l: [float(v.strip()) for v in l])
@@ -73,7 +74,7 @@ class Puzzles(Dataset):
     # noinspection PyMethodOverriding
     def _summary_plot(self, model, res, figsize, tight_layout, **kwargs):
         fig, axes = plt.subplots(1, 3, sharey='all', tight_layout=tight_layout, figsize=figsize)
-        wc, nr, sr = np.meshgrid(
+        wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),
             np.linspace(self.bound['star_rating'][0], self.bound['star_rating'][1], res),
             np.linspace(self.bound['num_reviews'][0], self.bound['num_reviews'][1], res)
@@ -90,4 +91,3 @@ class Puzzles(Dataset):
                 label = f'{fi}: {i:.0f}, {fj}: {j:.0f}' if (i in [li, ui] and j in [lj, uj]) else None
                 sns.lineplot(data=group, x=feat, y='pred', color=fader(i, j), alpha=0.6, label=label, ax=ax)
         fig.suptitle('Estimated Functions')
-        plt.show()

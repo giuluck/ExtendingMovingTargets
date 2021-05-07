@@ -10,7 +10,8 @@ from util.augmentation import compute_numeric_monotonicities
 
 
 class Cars(Dataset):
-    def __init__(self, x_scaling='std', y_scaling='norm', bound=(0, 100), res=700):
+    def __init__(self, filepath, x_scaling='std', y_scaling='norm', bound=(0, 100), res=700):
+        self.filepath = filepath
         super(Cars, self).__init__(
             x_columns=['price'],
             x_scaling=x_scaling,
@@ -24,12 +25,12 @@ class Cars(Dataset):
         )
         self.bound = bound
 
-    def compute_monotonicities(self, samples, references):
-        return compute_numeric_monotonicities(samples, references, directions=[-1])
+    def compute_monotonicities(self, samples, references, eps=1e-5):
+        return compute_numeric_monotonicities(samples, references, directions=[-1], eps=eps)
 
-    def _load_splits(self, filepath, extrapolation=False):
+    def _load_splits(self, extrapolation=False):
         # preprocess data
-        df = pd.read_csv(filepath).rename(
+        df = pd.read_csv(self.filepath).rename(
             columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
         df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
         # split data
@@ -46,7 +47,9 @@ class Cars(Dataset):
         for ax, (title, (x, y)) in zip(axes, kwargs.items()):
             sns.scatterplot(x=x['price'], y=y, ax=ax).set(xlabel='price', ylabel='sales', title=title.capitalize())
 
-    def _augmented_plot(self, aug, **kwargs):
+    # noinspection PyMethodOverriding
+    def _augmented_plot(self, aug, figsize, **kwargs):
+        plt.figure(figsize=figsize)
         sns.histplot(data=aug, x='price', hue='Augmented')
 
     # noinspection PyMethodOverriding

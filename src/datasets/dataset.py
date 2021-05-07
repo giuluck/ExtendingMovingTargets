@@ -9,6 +9,16 @@ from src.util.preprocessing import Scaler
 
 
 class Dataset:
+    @staticmethod
+    def get_kwargs(default, figsize, tight_layout, **kwargs):
+        output = default.copy()
+        if figsize is not None:
+            output['figsize'] = figsize
+        if tight_layout is not None:
+            output[tight_layout] = tight_layout
+        output.update(kwargs)
+        return output
+
     def __init__(self, x_columns, x_scaling, y_column, y_scaling, metric, grid,
                  data_kwargs, augmented_kwargs, summary_kwargs):
         self.x_columns = x_columns
@@ -46,12 +56,12 @@ class Dataset:
     def _summary_plot(self, model, **kwargs):
         raise NotImplementedError("please implement method '_summary_plot'")
 
-    def compute_monotonicities(self, samples, references):
+    def compute_monotonicities(self, samples, references, eps=1e-5):
         raise NotImplementedError("please implement method '_compute_monotonicities'")
 
     def get_scalers(self, x, y):
-        x_scaler = Scaler(self.x_scaling).fit(x)
-        y_scaler = Scaler(self.y_scaling).fit(y)
+        x_scaler = None if self.x_scaling is None else Scaler(self.x_scaling).fit(x)
+        y_scaler = None if self.y_scaling is None else Scaler(self.y_scaling).fit(y)
         return x_scaler, y_scaler
 
     def load_data(self, **kwargs):
@@ -84,35 +94,29 @@ class Dataset:
         mask = ~np.isnan(y_aug[self.y_column])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
 
-    def plot_data(self, **kwargs):
+    def plot_data(self, figsize=None, tight_layout=None, **kwargs):
         # print general info about data
         info = [f'{len(x)} {title} samples' for title, (x, _) in kwargs.items()]
         print(', '.join(info))
         # plot data
-        kw = self.data_kwargs.copy()
-        kw.update(kwargs)
-        plt.figure(figsize=kw['figsize'])
-        self._data_plot(**kw)
+        kwargs = Dataset.get_kwargs(default=self.data_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        self._data_plot(**kwargs)
         plt.show()
 
-    def plot_augmented(self, x, y, **kwargs):
+    def plot_augmented(self, x, y, figsize=None, tight_layout=None, **kwargs):
         # retrieve augmented data
         aug = x.copy()
         aug['Augmented'] = np.isnan(y[self.y_column])
         # plot augmented data
-        kw = self.augmented_kwargs.copy()
-        kw.update(kwargs)
-        plt.figure(figsize=kw['figsize'])
-        self._augmented_plot(aug=aug, **kw)
+        kwargs = Dataset.get_kwargs(default=self.augmented_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        self._augmented_plot(aug=aug, **kwargs)
         plt.show()
 
-    def evaluation_summary(self, model, **kwargs):
+    def evaluation_summary(self, model, figsize=None, tight_layout=None, **kwargs):
         # compute metrics on kwargs
         print(violations_summary(model=model, grid=self.grid, monotonicities=self.monotonicities))
         print(metrics_summary(model=model, metric=self.metric, **kwargs))
         # plot summary
-        kw = self.summary_kwargs.copy()
-        kw.update(kwargs)
-        plt.figure(figsize=kw['figsize'])
-        self._summary_plot(model=model, **kw)
+        kwargs = Dataset.get_kwargs(default=self.summary_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        self._summary_plot(model=model, **kwargs)
         plt.show()
