@@ -1,14 +1,97 @@
+import random
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback
+from moving_targets.metrics import MonotonicViolation
+from src.models import MTLearner, MT
+from src.util.augmentation import get_monotonicities_list
+from src.util.dictionaries import merge_dictionaries
 
-PRETRAINING = 'PT'
+
+class TestManager:
+    DATA_ARGS = dict()
+    AUGMENTED_ARGS = dict()
+    MONOTONICITIES_ARGS = dict(kind='group')
+    LEARNER_ARGS = dict(optimizer='adam', epochs=200, verbose=False,
+                        callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)])
+    MASTER_ARGS = dict()
+    PLOT_ARGS = dict(figsize=(20, 10), num_columns=4)
+    SUMMARY_ARGS = dict()
+
+    @staticmethod
+    def setup(seed=0, max_rows=10000, max_columns=10000, width=10000, max_colwidth=10000, float_format='{:.4f}'):
+        random.seed(seed)
+        np.random.seed(seed)
+        tf.random.set_seed(seed)
+        pd.options.display.max_rows = max_rows
+        pd.options.display.max_columns = max_columns
+        pd.options.display.width = width
+        pd.options.display.max_colwidth = max_colwidth
+        pd.options.display.float_format = float_format.format
+
+    def __init__(self, dataset, master_type, init_step='pretraining', metrics=None, data_args=None, augmented_args=None,
+                 monotonicities_args=None, learner_args=None, master_args=None, seed=0):
+        # PARAMETERS
+        metrics = [] if metrics is None else metrics
+        data_args = merge_dictionaries(TestManager.DATA_ARGS, data_args)
+        augmented_args = merge_dictionaries(TestManager.AUGMENTED_ARGS, augmented_args)
+        monotonicities_args = merge_dictionaries(TestManager.MONOTONICITIES_ARGS, monotonicities_args)
+        learner_args = merge_dictionaries(TestManager.LEARNER_ARGS, learner_args)
+        master_args = merge_dictionaries(TestManager.MASTER_ARGS, master_args)
+        self.seed = seed
+        # DATA
+        self.dataset = dataset
+        self.data, _ = dataset.load_data(**data_args)
+        (self.x, self.y), self.scalers = self.dataset.get_augmented_data(
+            x=self.data['train'][0],
+            y=self.data['train'][1],
+            **augmented_args,
+        )
+        self.monotonicities = get_monotonicities_list(
+            data=pd.concat((self.x, self.y), axis=1),
+            compute_monotonicities=self.dataset.compute_monotonicities,
+            label=self.dataset.y_column,
+            **monotonicities_args
+        )
+        self.y = self.y[self.dataset.y_column]
+        # MOVING TARGETS
+        self.moving_targets = MT(
+            learner=MTLearner(scalers=self.scalers, **learner_args),
+            master=master_type(monotonicities=self.monotonicities, augmented_mask=np.isnan(self.y), **master_args),
+            init_step=init_step,
+            metrics=metrics + [
+                MonotonicViolation(monotonicities=self.monotonicities, aggregation='average', name='avg. violation'),
+                MonotonicViolation(monotonicities=self.monotonicities, aggregation='percentage', name='pct. violation'),
+                MonotonicViolation(monotonicities=self.monotonicities, aggregation='feasible', name='is feasible')
+            ]
+        )
+
+    def fit(self, iterations, callbacks=None, verbose=1, plot_args=None, summary_args=None):
+        TestManager.setup(seed=self.seed)
+        history = self.moving_targets.fit(
+            x=self.x,
+            y=self.y,
+            iterations=iterations,
+            val_data=self.data,
+            callbacks=callbacks,
+            verbose=verbose
+        )
+        if plot_args is not None:
+            plot_args = merge_dictionaries(TestManager.PLOT_ARGS, plot_args)
+            history.plot(**plot_args)
+        if summary_args is not None:
+            summary_args = merge_dictionaries(TestManager.SUMMARY_ARGS, summary_args)
+            self.dataset.evaluation_summary(self.moving_targets, **self.data, **summary_args)
 
 
 class AnalysisCallback(Callback):
+    PRETRAINING = 'PT'
+
     def __init__(self, num_columns=5, sorting_attribute=None, file_signature=None, do_plot=True, **kwargs):
         super(AnalysisCallback, self).__init__()
         self.num_columns = num_columns
@@ -22,17 +105,17 @@ class AnalysisCallback(Callback):
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
-        self.data = pd.concat((x, y, m), axis=1)
+        self.data = pd.concat((x.reset_index(drop=True), y.reset_index(drop=True), m), axis=1)
 
     def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
-        kwargs['iteration'] = PRETRAINING
+        kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_iteration_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, **kwargs)
         self.on_training_start(macs, x, y, val_data, **kwargs)
 
     def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
-        kwargs['iteration'] = PRETRAINING
+        kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_training_end(macs, x, y, val_data, **kwargs)
         self.on_iteration_end(macs, x, y, val_data, **kwargs)
 

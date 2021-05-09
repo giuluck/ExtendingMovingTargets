@@ -4,13 +4,13 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 
-from src.datasets.dataset import Dataset
+from src.datasets.data_manager import DataManager
 from src.util.preprocessing import split_dataset
-from util.augmentation import compute_numeric_monotonicities
-from util.plot import ColorFader
+from src.util.augmentation import compute_numeric_monotonicities
+from src.util.plot import ColorFader
 
 
-class Synthetic(Dataset):
+class SyntheticManager(DataManager):
     @staticmethod
     def function(a, b):
         a = a ** 3
@@ -20,7 +20,7 @@ class Synthetic(Dataset):
     def __init__(self, noise=0.0, x_scaling='std', y_scaling='norm', res=80):
         self.noise = noise
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
-        super(Synthetic, self).__init__(
+        super(SyntheticManager, self).__init__(
             x_columns=['a', 'b'],
             x_scaling=x_scaling,
             y_column='label',
@@ -56,7 +56,7 @@ class Synthetic(Dataset):
         # assign y values
         outputs = {}
         for s, x in splits.items():
-            y = pd.Series(Synthetic.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise, size=len(x))
+            y = pd.Series(SyntheticManager.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise, size=len(x))
             outputs[s] = (x, y)
         return outputs
 
@@ -84,7 +84,7 @@ class Synthetic(Dataset):
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         grid['pred'] = model.predict(grid)
-        grid['label'] = Synthetic.function(grid['a'], grid['b'])
+        grid['label'] = SyntheticManager.function(grid['a'], grid['b'])
         fader = ColorFader('red', 'blue', bounds=(-1, 1))
         _, axes = plt.subplots(2, 3, figsize=figsize, tight_layout=tight_layout)
         for ax, (title, y) in zip(axes, {'Ground Truth': 'label', 'Estimated Function': 'pred'}.items()):

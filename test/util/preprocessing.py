@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-from util.preprocessing import Scaler
+from src.util.preprocessing import Scaler
 
 
 class TestCustomScalers(unittest.TestCase):

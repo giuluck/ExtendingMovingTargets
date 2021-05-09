@@ -15,3 +15,6 @@ class ConsoleLogger(Callback):
     def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
         print(f'Time: {time.time() - self.time:.4f} s')
         self.time = None
+
+    def on_process_end(self, macs, val_data, **kwargs):
+        print('-------------------------------------------------------')

@@ -4,15 +4,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 
-from src.datasets.dataset import Dataset
+from src.datasets.data_manager import DataManager
 from src.util.preprocessing import split_dataset
-from util.augmentation import compute_numeric_monotonicities
+from src.util.augmentation import compute_numeric_monotonicities
 
 
-class Cars(Dataset):
+class CarsManager(DataManager):
     def __init__(self, filepath, x_scaling='std', y_scaling='norm', bound=(0, 100), res=700):
         self.filepath = filepath
-        super(Cars, self).__init__(
+        super(CarsManager, self).__init__(
             x_columns=['price'],
             x_scaling=x_scaling,
             y_column='sales',
@@ -54,6 +54,7 @@ class Cars(Dataset):
 
     # noinspection PyMethodOverriding
     def _summary_plot(self, model, res, ylim, figsize, **kwargs):
+        plt.figure(figsize=figsize)
         for title, (x, y) in kwargs.items():
             sns.scatterplot(x=x['price'], y=y, alpha=0.25, sizes=0.25, label=title.capitalize())
         x = np.linspace(self.bound[0], self.bound[1], res)

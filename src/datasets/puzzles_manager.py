@@ -4,13 +4,13 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 
-from src.datasets.dataset import Dataset
+from src.datasets.data_manager import DataManager
 from src.util.preprocessing import split_dataset
-from util.augmentation import compute_numeric_monotonicities
-from util.plot import ColorFader
+from src.util.augmentation import compute_numeric_monotonicities
+from src.util.plot import ColorFader
 
 
-class Puzzles(Dataset):
+class PuzzlesManager(DataManager):
     def __init__(self, filepath, x_scaling='std', y_scaling='norm', res=20, bound=None):
         self.filepath = filepath
         self.bound = {'word_count': (0, 230), 'star_rating': (0, 5), 'num_reviews': (0, 70)} if bound is None else bound
@@ -19,7 +19,7 @@ class Puzzles(Dataset):
             np.linspace(self.bound['star_rating'][0], self.bound['star_rating'][1], res),
             np.linspace(self.bound['num_reviews'][0], self.bound['num_reviews'][1], res)
         )
-        super(Puzzles, self).__init__(
+        super(PuzzlesManager, self).__init__(
             x_columns=['word_count', 'star_rating', 'num_reviews'],
             x_scaling=x_scaling,
             y_column='label',

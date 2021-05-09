@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_auc_score, r2_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
-from src.datasets.dataset import Dataset
+from src.datasets.data_manager import DataManager
 
 
-class Restaurants(Dataset):
+class RestaurantsManager(DataManager):
     @staticmethod
     def ctr_estimate(avg_ratings, num_reviews, dollar_ratings):
         dollar_rating_baseline = {'D': 3, 'DD': 2, 'DDD': 4, 'DDDD': 4.5}
@@ -17,7 +17,7 @@ class Restaurants(Dataset):
 
     @staticmethod
     def predict(dataframe):
-        return Restaurants.ctr_estimate(
+        return RestaurantsManager.ctr_estimate(
             avg_ratings=dataframe['avg_rating'],
             num_reviews=dataframe['num_reviews'],
             dollar_ratings=dataframe[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1)
@@ -28,12 +28,12 @@ class Restaurants(Dataset):
         avg_ratings = rng.uniform(1.0, 5.0, n)
         num_reviews = np.round(np.exp(rng.uniform(0.0, np.log(200), n)))
         dollar_ratings = rng.choice(['D', 'DD', 'DDD', 'DDDD'], n)
-        ctr_labels = Restaurants.ctr_estimate(avg_ratings, num_reviews, dollar_ratings)
+        ctr_labels = RestaurantsManager.ctr_estimate(avg_ratings, num_reviews, dollar_ratings)
         return avg_ratings, num_reviews, dollar_ratings, ctr_labels
 
     @staticmethod
     def sample_dataset(n, rng, testing_set=True):
-        (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = Restaurants.sample_restaurants(n, rng)
+        (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = RestaurantsManager.sample_restaurants(n, rng)
         # testing has a more uniform distribution over all restaurants
         # while training/validation datasets have more views on popular restaurants
         if testing_set:
@@ -76,16 +76,16 @@ class Restaurants(Dataset):
         if 'clicked' in dataset.columns:
             return dataset.drop('clicked', axis=1), dataset['clicked']
         else:
-            return dataset, Restaurants.predict(dataset)
+            return dataset, RestaurantsManager.predict(dataset)
 
     def __init__(self, x_scaling='std', res=40):
         ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res), ['D', 'DD', 'DDD', 'DDDD'])
-        grid, self.ground_truth = Restaurants.process_data(pd.DataFrame.from_dict({
+        grid, self.ground_truth = self.process_data(pd.DataFrame.from_dict({
             'avg_rating': ar.flatten(),
             'num_reviews': nr.flatten(),
             'dollar_rating': dr.flatten()
         }))
-        super(Restaurants, self).__init__(
+        super(RestaurantsManager, self).__init__(
             x_columns=['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD'],
             x_scaling=dict(avg_rating=x_scaling, num_reviews=x_scaling),
             y_column='clicked',
@@ -129,9 +129,9 @@ class Restaurants(Dataset):
     def _load_splits(self):
         rng = np.random.default_rng(seed=0)
         return {
-            'train': Restaurants.process_data(Restaurants.sample_dataset(1000, rng, testing_set=False)),
-            'validation': Restaurants.process_data(Restaurants.sample_dataset(600, rng, testing_set=False)),
-            'test': Restaurants.process_data(Restaurants.sample_dataset(600, rng, testing_set=True))
+            'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
+            'validation': self.process_data(self.sample_dataset(600, rng, testing_set=False)),
+            'test': self.process_data(self.sample_dataset(600, rng, testing_set=True))
         }
 
     def _get_sampling_functions(self, num_augmented, rng):
@@ -160,7 +160,7 @@ class Restaurants(Dataset):
     # noinspection PyMethodOverriding
     def _summary_plot(self, model, res, figsize, tight_layout, **kwargs):
         print(f'{self.compute_ground_r2(model):.4} (ground r2)')
-        Restaurants.plot_conclusions(figsize=figsize, tight_layout=tight_layout, res=res, orient_columns=False, models={
+        self.plot_conclusions(figsize=figsize, tight_layout=tight_layout, res=res, orient_columns=False, models={
             'Estimated CTR': model,
-            'Real CTR': Restaurants
+            'Real CTR': RestaurantsManager
         })

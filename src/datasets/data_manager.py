@@ -8,7 +8,7 @@ from src.util.model import violations_summary, metrics_summary
 from src.util.preprocessing import Scaler
 
 
-class Dataset:
+class DataManager:
     @staticmethod
     def get_kwargs(default, figsize, tight_layout, **kwargs):
         output = default.copy()
@@ -85,12 +85,15 @@ class Dataset:
             x = pd.concat((x, pd.DataFrame.from_dict(random_values)), ignore_index=True)
             y = pd.concat((y, pd.Series([np.nan] * num_random, name=y.name)), ignore_index=True)
         # augment data
-        x_aug, y_aug = augment_data(
-            x=x,
-            y=y,
-            compute_monotonicities=self.compute_monotonicities,
-            sampling_functions=self._get_sampling_functions(num_augmented=num_augmented, rng=rng)
-        )
+        if num_augmented != 0:
+            x_aug, y_aug = augment_data(
+                x=x,
+                y=y,
+                compute_monotonicities=self.compute_monotonicities,
+                sampling_functions=self._get_sampling_functions(num_augmented=num_augmented, rng=rng)
+            )
+        else:
+            x_aug, y_aug = x, pd.DataFrame(y)
         mask = ~np.isnan(y_aug[self.y_column])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
 
@@ -99,7 +102,7 @@ class Dataset:
         info = [f'{len(x)} {title} samples' for title, (x, _) in kwargs.items()]
         print(', '.join(info))
         # plot data
-        kwargs = Dataset.get_kwargs(default=self.data_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        kwargs = self.get_kwargs(default=self.data_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
         self._data_plot(**kwargs)
         plt.show()
 
@@ -108,7 +111,7 @@ class Dataset:
         aug = x.copy()
         aug['Augmented'] = np.isnan(y[self.y_column])
         # plot augmented data
-        kwargs = Dataset.get_kwargs(default=self.augmented_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        kwargs = self.get_kwargs(default=self.augmented_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
         self._augmented_plot(aug=aug, **kwargs)
         plt.show()
 
@@ -117,6 +120,6 @@ class Dataset:
         print(violations_summary(model=model, grid=self.grid, monotonicities=self.monotonicities))
         print(metrics_summary(model=model, metric=self.metric, **kwargs))
         # plot summary
-        kwargs = Dataset.get_kwargs(default=self.summary_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        kwargs = self.get_kwargs(default=self.summary_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
         self._summary_plot(model=model, **kwargs)
         plt.show()

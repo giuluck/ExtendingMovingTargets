@@ -7,6 +7,7 @@ from moving_targets.masters import CplexMaster
 from moving_targets.metrics.constraints import MonotonicViolation
 from src.models import MLP
 from src.models.model import Model
+from src.util.dictionaries import merge_dictionaries
 
 
 class MTLearner(Learner):
@@ -14,21 +15,21 @@ class MTLearner(Learner):
         super(MTLearner, self).__init__()
         self.output_act = output_act
         self.h_units = h_units
+        self.scalers = scalers
         self.optimizer = optimizer
         self.loss = loss
         self.warm_start = warm_start
         self.fit_args = kwargs
-        self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=scalers)
+        self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=self.scalers)
 
     def fit(self, macs, x, y, iteration, **kwargs):
         start_time = time.time()
         # re-initialize weights if warm start is not enabled, re-initialize optimizer in any case
         if not self.warm_start:
-            self.model = MLP(output_act=self.output_act, h_units=self.h_units)
+            self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=self.scalers)
         self.model.compile(optimizer=self.optimizer, loss=self.loss)
         # fit model
-        fit_args = self.fit_args.copy()
-        fit_args.update(kwargs)
+        fit_args = merge_dictionaries(self.fit_args, kwargs)
         fit = self.model.fit(x[~np.isnan(y)], y[~np.isnan(y)], **fit_args)
         # log statistics
         macs.log(**{
@@ -42,18 +43,14 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    learners = ['original', 'augmented', 'adjusted']
-
-    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1., learner_y='original',
+    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1.,
                  learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=1.0, time_limit=time_limit)
-        assert learner_y in MTMaster.learners, f'learner_y should be in {MTMaster.learners}'
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
         self.y_loss_fn = getattr(CplexMaster, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
         self.p_loss_fn = getattr(CplexMaster, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
-        self.learner_y = learner_y
         self.learner_weights = learner_weights
         if learner_weights == 'all':
             self.infeasible_mask = np.where(augmented_mask, True, True)
@@ -109,12 +106,7 @@ class MTMaster(CplexMaster):
             self.infeasible_mask[self.lower_indices[infeasible_mask]] = True
         sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
         sample_weight[~self.augmented_mask] = 1.0
-        learner_y = y.copy()
-        if self.learner_y == 'augmented':
-            learner_y[self.augmented_mask] = adj[self.augmented_mask]
-        elif self.learner_y == 'adjusted':
-            learner_y = adj.copy()
-        return adj, {'y': learner_y, 'sample_weight': sample_weight}
+        return adj, {'sample_weight': sample_weight}
 
 
 class MTRegressionMaster(MTMaster):
