@@ -19,13 +19,15 @@ class DataManager:
         output.update(kwargs)
         return output
 
-    def __init__(self, x_columns, x_scaling, y_column, y_scaling, metric, grid,
-                 data_kwargs, augmented_kwargs, summary_kwargs):
+    def __init__(self, x_columns, x_scaling, y_column, y_scaling, metric, grid, data_kwargs, augmented_kwargs,
+                 summary_kwargs, metric_name=None, post_process=None):
         self.x_columns = x_columns
         self.x_scaling = x_scaling
         self.y_column = y_column
         self.y_scaling = y_scaling
         self.metric = metric
+        self.metric_name = metric_name
+        self.post_process = post_process
         self.grid = grid
         self.monotonicities = get_monotonicities_list(
             data=self.grid,
@@ -80,20 +82,17 @@ class DataManager:
             sampling_functions = self._get_sampling_functions(num_augmented=num_random, rng=rng)
             for col in x.columns:
                 # if there is an explicit sampling strategy use it, otherwise sample original data
-                n, f = sampling_functions.get(col, (num_random, lambda s: rng.choice(x[col], size=s)))
-                random_values[col] = f(n)
+                n, f = sampling_functions.get(col, (0, lambda s: rng.choice(x[col], size=s)))
+                random_values[col] = f(num_random)
             x = pd.concat((x, pd.DataFrame.from_dict(random_values)), ignore_index=True)
             y = pd.concat((y, pd.Series([np.nan] * num_random, name=y.name)), ignore_index=True)
         # augment data
-        if num_augmented != 0:
-            x_aug, y_aug = augment_data(
-                x=x,
-                y=y,
-                compute_monotonicities=self.compute_monotonicities,
-                sampling_functions=self._get_sampling_functions(num_augmented=num_augmented, rng=rng)
-            )
-        else:
-            x_aug, y_aug = x, pd.DataFrame(y)
+        x_aug, y_aug = augment_data(
+            x=x,
+            y=y,
+            compute_monotonicities=self.compute_monotonicities,
+            sampling_functions=self._get_sampling_functions(num_augmented=num_augmented, rng=rng)
+        )
         mask = ~np.isnan(y_aug[self.y_column])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
 
@@ -118,7 +117,8 @@ class DataManager:
     def evaluation_summary(self, model, figsize=None, tight_layout=None, **kwargs):
         # compute metrics on kwargs
         print(violations_summary(model=model, grid=self.grid, monotonicities=self.monotonicities))
-        print(metrics_summary(model=model, metric=self.metric, **kwargs))
+        print(metrics_summary(model=model, metric=self.metric, metric_name=self.metric_name,
+                              post_process=self.post_process, **kwargs))
         # plot summary
         kwargs = self.get_kwargs(default=self.summary_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
         self._summary_plot(model=model, **kwargs)

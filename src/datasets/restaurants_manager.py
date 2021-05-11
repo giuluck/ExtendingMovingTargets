@@ -91,6 +91,7 @@ class RestaurantsManager(DataManager):
             y_column='clicked',
             y_scaling=None,
             metric=roc_auc_score,
+            metric_name='auc',
             grid=grid,
             data_kwargs=dict(figsize=(10, 8), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
@@ -137,9 +138,9 @@ class RestaurantsManager(DataManager):
     def _get_sampling_functions(self, num_augmented, rng):
         dollar_rating = ('D', 'DD', 'DDD', 'DDDD')
         return {
-            'avg_rating': (num_augmented, lambda s: rng.uniform(1.0, 5.0, size=s)),
-            'num_reviews': (num_augmented, lambda s: np.round(np.exp(rng.uniform(0.0, np.log(200), size=s)))),
-            dollar_rating: (num_augmented, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
+            'avg_rating': (num_augmented // 3, lambda s: rng.uniform(1.0, 5.0, size=s)),
+            'num_reviews': (num_augmented // 3, lambda s: np.round(np.exp(rng.uniform(0.0, np.log(200), size=s)))),
+            dollar_rating: (num_augmented // 3, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
     def _data_plot(self, figsize, tight_layout, kind='distributions', **kwargs):

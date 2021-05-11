@@ -1,0 +1,56 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+from moving_targets.metrics import CrossEntropy, Accuracy
+from src.datasets import DefaultManager
+from src.models import MTClassificationMaster
+from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+
+
+class DefaultTest(TestManager):
+    def __init__(self, filepath='../../res/default.csv', warm_start=False, **kwargs):
+        super(DefaultTest, self).__init__(
+            dataset=DefaultManager(filepath=filepath),
+            master_type=MTClassificationMaster,
+            metrics=[CrossEntropy(), Accuracy()],
+            data_args=dict(),
+            augmented_args=dict(num_augmented=15),
+            monotonicities_args=dict(kind='group'),
+            learner_args=dict(output_act='sigmoid', h_units=[128, 128], optimizer='adam', loss='binary_crossentropy',
+                              warm_start=warm_start),
+            **kwargs
+        )
+
+
+class DefaultAdjustments(AnalysisCallback):
+    max_size = 2000
+    alpha = 0.8
+
+    def __init__(self, **kwargs):
+        super(DefaultAdjustments, self).__init__(**kwargs)
+        married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
+        self.grid = pd.DataFrame.from_dict({'married': married.flatten(), 'payment': payment.flatten()})
+
+    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
+        self.data[f'pred {iteration}'] = macs.predict(x)
+        self.grid[f'pred {iteration}'] = macs.predict(self.grid[['married', 'payment']])
+
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+        self.data[f'adj {iteration}'] = adjusted_y
+        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
+
+    def plot_function(self, iteration):
+        y, adj = self.data['default'], self.data[f'adj {iteration}']
+        label = 'default' if iteration == AnalysisCallback.PRETRAINING else f'adj {iteration}'
+        data = self.data.astype({'married': int}).rename(columns={label: 'y', f'sw {iteration}': 'sw'})
+        data = data.groupby(['married', 'payment', 'y'])['sw'].sum().reset_index()
+        # normalize sample weights
+        data['sw'] = data['sw'] / data['sw'].sum()
+        # dodge based on married value due to visualization reasons
+        data['payment'] = [d + (0.1 if m == 0 else -0.1) for d, m in zip(data['payment'], data['married'])]
+        # plot mass probabilities and responses
+        sns.scatterplot(data=data, x='payment', y='y', hue='married', size='sw', size_norm=(0, 1), legend=False,
+                        sizes=(0, DefaultAdjustments.max_size), alpha=DefaultAdjustments.alpha)
+        sns.lineplot(data=self.grid, x='payment', y=f'pred {iteration}', hue='married')
+        return f'{iteration}) avg. flips = {np.abs(adj[~np.isnan(y)] - y[~np.isnan(y)]).mean():.4f}'

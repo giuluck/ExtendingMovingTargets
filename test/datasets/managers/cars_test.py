@@ -42,8 +42,7 @@ class CarsUnivariateTest(AbstractCarsTest):
 
 
 class CarsAdjustments(AnalysisCallback):
-    label_size = 0.4
-    max_size = 100
+    max_size = 50
     alpha = 0.4
 
     def __init__(self, plot_kind='scatter', **kwargs):
@@ -56,18 +55,14 @@ class CarsAdjustments(AnalysisCallback):
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
-        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', CarsAdjustments.label_size * np.ones_like(y))
+        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
     def plot_function(self, iteration):
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha
         p, adj, sw = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'], self.data[f'sw {iteration}'].values
-        # rescale in case of uniform values
-        if np.allclose(sw, 1.0):
-            sw *= CarsAdjustments.label_size
-        else:
-            sw[s == 'label'] = CarsAdjustments.label_size
+        # rescale original labels weights
         if iteration == AnalysisCallback.PRETRAINING:
             sns.scatterplot(x=x, y=y, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=sn, color='black', alpha=al)
         elif self.plot_kind == 'line':

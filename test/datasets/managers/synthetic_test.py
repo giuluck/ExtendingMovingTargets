@@ -25,8 +25,7 @@ class SyntheticTest(TestManager):
 
 
 class SyntheticAdjustments2D(AnalysisCallback):
-    label_size = 0.3
-    max_size = 100
+    max_size = 30
     alpha = 0.4
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
@@ -40,7 +39,7 @@ class SyntheticAdjustments2D(AnalysisCallback):
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'adj err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
-        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments2D.label_size * np.ones_like(y))
+        self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
     def plot_function(self, iteration):
         def synthetic_inverse(column):
@@ -48,31 +47,26 @@ class SyntheticAdjustments2D(AnalysisCallback):
             return (self.data[column] - b) * b
 
         a, sw, pred = self.data['a'], self.data[f'sw {iteration}'].values, synthetic_inverse(f'pred {iteration}')
-        s, m = self.data['mask'].values, dict(aug='o', label='X')
-        ls, ms, al = SyntheticAdjustments2D.label_size, SyntheticAdjustments2D.max_size, SyntheticAdjustments2D.alpha
+        s, m = self.data['mask'].values, AnalysisCallback.MARKERS
+        ms, al = SyntheticAdjustments2D.max_size, SyntheticAdjustments2D.alpha
         sns.lineplot(x=self.data['a'], y=synthetic_inverse('ground'), color='green')
-        sns.scatterplot(x=a, y=pred, color='red', alpha=al, s=ls * ms / 2)
+        sns.scatterplot(x=a, y=pred, color='red', alpha=al, s=ms)
         if iteration == AnalysisCallback.PRETRAINING:
             adj, color = synthetic_inverse('label'), 'black'
         else:
             adj, color = synthetic_inverse(f'adj {iteration}'), 'blue'
-        # rescale in case of uniform values
-        if np.allclose(sw, 1.0):
-            sw *= ls
-        else:
-            sw[s == 'label'] = ls
         sns.scatterplot(x=a, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=(0, ms), color=color, alpha=al)
         plt.legend(['ground', 'predictions', 'labels' if iteration == AnalysisCallback.PRETRAINING else 'adjusted'])
 
 
 class SyntheticAdjustments3D(AnalysisCallback):
-    label_size = 0.3
-    max_size = 100
+    max_size = 40
 
-    def __init__(self, res=100, **kwargs):
+    def __init__(self, res=100, data_points=True, **kwargs):
         super(SyntheticAdjustments3D, self).__init__(**kwargs)
         assert self.sorting_attribute is None, 'sorting_attribute must be None'
         self.res = res
+        self.data_points = data_points
         self.val = None
 
     def on_process_start(self, macs, x, y, val_data, **kwargs):
@@ -88,7 +82,7 @@ class SyntheticAdjustments3D(AnalysisCallback):
 
     def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
         self.val[f'adj {iteration}'] = adjusted_y
-        self.val[f'sw {iteration}'] = kwargs.get('sample_weight', SyntheticAdjustments3D.label_size * np.ones_like(y))
+        self.val[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.val['mask'] == 'label', 1, 0))
 
     def plot_function(self, iteration):
         # plot 3D response
@@ -96,14 +90,11 @@ class SyntheticAdjustments3D(AnalysisCallback):
         gb = self.data['b'].values.reshape(self.res, self.res)
         gz = self.data[f'z {iteration}'].values.reshape(self.res, self.res)
         plt.pcolor(ga, gb, gz, shading='auto', cmap='viridis', vmin=gz.min(), vmax=gz.max())
-        # plot sample weights
-        m, s = self.val['mask'].values == 'aug', (0, SyntheticAdjustments3D.max_size)
-        a, b, pred, sw = self.val['a'], self.val['b'], self.val[f'pred {iteration}'], self.val[f'sw {iteration}'].values
-        ls = SyntheticAdjustments3D.label_size * SyntheticAdjustments3D.max_size
-        sns.scatterplot(x=a[~m], y=b[~m], s=ls, size_norm=(0, 1), sizes=s, color='black', marker='X', legend=False)
-        if iteration != AnalysisCallback.PRETRAINING:
-            sw = sw[m] * SyntheticAdjustments3D.label_size if np.allclose(sw, 1.0) else sw[m]
-            sns.scatterplot(x=a[m], y=b[m], size=sw, size_norm=(0, 1), sizes=s, color='black', marker='o', legend=False)
+        # plot data points
+        if self.data_points:
+            markers, sizes = AnalysisCallback.MARKERS, (0, SyntheticAdjustments3D.max_size)
+            sns.scatterplot(data=self.val, x='a', y='b', size=f'sw {iteration}', size_norm=(0, 1), sizes=sizes,
+                            color='black', style='mask', markers=markers, legend=False)
         plt.legend(['ground', 'label', 'adjusted'])
 
 

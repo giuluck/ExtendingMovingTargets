@@ -12,18 +12,19 @@ from src.util.augmentation import compute_numeric_monotonicities
 class CarsManager(DataManager):
     def __init__(self, filepath, x_scaling='std', y_scaling='norm', bound=(0, 100), res=700):
         self.filepath = filepath
+        self.bound = bound
         super(CarsManager, self).__init__(
             x_columns=['price'],
             x_scaling=x_scaling,
             y_column='sales',
             y_scaling=y_scaling,
             metric=r2_score,
-            grid=pd.DataFrame.from_dict({'price': np.linspace(bound[0], bound[1], res)}),
+            metric_name='r2',
+            grid=pd.DataFrame.from_dict({'price': np.linspace(self.bound[0], self.bound[1], res)}),
             data_kwargs=dict(figsize=(14, 4), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4)),
             summary_kwargs=dict(figsize=(10, 4), res=100, ylim=(-5, 125))
         )
-        self.bound = bound
 
     def compute_monotonicities(self, samples, references, eps=1e-5):
         return compute_numeric_monotonicities(samples, references, directions=[-1], eps=eps)

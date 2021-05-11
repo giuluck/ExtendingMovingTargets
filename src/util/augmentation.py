@@ -7,20 +7,24 @@ def augment_data(x, y, compute_monotonicities, sampling_functions):
     new_info = []
     for ground_index, sample in x.iterrows():
         for attribute, (num_augmented, function) in sampling_functions.items():
-            samples = pd.DataFrame([sample] * num_augmented)
-            # handle monotonicities on multiple attribute with tuples (python dict do not allow lists as key)
-            if isinstance(attribute, tuple):
-                attribute = list(attribute)
-            samples[attribute] = function(num_augmented)
-            monotonicities = compute_monotonicities(samples.values, sample.values.reshape(1, -1)).reshape(-1, )
-            new_samples.append(samples.astype(x.dtypes))
-            new_info.append(pd.DataFrame(
-                data=zip([ground_index] * num_augmented, monotonicities),
-                columns=['ground_index', 'monotonicity'],
-                dtype='int'
-            ))
-    x_aug = pd.concat((x, pd.concat(new_samples))).reset_index(drop=True)
-    y_aug = pd.concat((y, pd.concat(new_info))).rename({0: y.name}, axis=1).reset_index(drop=True)
+            if num_augmented > 0:
+                samples = pd.DataFrame([sample] * num_augmented)
+                # handle monotonicities on multiple attribute with tuples (python dict do not allow lists as key)
+                if isinstance(attribute, tuple):
+                    attribute = list(attribute)
+                samples[attribute] = function(num_augmented)
+                monotonicities = compute_monotonicities(samples.values, sample.values.reshape(1, -1)).reshape(-1, )
+                new_samples.append(samples.astype(x.dtypes))
+                new_info.append(pd.DataFrame(
+                    data=zip([ground_index] * num_augmented, monotonicities),
+                    columns=['ground_index', 'monotonicity'],
+                    dtype='int'
+                ))
+            else:
+                new_samples.append(x.head(0))
+                new_info.append(pd.DataFrame(data=[], columns=['ground_index', 'monotonicity'], dtype='int'))
+    x_aug = pd.concat([x] + new_samples).reset_index(drop=True)
+    y_aug = pd.concat([y] + new_info).reset_index(drop=True).rename({0: y.name}, axis=1)
     y_aug = y_aug.fillna({'ground_index': pd.Series(y_aug.index), 'monotonicity': 0}).astype({'ground_index': 'int'})
     return x_aug, y_aug
 

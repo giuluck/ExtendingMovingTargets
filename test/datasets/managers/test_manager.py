@@ -91,6 +91,7 @@ class TestManager:
 
 class AnalysisCallback(Callback):
     PRETRAINING = 'PT'
+    MARKERS = dict(aug='o', label='X')
 
     def __init__(self, num_columns=5, sorting_attribute=None, file_signature=None, do_plot=True, **kwargs):
         super(AnalysisCallback, self).__init__()
@@ -172,16 +173,16 @@ class DistanceAnalysis(AnalysisCallback):
     def plot_function(self, iteration):
         x = np.arange(len(self.data))
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
+        style = self.data['mask']
         sns.scatterplot(x=x, y=y, color='black', alpha=0.6).set_xticks([])
         sns.scatterplot(x=x, y=p, color='red', alpha=0.6)
-        s, m = self.data['mask'], dict(aug='o', label='X')
-        sns.scatterplot(x=x, y=j, style=s, markers=m, color='blue', alpha=0.8, s=50)
+        sns.scatterplot(x=x, y=j, style=style, markers=AnalysisCallback.MARKERS, color='blue', alpha=0.8, s=50)
         plt.legend(['labels', 'predictions', 'adjusted'])
         for i in x:
             plt.plot([i, i], [p[i], j[i]], c='red')
             plt.plot([i, i], [y[i], j[i]], c='black')
         avg_pred_distance = np.abs(p - j).mean()
-        avg_label_distance = np.abs(y[s == 'label'] - j[s == 'label']).mean()
+        avg_label_distance = np.abs(y[style == 'label'] - j[style == 'label']).mean()
         return f'{iteration}) pred. distance = {avg_pred_distance:.4f}, label distance = {avg_label_distance:.4f}'
 
 

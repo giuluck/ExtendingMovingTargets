@@ -25,6 +25,7 @@ class PuzzlesManager(DataManager):
             y_column='label',
             y_scaling=y_scaling,
             metric=r2_score,
+            metric_name='r2',
             grid=pd.DataFrame({'word_count': wc.flatten(), 'star_rating': sr.flatten(), 'num_reviews': nr.flatten()}),
             data_kwargs=dict(figsize=(12, 10)),
             augmented_kwargs=dict(figsize=(14, 4), tight_layout=True),

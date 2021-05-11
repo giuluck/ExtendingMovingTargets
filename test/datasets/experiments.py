@@ -15,15 +15,15 @@ if __name__ == '__main__':
     master_args = cartesian_product(
         alpha=[0.01, 0.1, 1.0],
         use_prob=[True, False],
-        master_omega=[1, 10, 100],
-        learner_omega=[1, 10, 100],
-        learner_weights=['all', 'infeasible']
+        learner_weights=['all', 'infeasible'],
+        master_omega=[1],
+        learner_omega=[1]
     )
     study = cartesian_product(
         seed=[0, 1, 2],
         master_args=master_args,
         warm_start=[True, False],
-        dataset=['restaurants']
+        dataset=['lo', 'default', 'restaurants']
     )
 
     # begin study
@@ -31,15 +31,20 @@ if __name__ == '__main__':
         start_time = time.time()
         manager, _, _ = get_dataset(**p)
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
+        # noinspection PyBroadException
         try:
             manager.fit(
-                iterations=30,
+                iterations=20,
                 verbose=False,
                 callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=p['dataset'], **p)]
             )
             print(f' -- elapsed time: {time.time() - start_time}')
         except RuntimeError:
             print(' -- unsolvable')
+            WandBLogger.instance.config.update({'crashed': True})
+            WandBLogger.instance.finish()
+        except:
+            print(' -- errors')
             WandBLogger.instance.config.update({'crashed': True})
             WandBLogger.instance.finish()
     shutil.rmtree('wandb')

@@ -26,10 +26,11 @@ class SyntheticManager(DataManager):
             y_column='label',
             y_scaling=y_scaling,
             metric=r2_score,
+            metric_name='r2',
             grid=pd.DataFrame({'a': a.flatten(), 'b': b.flatten()}),
             data_kwargs=dict(figsize=(12, 10), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
-            summary_kwargs=dict(figsize=(14, 8), tight_layout=True, res=50)
+            summary_kwargs=dict(figsize=(10, 4), tight_layout=True, res=50)
         )
 
     def compute_monotonicities(self, samples, references, eps=1e-5):
@@ -56,7 +57,8 @@ class SyntheticManager(DataManager):
         # assign y values
         outputs = {}
         for s, x in splits.items():
-            y = pd.Series(SyntheticManager.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise, size=len(x))
+            y = pd.Series(SyntheticManager.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise,
+                                                                                                size=len(x))
             outputs[s] = (x, y)
         return outputs
 

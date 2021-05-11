@@ -43,7 +43,7 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1.,
+    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1.0,
                  learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=1.0, time_limit=time_limit)
         self.higher_indices = np.array([hi for hi, _ in monotonicities])

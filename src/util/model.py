@@ -1,10 +1,12 @@
 from moving_targets.metrics import MonotonicViolation
 
 
-def metrics_summary(model, metric, **kwargs):
+def metrics_summary(model, metric, metric_name=None, post_process=None, **kwargs):
     summary = []
+    metric_name = metric.__name__ if metric_name is None else metric_name
     for title, (x, y) in kwargs.items():
-        summary.append(f'{metric(y, model.predict(x)):.4} ({title} r2)')
+        p = model.predict(x) if post_process is None else post_process(model.predict(x))
+        summary.append(f'{metric(y, p):.4} ({title} {metric_name})')
     return ', '.join(summary)
 
 
