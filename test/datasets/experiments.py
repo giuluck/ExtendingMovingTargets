@@ -12,39 +12,46 @@ from test.datasets.tests import get_dataset
 
 if __name__ == '__main__':
     # create study list
-    master_args = cartesian_product(
-        alpha=[0.01, 0.1, 1.0],
-        use_prob=[True, False],
-        learner_weights=['all', 'infeasible'],
-        master_omega=[1],
-        learner_omega=[1]
-    )
     study = cartesian_product(
         seed=[0, 1, 2],
-        master_args=master_args,
+        alpha=[0.01, 0.1, 1.0],
+        learner_weights=['all'],
+        learner_omega=[1],
+        master_omega=[1],
         warm_start=[True, False],
-        dataset=['lo', 'default', 'restaurants']
+        dataset=['cars univariate']
+    ) + cartesian_product(
+        seed=[0, 1, 2],
+        alpha=[0.01, 0.1, 1.0],
+        learner_weights=['all', 'infeasible'],
+        learner_omega=[1],
+        master_omega=[1],
+        warm_start=[True, False],
+        dataset=['cars', 'synthetic', 'puzzles']
     )
 
     # begin study
-    for i, p in enumerate(study):
+    for i, config in enumerate(study):
         start_time = time.time()
-        manager, _, _ = get_dataset(**p)
-        print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end='')
-        # noinspection PyBroadException
+        print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end=' ')
+        dataset = config['dataset']
+        del config['dataset']
         try:
-            manager.fit(
+            manager, _ = get_dataset(dataset=dataset)
+            manager(
+                seed=config['seed'],
+                warm_start=config['warm_start'],
+                master_args={k: v for k, v in config.items() if k not in ['seed', 'warm_start']}
+            ).fit(
                 iterations=20,
                 verbose=False,
-                callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=p['dataset'], **p)]
+                callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=dataset, crashed=False, **config)]
             )
-            print(f' -- elapsed time: {time.time() - start_time}')
+            print(f'-- elapsed time: {time.time() - start_time}')
         except RuntimeError:
-            print(' -- unsolvable')
-            WandBLogger.instance.config.update({'crashed': True})
+            print('-- unsolvable')
+            WandBLogger.instance.config['crashed'] = True
             WandBLogger.instance.finish()
         except:
-            print(' -- errors')
-            WandBLogger.instance.config.update({'crashed': True})
-            WandBLogger.instance.finish()
-    shutil.rmtree('wandb')
+            print('-- errors')
+shutil.rmtree('wandb')

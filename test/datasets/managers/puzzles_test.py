@@ -2,23 +2,17 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from moving_targets.metrics import MAE, MSE, R2
 from src.datasets import PuzzlesManager
-from src.models import MTRegressionMaster
 from src.util.plot import ColorFader
-from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+from test.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 
-class PuzzlesTest(TestManager):
-    def __init__(self, filepath='../../res/puzzles.csv', extrapolation=False, warm_start=False, **kwargs):
+class PuzzlesTest(RegressionTest):
+    def __init__(self, filepath='../../res/puzzles.csv', **kwargs):
         super(PuzzlesTest, self).__init__(
             dataset=PuzzlesManager(filepath=filepath),
-            master_type=MTRegressionMaster,
-            metrics=[MAE(), MSE(), R2()],
-            data_args=dict(extrapolation=extrapolation),
             augmented_args=dict(num_random=465, num_augmented=[3, 4, 8]),
             monotonicities_args=dict(kind='group'),
-            learner_args=dict(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=warm_start),
             **kwargs
         )
 

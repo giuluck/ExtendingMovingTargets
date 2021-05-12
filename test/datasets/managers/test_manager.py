@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback
-from moving_targets.metrics import MonotonicViolation
-from src.models import MTLearner, MT
+from moving_targets.metrics import MonotonicViolation, MSE, R2, CrossEntropy, Accuracy
+from src.models import MTLearner, MT, MTRegressionMaster, MTClassificationMaster
 from src.util.augmentation import get_monotonicities_list
 from src.util.dictionaries import merge_dictionaries
 
@@ -87,6 +87,46 @@ class TestManager:
         if summary_args is not None:
             summary_args = merge_dictionaries(TestManager.SUMMARY_ARGS, summary_args)
             self.dataset.evaluation_summary(self.moving_targets, **self.data, **summary_args)
+
+
+class RegressionTest(TestManager):
+    def __init__(self, dataset, augmented_args, monotonicities_args, extrapolation=False, warm_start=False, **kwargs):
+        super(RegressionTest, self).__init__(
+            dataset=dataset,
+            master_type=MTRegressionMaster,
+            metrics=[MSE(name='loss'), R2(name='metric')],
+            data_args=dict(extrapolation=extrapolation),
+            augmented_args=augmented_args,
+            monotonicities_args=monotonicities_args,
+            learner_args=dict(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=warm_start),
+            **kwargs
+        )
+
+
+class ClassificationTest(TestManager):
+    def __init__(self, dataset, augmented_args, monotonicities_args, kind='probabilities', h_units=(128, 128),
+                 evaluation_metric=Accuracy(), warm_start=False, **kwargs):
+        if kind == 'classes':
+            master_type = MTClassificationMaster
+            loss_metric = CrossEntropy(name='loss')
+            loss_fn = 'binary_crossentropy'
+        elif kind == 'probabilities':
+            master_type = MTRegressionMaster
+            loss_metric = MSE(name='loss')
+            loss_fn = 'mse'
+        else:
+            raise ValueError(f"kind should be either 'classes' or 'probabilities'")
+        super(ClassificationTest, self).__init__(
+            dataset=dataset,
+            master_type=master_type,
+            metrics=[loss_metric, evaluation_metric],
+            data_args=dict(),
+            augmented_args=augmented_args,
+            monotonicities_args=monotonicities_args,
+            learner_args=dict(output_act='sigmoid', h_units=h_units, optimizer='adam', loss=loss_fn,
+                              warm_start=warm_start),
+            **kwargs
+        )
 
 
 class AnalysisCallback(Callback):

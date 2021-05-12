@@ -2,39 +2,24 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from moving_targets.metrics import MAE, MSE, R2
 from src.datasets import CarsManager
-from src.models import MTRegressionMaster
-from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+from test.datasets.managers.test_manager import AnalysisCallback, RegressionTest
 
 
-class AbstractCarsTest(TestManager):
-    def __init__(self, augmented_args, monotonicities_args, filepath='../../res/cars.csv', extrapolation=False,
-                 warm_start=False, **kwargs):
-        super(AbstractCarsTest, self).__init__(
-            dataset=CarsManager(filepath=filepath),
-            master_type=MTRegressionMaster,
-            metrics=[MAE(), MSE(), R2()],
-            data_args=dict(extrapolation=extrapolation),
-            augmented_args=augmented_args,
-            monotonicities_args=monotonicities_args,
-            learner_args=dict(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=warm_start),
-            **kwargs
-        )
-
-
-class CarsTest(AbstractCarsTest):
-    def __init__(self, **kwargs):
+class CarsTest(RegressionTest):
+    def __init__(self, filepath='../../res/cars.csv', **kwargs):
         super(CarsTest, self).__init__(
+            dataset=CarsManager(filepath=filepath),
             augmented_args=dict(num_augmented=15),
             monotonicities_args=dict(kind='group'),
             **kwargs
         )
 
 
-class CarsUnivariateTest(AbstractCarsTest):
-    def __init__(self, **kwargs):
+class CarsUnivariateTest(RegressionTest):
+    def __init__(self, filepath='../../res/cars.csv', **kwargs):
         super(CarsUnivariateTest, self).__init__(
+            dataset=CarsManager(filepath=filepath),
             augmented_args=dict(num_augmented=0),
             monotonicities_args=dict(kind='all', errors='ignore'),
             **kwargs
@@ -73,4 +58,4 @@ class CarsAdjustments(AnalysisCallback):
             sns.scatterplot(x=x, y=adj, style=s, markers=m, size=sw, size_norm=(0, 1), sizes=sn, color='blue', alpha=al)
         sns.lineplot(x=x, y=p, color='red')
         plt.legend(['predictions', 'labels' if iteration == AnalysisCallback.PRETRAINING else 'adjusted'])
-        return f'{iteration}) adj. mae = {np.abs((adj - y).fillna(0)).mean():.4f}'
+        return f'{iteration}) adj. mse = {np.square((adj - y).fillna(0)).mean():.4f}'

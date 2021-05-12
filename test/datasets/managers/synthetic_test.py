@@ -3,23 +3,17 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from moving_targets.metrics import MAE, MSE, R2
 from src.datasets import SyntheticManager
-from src.models import MTRegressionMaster
 from src.util.plot import ColorFader
-from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+from test.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 
-class SyntheticTest(TestManager):
-    def __init__(self, extrapolation=False, warm_start=False, **kwargs):
+class SyntheticTest(RegressionTest):
+    def __init__(self, noise=0.0, **kwargs):
         super(SyntheticTest, self).__init__(
-            dataset=SyntheticManager(),
-            master_type=MTRegressionMaster,
-            metrics=[MAE(), MSE(), R2()],
-            data_args=dict(extrapolation=extrapolation),
+            dataset=SyntheticManager(noise=noise),
             augmented_args=dict(num_augmented=15),
             monotonicities_args=dict(kind='group'),
-            learner_args=dict(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=warm_start),
             **kwargs
         )
 

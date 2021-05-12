@@ -3,23 +3,20 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from moving_targets.metrics import CrossEntropy, AUC
+from moving_targets.metrics import AUC
 from src.datasets import RestaurantsManager
-from src.models import MTClassificationMaster
-from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
-class RestaurantsTest(TestManager):
-    def __init__(self, warm_start=False, **kwargs):
+class RestaurantsTest(ClassificationTest):
+    def __init__(self, kind='probabilities', **kwargs):
         super(RestaurantsTest, self).__init__(
+            kind=kind,
+            h_units=[16, 8, 8],
+            evaluation_metric=AUC(name='metric'),
             dataset=RestaurantsManager(),
-            master_type=MTClassificationMaster,
-            metrics=[CrossEntropy(), AUC()],
-            data_args=dict(),
             augmented_args=dict(num_augmented=15),
             monotonicities_args=dict(kind='group'),
-            learner_args=dict(output_act='sigmoid', h_units=[16, 8, 8], optimizer='adam', loss='binary_crossentropy',
-                              warm_start=warm_start),
             **kwargs
         )
 

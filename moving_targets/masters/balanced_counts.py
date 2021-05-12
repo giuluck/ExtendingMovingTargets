@@ -48,12 +48,12 @@ class BalancedCounts(CplexMaster):
 
     def y_loss(self, macs, model, model_info, x, y, iteration):
         variables, _, _, _ = model_info
-        return CplexMaster.categorical_indicator(model=model, numeric_variables=y, model_variables=variables)
+        return CplexMaster.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         variables, pred, prob, _ = model_info
         if prob is None:
-            return CplexMaster.categorical_indicator(model=model, numeric_variables=pred, model_variables=variables)
+            return CplexMaster.categorical_hamming(model=model, numeric_variables=pred, model_variables=variables)
         else:
             return CplexMaster.categorical_crossentropy(model=model, numeric_variables=prob, model_variables=variables)
 

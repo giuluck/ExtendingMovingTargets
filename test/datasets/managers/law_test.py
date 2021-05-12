@@ -7,20 +7,18 @@ from moving_targets.metrics import CrossEntropy, Accuracy
 from src.datasets import LawManager
 from src.models import MTClassificationMaster
 from src.util.plot import ColorFader
-from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
-class LawTest(TestManager):
-    def __init__(self, filepath='../../res/law.csv', warm_start=False, **kwargs):
+class LawTest(ClassificationTest):
+    def __init__(self, kind='probabilities', filepath='../../res/law.csv', test_size=0.8, **kwargs):
         super(LawTest, self).__init__(
-            dataset=LawManager(filepath=filepath),
-            master_type=MTClassificationMaster,
-            metrics=[CrossEntropy(), Accuracy()],
-            data_args=dict(),
+            kind=kind,
+            h_units=[128, 128],
+            evaluation_metric=Accuracy(name='metric'),
+            dataset=LawManager(filepath=filepath, test_size=test_size),
             augmented_args=dict(num_augmented=15),
             monotonicities_args=dict(kind='group'),
-            learner_args=dict(output_act='sigmoid', h_units=[128, 128], optimizer='adam', loss='binary_crossentropy',
-                              warm_start=warm_start),
             **kwargs
         )
 

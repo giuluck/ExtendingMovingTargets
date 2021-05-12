@@ -2,23 +2,20 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from moving_targets.metrics import CrossEntropy, Accuracy
+from moving_targets.metrics import Accuracy
 from src.datasets import DefaultManager
-from src.models import MTClassificationMaster
-from test.datasets.managers.test_manager import TestManager, AnalysisCallback
+from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
-class DefaultTest(TestManager):
-    def __init__(self, filepath='../../res/default.csv', warm_start=False, **kwargs):
+class DefaultTest(ClassificationTest):
+    def __init__(self, kind='probabilities', filepath='../../res/default.csv', test_size=0.8, **kwargs):
         super(DefaultTest, self).__init__(
-            dataset=DefaultManager(filepath=filepath),
-            master_type=MTClassificationMaster,
-            metrics=[CrossEntropy(), Accuracy()],
-            data_args=dict(),
+            kind=kind,
+            h_units=[128, 128],
+            evaluation_metric=Accuracy(name='metric'),
+            dataset=DefaultManager(filepath=filepath, test_size=test_size),
             augmented_args=dict(num_augmented=15),
             monotonicities_args=dict(kind='group'),
-            learner_args=dict(output_act='sigmoid', h_units=[128, 128], optimizer='adam', loss='binary_crossentropy',
-                              warm_start=warm_start),
             **kwargs
         )
 
