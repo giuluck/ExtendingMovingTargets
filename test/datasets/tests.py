@@ -95,18 +95,16 @@ def get_plot_args(mng):
 if __name__ == '__main__':
     iterations = 1
     manager, callbacks = get_dataset(
-        dataset='cars univariate',
+        dataset='restaurants',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['adjustments', 'response']
     )
     manager = manager(
-        # kind='probabilities',
-        # test_size=0.99,
+        kind='probabilities',
         warm_start=False,
         master_args=dict(
             alpha=1.0,
-            # use_prob=False,
-            loss_fn='mse',
+            loss_fn='bce',
             learner_weights='all',
             learner_omega=1.0,
             master_omega=1.0

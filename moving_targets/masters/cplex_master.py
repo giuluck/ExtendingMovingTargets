@@ -7,7 +7,7 @@ from moving_targets.masters.master import Master
 
 
 class CplexMaster(Master, ABC):
-    losses = LossesHandler(sum_fn=lambda model: model.sum, abs_fn=lambda model: model.abs, log_fn=None)
+    losses = LossesHandler(sum_fn=lambda model, x: model.sum(x), abs_fn=lambda model, x: model.abs(x), log_fn=None)
 
     def __init__(self, alpha=1., beta=1., time_limit=30.):
         super(CplexMaster, self).__init__(alpha=alpha, beta=beta)

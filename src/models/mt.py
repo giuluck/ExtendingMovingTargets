@@ -7,7 +7,6 @@ from moving_targets.learners import Learner
 from moving_targets.masters import GurobiMaster
 from moving_targets.metrics.constraints import MonotonicViolation
 from src.models import MLP
-from src.models.model import Model
 from src.util.dictionaries import merge_dictionaries
 
 
@@ -46,7 +45,7 @@ class MTLearner(Learner):
 class MTMaster(GurobiMaster):
     def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1.0,
                  learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
-        super(MTMaster, self).__init__(alpha=alpha, beta=1.0, time_limit=time_limit)
+        super(MTMaster, self).__init__(alpha=alpha, beta=None, time_limit=time_limit)
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
@@ -54,9 +53,9 @@ class MTMaster(GurobiMaster):
         self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         self.learner_weights = learner_weights
         if learner_weights == 'all':
-            self.infeasible_mask = np.where(augmented_mask, True, True)
+            self.infeasible_mask = np.ones_like(augmented_mask)  # vector of 'True'
         elif learner_weights == 'infeasible':
-            self.infeasible_mask = np.where(augmented_mask, False, False)
+            self.infeasible_mask = np.zeros_like(augmented_mask)  # vector of 'False'
         else:
             raise ValueError("learner_weights should be either 'all' or 'infeasible'")
         self.learner_omega = learner_omega
@@ -77,13 +76,11 @@ class MTMaster(GurobiMaster):
     def build_model(self, macs, model, x, y, iteration):
         # handle 'projection' initial step (p = None)
         pred = None if not macs.fitted else self.build_predictions(macs, x)
-        model.update()
         # create variables and impose constraints for each monotonicity
         var = np.array(self.build_variables(model, y))
         model.update()
         if len(self.higher_indices):
             model.addConstrs((h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])), name='c')
-            model.update()
         # return model info
         return var, pred
 
@@ -134,6 +131,7 @@ class MTRegressionMaster(MTMaster):
         'sse': 'sum_of_squared_errors',
         'sum_of_squared_errors': 'sum_of_squared_errors',
         'bce': 'swapped_binary_crossentropy',
+        'binary_crossentropy': 'swapped_binary_crossentropy',
         'swapped_binary_crossentropy': 'swapped_binary_crossentropy'
     }
 
@@ -170,7 +168,7 @@ class MTClassificationMaster(MTMaster):
         self.use_prob = use_prob
 
     def build_variables(self, model, y):
-        return model.binary_var_list(keys=len(y), name='y')
+        return model.addVars(len(y), vtype=GRB.BINARY, name='y').values()
 
     def build_predictions(self, macs, x):
         return macs.predict(x) if self.use_prob else macs.predict(x).round()
@@ -185,7 +183,7 @@ class MTClassificationMaster(MTMaster):
         return adj, kwargs
 
 
-class MT(MACS, Model):
+class MT(MACS):
     def __init__(self, learner, master, init_step='pretraining', metrics=None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
         self.violation_metrics = [m for m in self.metrics if isinstance(m, MonotonicViolation)]

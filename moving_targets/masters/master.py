@@ -2,7 +2,7 @@ class Master:
     def __init__(self, alpha, beta):
         super(Master, self).__init__()
         assert alpha > 0, "alpha should be a positive number"
-        assert beta > 0, "beta should be a positive number"
+        assert beta is None or beta > 0, "beta should be either None or a positive number"
         self.alpha = alpha
         self.beta = beta
 

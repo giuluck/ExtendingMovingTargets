@@ -1,11 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.models import Model as KerasModel
-
-from src.models.model import Model
+from tensorflow.keras.models import Model
 
 
-class MLP(KerasModel, Model):
+class MLP(Model):
     def __init__(self, output_act=None, h_units=None, scalers=None, input_dim=None):
         super(MLP, self).__init__()
         if scalers is None:

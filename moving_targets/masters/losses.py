@@ -43,7 +43,10 @@ class ClippedMeanLoss(MeanLoss):
 
 # noinspection PyMethodMayBeStatic,PyUnusedLocal
 class LossesHandler:
-    def __init__(self, sum_fn=lambda model: sum, abs_fn=lambda model: abs, log_fn=lambda model: model.log):
+    def __init__(self,
+                 sum_fn=lambda model, x: model.sum(x),
+                 abs_fn=lambda model, x: model.abs(x),
+                 log_fn=lambda model, x: model.log(x)):
         # metadata
         self.sum_fn = sum_fn
         self.abs_fn = abs_fn
@@ -60,8 +63,7 @@ class LossesHandler:
         self.categorical_crossentropy = ClippedMeanLoss(call_fn=self.__call__, loss_fn=self.categorical_crossentropy)
 
     def absolute_errors(self, model, numeric_variable, model_variable):
-        _abs = self.abs_fn(model)
-        return _abs(numeric_variable - model_variable)
+        return self.abs_fn(model, numeric_variable - model_variable)
 
     def squared_errors(self, model, numeric_variable, model_variable):
         return (numeric_variable - model_variable) ** 2
@@ -73,15 +75,14 @@ class LossesHandler:
         return -(model_variable * np.log(numeric_variable) + (1 - model_variable) * np.log(1 - numeric_variable))
 
     def swapped_binary_crossentropy(self, model, numeric_variable, model_variable):
-        _log = self.log_fn(model)
-        return -(numeric_variable * _log(model_variable) + (1 - numeric_variable) * model.log(model_variable))
+        _log = lambda x: self.log_fn(model, x)
+        return -(numeric_variable * _log(model_variable) + (1 - numeric_variable) * _log(1 - model_variable))
 
     def categorical_hamming(self, model, numeric_variable, model_variable):
         return 1 - model_variable[numeric_variable]
 
     def categorical_crossentropy(self, model, numeric_variable, model_variable):
-        _sum = self.sum_fn(model)
-        return -sum(model_variable * np.log(numeric_variable))
+        return self.sum_fn(model, -model_variable * np.log(numeric_variable))
 
     def __call__(self, loss, model, numeric_variables, model_variables, sample_weight):
         # use uniform weights if none are passed, otherwise normalize the weights so that they sum to len(samples)
@@ -90,5 +91,5 @@ class LossesHandler:
         else:
             sample_weight = len(sample_weight) * np.array(sample_weight) / np.sum(sample_weight)
         # compute sum of losses
-        _sum = self.sum_fn(model)
-        return _sum([sw * loss(model, nv, mv) for nv, mv, sw in zip(numeric_variables, model_variables, sample_weight)])
+        variables = zip(numeric_variables, model_variables, sample_weight)
+        return self.sum_fn(model, [sw * loss(model, nv, mv) for nv, mv, sw in variables])

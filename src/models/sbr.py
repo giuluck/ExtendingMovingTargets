@@ -6,7 +6,6 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import Sequence
 
 from src.models.mlp import MLP
-from src.models.model import Model
 
 
 def hard_tanh(x, factor=10 ** 6):
@@ -42,7 +41,7 @@ class SBRBatchGenerator(Sequence):
         return tensor[:, :, :-2].reshape(-1, num_features - 2), (tensor[:, :, -2], tensor[:, :, -1])
 
 
-class SBR(MLP, Model):
+class SBR(MLP):
     def __init__(self, output_act=None, h_units=None, scalers=None, alpha=None, regularizer_act=None, input_dim=None):
         super(SBR, self).__init__(output_act=output_act, h_units=h_units, scalers=scalers, input_dim=input_dim)
         if alpha is None:
