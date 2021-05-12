@@ -17,9 +17,7 @@ def custom_loss(name):
         return lambda yt, yp, sample_weight: NUM_KEYS * mean_absolute_error(yt, yp, sample_weight=sample_weight)
     elif name == 'sse':
         return lambda yt, yp, sample_weight: NUM_KEYS * mean_squared_error(yt, yp, sample_weight=sample_weight)
-    elif name == 'swap':
-        return lambda yt, yp, sample_weight: log_loss(yp, yt, sample_weight=sample_weight)
-    elif name == 'cat pre':
+    elif name == 'pre':
         return lambda yt, yp, sample_weight: precision_score(yt, yp, sample_weight=sample_weight, average='micro')
     else:
         raise ValueError(f'{name} is not a valid loss')
@@ -78,49 +76,49 @@ class TestCplexLosses(unittest.TestCase):
             self.assertAlmostEqual(cplex_objective, scikit_objective, delta=3)
 
     def test_sae(self):
-        self._test(CplexMaster.sum_of_absolute_errors, custom_loss('sae'), classes=None, weights=False)
+        self._test(CplexMaster.losses.sum_of_absolute_errors, custom_loss('sae'), classes=None, weights=False)
 
     def test_sae_weights(self):
-        self._test(CplexMaster.sum_of_absolute_errors, custom_loss('sae'), classes=None, weights=True)
+        self._test(CplexMaster.losses.sum_of_absolute_errors, custom_loss('sae'), classes=None, weights=True)
 
     def test_sse(self):
-        self._test(CplexMaster.sum_of_squared_errors, custom_loss('sse'), classes=None, weights=False)
+        self._test(CplexMaster.losses.sum_of_squared_errors, custom_loss('sse'), classes=None, weights=False)
 
     def test_sse_weights(self):
-        self._test(CplexMaster.sum_of_squared_errors, custom_loss('sse'), classes=None, weights=True)
+        self._test(CplexMaster.losses.sum_of_squared_errors, custom_loss('sse'), classes=None, weights=True)
 
     def test_mae(self):
-        self._test(CplexMaster.mean_absolute_error, mean_absolute_error, classes=None, weights=False)
+        self._test(CplexMaster.losses.mean_absolute_error, mean_absolute_error, classes=None, weights=False)
 
     def test_mae_weights(self):
-        self._test(CplexMaster.mean_absolute_error, mean_absolute_error, classes=None, weights=True)
+        self._test(CplexMaster.losses.mean_absolute_error, mean_absolute_error, classes=None, weights=True)
 
     def test_mse(self):
-        self._test(CplexMaster.mean_squared_error, mean_squared_error, classes=None, weights=False)
+        self._test(CplexMaster.losses.mean_squared_error, mean_squared_error, classes=None, weights=False)
 
     def test_mse_weights(self):
-        self._test(CplexMaster.mean_squared_error, mean_squared_error, classes=None, weights=True)
+        self._test(CplexMaster.losses.mean_squared_error, mean_squared_error, classes=None, weights=True)
 
     def test_bh(self):
-        self._test(CplexMaster.binary_hamming, precision_score, classes=(2, 'indicator'), weights=False)
+        self._test(CplexMaster.losses.binary_hamming, precision_score, classes=(2, 'indicator'), weights=False)
 
     def test_bh_weights(self):
-        self._test(CplexMaster.binary_hamming, precision_score, classes=(2, 'indicator'), weights=True)
+        self._test(CplexMaster.losses.binary_hamming, precision_score, classes=(2, 'indicator'), weights=True)
 
     def test_bce(self):
-        self._test(CplexMaster.binary_crossentropy, log_loss, classes=(2, 'probability'), weights=False)
+        self._test(CplexMaster.losses.binary_crossentropy, log_loss, classes=(2, 'probability'), weights=False)
 
     def test_bce_weights(self):
-        self._test(CplexMaster.binary_crossentropy, log_loss, classes=(2, 'probability'), weights=True)
+        self._test(CplexMaster.losses.binary_crossentropy, log_loss, classes=(2, 'probability'), weights=True)
 
     def test_ch(self):
-        self._test(CplexMaster.categorical_hamming, custom_loss('cat pre'), classes=(5, 'indicator'), weights=False)
+        self._test(CplexMaster.losses.categorical_hamming, custom_loss('pre'), classes=(5, 'indicator'), weights=False)
 
     def test_ch_weights(self):
-        self._test(CplexMaster.categorical_hamming, custom_loss('cat pre'), classes=(5, 'indicator'), weights=True)
+        self._test(CplexMaster.losses.categorical_hamming, custom_loss('pre'), classes=(5, 'indicator'), weights=True)
 
     def test_cce(self):
-        self._test(CplexMaster.categorical_crossentropy, log_loss, classes=(5, 'probability'), weights=False)
+        self._test(CplexMaster.losses.categorical_crossentropy, log_loss, classes=(5, 'probability'), weights=False)
 
     def test_cce_weights(self):
-        self._test(CplexMaster.categorical_crossentropy, log_loss, classes=(5, 'probability'), weights=True)
+        self._test(CplexMaster.losses.categorical_crossentropy, log_loss, classes=(5, 'probability'), weights=True)

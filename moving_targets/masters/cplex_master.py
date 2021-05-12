@@ -1,12 +1,14 @@
 from abc import ABC
 
-import numpy as np
 from docplex.mp.model import Model
 
+from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
 
 
 class CplexMaster(Master, ABC):
+    losses = LossesHandler(sum_fn=lambda model: model.sum, abs_fn=lambda model: model.abs, log_fn=None)
+
     def __init__(self, alpha=1., beta=1., time_limit=30.):
         super(CplexMaster, self).__init__(alpha=alpha, beta=beta)
         self.time_limit = time_limit
@@ -31,85 +33,3 @@ class CplexMaster(Master, ABC):
         if solution is None:
             raise RuntimeError('The given model has no admissible solution, please check its constraints.')
         return self.return_solutions(macs, solution, model_info, x, y, iteration)
-
-    @staticmethod
-    def custom_loss(loss, model, numeric_variables, model_variables, sample_weight=None):
-        # use uniform weights if none are passed, otherwise normalize the weights so that they sum to len(samples)
-        if sample_weight is None:
-            sample_weight = np.ones(len(numeric_variables))
-        else:
-            sample_weight = len(sample_weight) * np.array(sample_weight) / np.sum(sample_weight)
-        return model.sum([sw * loss(nv, mv) for nv, mv, sw in zip(numeric_variables, model_variables, sample_weight)])
-
-    @staticmethod
-    def sum_of_absolute_errors(model, **kwargs):
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: model.abs(nv - mv),
-            model=model,
-            **kwargs
-        )
-
-    @staticmethod
-    def sum_of_squared_errors(**kwargs):
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: (nv - mv) ** 2,
-            **kwargs
-        )
-
-    @staticmethod
-    def mean_absolute_error(numeric_variables, **kwargs):
-        return CplexMaster.sum_of_absolute_errors(
-            numeric_variables=numeric_variables,
-            **kwargs
-        ) / len(numeric_variables)
-
-    @staticmethod
-    def mean_squared_error(numeric_variables, **kwargs):
-        return CplexMaster.sum_of_squared_errors(
-            numeric_variables=numeric_variables,
-            **kwargs
-        ) / len(numeric_variables)
-
-    @staticmethod
-    def binary_hamming(numeric_variables, **kwargs):
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: nv * mv + (1 - nv) * mv,
-            numeric_variables=numeric_variables,
-            **kwargs
-        ) / len(numeric_variables)
-
-    @staticmethod
-    def binary_crossentropy(numeric_variables, eps=1e-3, **kwargs):
-        numeric_variables = np.clip(numeric_variables, a_min=eps, a_max=1 - eps)
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: -(mv * np.log(nv) + (1 - mv) * np.log(1 - nv)),
-            numeric_variables=numeric_variables,
-            **kwargs
-        ) / len(numeric_variables)
-
-    @staticmethod
-    def swapped_binary_crossentropy(model, numeric_variables, **kwargs):
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: -(nv * model.log(mv) + (1 - nv) * model.log(mv)),
-            model=model,
-            numeric_variables=numeric_variables,
-            **kwargs
-        )
-
-    @staticmethod
-    def categorical_hamming(numeric_variables, **kwargs):
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: 1 - mv[nv],
-            numeric_variables=numeric_variables,
-            **kwargs
-        ) / len(numeric_variables)
-
-    @staticmethod
-    def categorical_crossentropy(model, numeric_variables, eps=1e-3, **kwargs):
-        numeric_variables = np.clip(numeric_variables, a_min=eps, a_max=1 - eps)
-        return CplexMaster.custom_loss(
-            loss=lambda nv, mv: -model.sum(mv * np.log(nv)),
-            model=model,
-            numeric_variables=numeric_variables,
-            **kwargs
-        ) / len(numeric_variables)

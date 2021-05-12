@@ -50,8 +50,8 @@ class MTMaster(GurobiMaster):
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
-        self.y_loss_fn = getattr(GurobiMaster, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
-        self.p_loss_fn = getattr(GurobiMaster, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
+        self.y_loss_fn = getattr(GurobiMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
+        self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         self.learner_weights = learner_weights
         if learner_weights == 'all':
             self.infeasible_mask = np.where(augmented_mask, True, True)
