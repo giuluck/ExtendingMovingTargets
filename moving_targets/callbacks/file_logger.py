@@ -1,55 +1,57 @@
 import sys
+from typing import Any, Tuple, Dict, List, Optional, Set
 
 from moving_targets.callbacks.logger import Logger
 
-SEPARATOR = '--------------------------------------------------'
+SEPARATOR: str = '--------------------------------------------------'
 
 
 class FileLogger(Logger):
-    def __init__(self, filepath=None, routines=None, log_empty=False, sort_keys=False, separator=SEPARATOR, end='\n'):
+    def __init__(self, filepath: str = None, routines: Optional[List[str]] = None, log_empty: bool = False,
+                 sort_keys: bool = False, separator: str = SEPARATOR, end: str = '\n'):
         super(FileLogger, self).__init__()
-        self.filepath = filepath
-        self.routines = None if routines is None else set(routines)
-        self.log_empty = log_empty
-        self.sort_keys = sort_keys
-        self.separator = separator
-        self.end = end
-        self.logged_once = False
+        self.filepath: str = filepath
+        self.routines: Optional[Set[str]] = None if routines is None else set(routines)
+        self.log_empty: bool = log_empty
+        self.sort_keys: bool = sort_keys
+        self.separator: str = separator
+        self.end: str = end
+        self.logged_once: bool = False
         # reset file content
         if self.filepath is not None:
             open(filepath, 'w').close()
 
-    def on_process_start(self, macs, x, y, val_data, **kwargs):
+    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         self._write_on_file('START PROCESS', 'on_process_start')
 
-    def on_process_end(self, macs, val_data, **kwargs):
+    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         self._write_on_file('END PROCESS', 'on_process_end')
 
-    def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
+    def on_pretraining_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         self._write_on_file('START PRETRAINING', 'on_pretraining_start')
 
-    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
+    def on_pretraining_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         self._write_on_file('END PRETRAINING', 'on_pretraining_end')
 
-    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self._write_on_file(f'START ITERATION', 'on_iteration_start')
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self._write_on_file(f'END ITERATION', 'on_iteration_end')
 
-    def on_training_start(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_training_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self._write_on_file('START TRAINING', 'on_training_start')
 
-    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self._write_on_file('END TRAINING', 'on_training_end')
 
-    def on_adjustment_start(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_adjustment_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self._write_on_file('START ADJUSTMENT', 'on_adjustment_start')
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self._write_on_file('END ADJUSTMENT', 'on_adjustment_end')
 
-    def _write_on_file(self, message, routine_name):
+    def _write_on_file(self, message: str, routine_name: str):
         if (self.routines is None or routine_name in self.routines) and (self.log_empty or len(self.cache) > 0):
             # open file
             file = sys.stdout if self.filepath is None else open(self.filepath, 'a', encoding='utf8')

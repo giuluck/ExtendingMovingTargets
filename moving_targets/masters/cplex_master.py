@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import Any
 
 from docplex.mp.model import Model
 
@@ -9,11 +10,11 @@ from moving_targets.masters.master import Master
 class CplexMaster(Master, ABC):
     losses = LossesHandler(sum_fn=lambda model, x: model.sum(x), abs_fn=lambda model, x: model.abs(x), log_fn=None)
 
-    def __init__(self, alpha=1., beta=1., time_limit=30.):
+    def __init__(self, alpha: float = 1., beta: float = 1., time_limit: float = 30.):
         super(CplexMaster, self).__init__(alpha=alpha, beta=beta)
-        self.time_limit = time_limit
+        self.time_limit: float = time_limit
 
-    def adjust_targets(self, macs, x, y, iteration):
+    def adjust_targets(self, macs, x, y, iteration: int) -> Any:
         # build model and get losses
         model = Model(name='model')
         model.set_time_limit(self.time_limit)

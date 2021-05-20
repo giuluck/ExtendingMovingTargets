@@ -1,15 +1,18 @@
+from typing import Any
+
 import numpy as np
 
 from moving_targets.masters.cplex_master import CplexMaster
 
 
 class BalancedCounts(CplexMaster):
-    def __init__(self, n_classes, alpha=1., beta=1., time_limit=30, use_prob=True):
+    def __init__(self, n_classes: int, alpha: float = 1., beta: float = 1., time_limit: float = 30.,
+                 use_prob: bool = True):
         super(BalancedCounts, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
-        self.num_classes = n_classes
-        self.use_prob = use_prob
+        self.num_classes: int = n_classes
+        self.use_prob: bool = use_prob
 
-    def build_model(self, macs, model, x, y, iteration):
+    def build_model(self, macs, model, x, y, iteration: int):
         # if the model has not been fitted yet (i.e., the initial macs step is 'projection') we use the original labels
         # otherwise we use either the predicted classes or the predicted probabilities
         if not macs.fitted:
@@ -41,16 +44,16 @@ class BalancedCounts(CplexMaster):
         # return model info
         return variables, pred, prob, max_count
 
-    def beta_step(self, macs, model, model_info, x, y, iteration):
+    def beta_step(self, macs, model, model_info, x, y, iteration: int) -> bool:
         _, pred, _, max_count = model_info
         _, pred_classes_counts = np.unique(pred, return_counts=True)
         return np.all(pred_classes_counts <= max_count)
 
-    def y_loss(self, macs, model, model_info, x, y, iteration):
+    def y_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
         variables, _, _, _ = model_info
         return CplexMaster.losses.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
 
-    def p_loss(self, macs, model, model_info, x, y, iteration):
+    def p_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
         variables, pred, prob, _ = model_info
         if prob is None:
             return CplexMaster.losses.categorical_hamming(
@@ -65,20 +68,8 @@ class BalancedCounts(CplexMaster):
                 model_variables=variables
             )
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration):
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: int) -> Any:
         variables, _, _, _ = model_info
         y_adj = [sum(c * solution.get_value(variables[i, c]) for c in range(self.num_classes)) for i in range(len(y))]
         y_adj = np.array([int(v) for v in y_adj])
         return y_adj
-
-    @staticmethod
-    def _crossentropy_loss(variable, probabilities):
-        # the loss is the negative log-probability over all the possible classes
-        n_classes = len(probabilities)
-        return -sum([variable[j] * np.log(probabilities[j]) for j in range(n_classes)])
-
-    @staticmethod
-    def _indicator_loss(variable, label):
-        # variable[label] = 1 if the variable has the same class as the label, 0 otherwise
-        # therefore, the loss for each sample is 0 if the class has been assigned correctly, 1 otherwise
-        return 1 - variable[label]

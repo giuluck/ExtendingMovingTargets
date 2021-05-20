@@ -1,21 +1,27 @@
 import time
+from typing import List, Optional, Tuple, Any, Dict, Callable
 
-from moving_targets.callbacks import Logger, FileLogger, History, ConsoleLogger
+from moving_targets.callbacks import Logger, FileLogger, History, ConsoleLogger, Callback
+from moving_targets.learners import Learner
+from moving_targets.masters import Master
+from moving_targets.metrics import Metric
 
 
 class MACS(Logger):
-    def __init__(self, learner, master, init_step='pretraining', metrics=None):
+    def __init__(self, learner: Learner, master: Master, init_step: str = 'pretraining',
+                 metrics: Optional[List[Metric]] = None):
         super(MACS, self).__init__()
         assert init_step in ['pretraining', 'projection'], "initial step should be 'pretraining' or 'projection'"
-        self.learner = learner
-        self.master = master
-        self.init_step = init_step
-        self.metrics = [] if metrics is None else metrics
-        self.history = History()
-        self.fitted = False
-        self.time = None
+        self.learner: Learner = learner
+        self.master: Master = master
+        self.init_step: str = init_step
+        self.metrics: List[Metric] = [] if metrics is None else metrics
+        self.history: History = History()
+        self.fitted: bool = False
+        self.time: Optional[float] = None
 
-    def fit(self, x, y, iterations=1, val_data=None, callbacks=None, verbose=2):
+    def fit(self, x, y, iterations: int = 1, val_data: Dict[str, Tuple[Any, Any]] = None,
+            callbacks: Optional[List[Callback]] = None, verbose: Any = 2):
         # check user input
         assert iterations >= 0, 'the number of iterations should be non-negative'
         assert iterations > 0 or self.init_step == 'pretraining', 'if projection, iterations should be a positive value'
@@ -72,10 +78,10 @@ class MACS(Logger):
         p = self.predict(x)
         return {metric.__name__: metric(x, y, p) for metric in self.metrics}
 
-    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self.time = time.time()
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         logs = {'iteration': iteration, 'elapsed time': time.time() - self.time}
         # log metrics on training data
         p = self.predict(x)
@@ -88,11 +94,11 @@ class MACS(Logger):
                 logs[f'{name}_{metric.__name__}'] = metric(xx, yy, pp)
         self.log(**logs)
 
-    def _update_callbacks(self, callbacks, routine):
+    def _update_callbacks(self, callbacks: List[Callback], routine: Callable):
         # run callback routine for macs object itself and history object
         routine(self)
         # run callback routine for the history logger and for each external callback
-        for callback in [self.history] + callbacks:
+        for callback in callbacks + [self.history]:
             # if the callback is a logger, log the internal cache before calling the routine (and eventually clear it)
             if isinstance(callback, Logger):
                 callback.log(**self.cache)

@@ -1,10 +1,12 @@
+from collections import Callable
+
 import numpy as np
 
 
 class SumLoss:
-    def __init__(self, call_fn, loss_fn):
-        self.call_fn = call_fn
-        self.loss_fn = loss_fn
+    def __init__(self, call_fn: Callable, loss_fn: Callable):
+        self.call_fn: Callable = call_fn
+        self.loss_fn: Callable = loss_fn
 
     def __call__(self, model, numeric_variables, model_variables, sample_weight=None):
         return self.call_fn(
@@ -27,18 +29,18 @@ class MeanLoss(SumLoss):
 
 
 class ClippedMeanLoss(MeanLoss):
-    def __init__(self, call_fn, loss_fn, clip_value=1e-3):
+    def __init__(self, call_fn: Callable, loss_fn: Callable, clip_value: float = 1e-15):
         super(ClippedMeanLoss, self).__init__(call_fn=call_fn, loss_fn=loss_fn)
-        self.clip_value = clip_value
+        self.clip_value: float = clip_value
 
     def __call__(self, model, numeric_variables, model_variables, sample_weight=None):
         numeric_variables = np.clip(numeric_variables, a_min=self.clip_value, a_max=1 - self.clip_value)
-        return super(MeanLoss, self).__call__(
+        return super(ClippedMeanLoss, self).__call__(
             model=model,
             numeric_variables=numeric_variables,
             model_variables=model_variables,
             sample_weight=sample_weight
-        ) / len(numeric_variables)
+        )
 
 
 # noinspection PyMethodMayBeStatic,PyUnusedLocal

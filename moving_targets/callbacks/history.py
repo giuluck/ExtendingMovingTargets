@@ -1,3 +1,5 @@
+from typing import Dict, Tuple, Any, List, Optional
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -9,16 +11,16 @@ from moving_targets.callbacks.logger import Logger
 class History(Logger):
     def __init__(self):
         super(History, self).__init__()
-        self.history = []
+        self.history: Any = []
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
         self.history.append(pd.DataFrame([self.cache.values()], columns=self.cache.keys(), index=[iteration]))
         self.cache = {}
 
-    def on_process_end(self, macs, val_data, **kwargs):
+    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         self.history = pd.concat(self.history)
 
-    def plot(self, columns=None, num_columns=4, show=True, **kwargs):
+    def plot(self, columns: Optional[List[str]] = None, num_columns: int = 4, show: bool = True, **kwargs):
         # handle columns and number of rows
         assert isinstance(self.history, pd.DataFrame), 'Process did not end correctly, therefore no dataframe was built'
         columns = self.history.columns if columns is None else columns
