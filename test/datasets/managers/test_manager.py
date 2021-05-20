@@ -17,7 +17,7 @@ class TestManager:
     DATA_ARGS = dict()
     AUGMENTED_ARGS = dict()
     MONOTONICITIES_ARGS = dict(kind='group')
-    LEARNER_ARGS = dict(optimizer='adam', epochs=200, verbose=False,
+    LEARNER_ARGS = dict(optimizer='adam', epochs=0, verbose=False,
                         callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)])
     MASTER_ARGS = dict()
     PLOT_ARGS = dict(figsize=(20, 10), num_columns=4)
@@ -104,13 +104,13 @@ class RegressionTest(TestManager):
 
 
 class ClassificationTest(TestManager):
-    def __init__(self, dataset, augmented_args, monotonicities_args, kind='probabilities', h_units=(128, 128),
+    def __init__(self, dataset, augmented_args, monotonicities_args, kind='classification', h_units=(128, 128),
                  evaluation_metric=Accuracy(), warm_start=False, **kwargs):
-        if kind == 'classes':
+        if kind == 'classification':
             master_type = MTClassificationMaster
             loss_metric = CrossEntropy(name='loss')
             loss_fn = 'binary_crossentropy'
-        elif kind == 'probabilities':
+        elif kind == 'regression':
             master_type = MTRegressionMaster
             loss_metric = MSE(name='loss')
             loss_fn = 'mse'

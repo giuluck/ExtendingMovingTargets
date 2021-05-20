@@ -3,9 +3,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from moving_targets.metrics import CrossEntropy, Accuracy
+from moving_targets.metrics import Accuracy
 from src.datasets import LawManager
-from src.models import MTClassificationMaster
 from src.util.plot import ColorFader
 from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 

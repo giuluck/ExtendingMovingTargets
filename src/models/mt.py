@@ -1,10 +1,9 @@
 import time
 import numpy as np
-from gurobipy import GRB
 
 from moving_targets import MACS
 from moving_targets.learners import Learner
-from moving_targets.masters import GurobiMaster
+from moving_targets.masters import CplexMaster
 from moving_targets.metrics.constraints import MonotonicViolation
 from src.models import MLP
 from src.util.dictionaries import merge_dictionaries
@@ -34,23 +33,23 @@ class MTLearner(Learner):
         # log statistics
         macs.log(**{
             'time/learner': time.time() - start_time,
-            'learner/epochs': fit.epoch[-1] + 1,
-            'learner/loss': fit.history['loss'][-1]
+            'learner/epochs': len(fit.epoch),
+            'learner/loss': fit.history['loss'][-1] if len(fit.epoch) > 0 else np.nan
         })
 
     def predict(self, x):
         return self.model.predict(x).flatten()
 
 
-class MTMaster(GurobiMaster):
+class MTMaster(CplexMaster):
     def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1.0,
                  learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
         super(MTMaster, self).__init__(alpha=alpha, beta=None, time_limit=time_limit)
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
-        self.y_loss_fn = getattr(GurobiMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
-        self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
+        self.y_loss_fn = getattr(CplexMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
+        self.p_loss_fn = getattr(CplexMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         self.learner_weights = learner_weights
         if learner_weights == 'all':
             self.infeasible_mask = np.ones_like(augmented_mask)  # vector of 'True'
@@ -66,21 +65,23 @@ class MTMaster(GurobiMaster):
         else:
             self.master_omega_y, self.master_omega_p = master_omega, master_omega
         self.eps = eps
+        self.start_time = None
 
     def build_variables(self, model, y):
         raise NotImplementedError("Please implement method 'build variables'")
 
+    # noinspection PyMethodMayBeStatic
     def build_predictions(self, macs, x):
         return macs.predict(x)
 
     def build_model(self, macs, model, x, y, iteration):
+        self.start_time = time.time()
         # handle 'projection' initial step (p = None)
         pred = None if not macs.fitted else self.build_predictions(macs, x)
         # create variables and impose constraints for each monotonicity
         var = np.array(self.build_variables(model, y))
-        model.update()
         if len(self.higher_indices):
-            model.addConstrs((h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])), name='c')
+            model.add_constraints([h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])])
         # return model info
         return var, pred
 
@@ -90,33 +91,24 @@ class MTMaster(GurobiMaster):
     def y_loss(self, macs, model, model_info, x, y, iteration):
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
-        return self.y_loss_fn(
-            model=model,
-            numeric_variables=y[~np.isnan(y)],
-            model_variables=var[~np.isnan(y)],
-            sample_weight=sw
-        )
+        return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
     def p_loss(self, macs, model, model_info, x, y, iteration):
         var, pred = model_info
         sw = np.where(self.augmented_mask, self.master_omega_p, 1)
-        return 0.0 if pred is None else self.p_loss_fn(
-            model=model,
-            numeric_variables=pred,
-            model_variables=var,
-            sample_weight=sw
-        )
+        return 0.0 if pred is None else self.p_loss_fn(model, pred, var, sample_weight=sw)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         var, pred = model_info
-        adj = np.array([vy.x for vy in var])
-        macs.log(**{'time/master': solution.Runtime})
+        adj = np.array([vy.solution_value for vy in var])
         if self.learner_weights == 'infeasible':
             infeasible_mask = (pred[self.lower_indices] - pred[self.higher_indices]) > self.eps
             self.infeasible_mask[self.higher_indices[infeasible_mask]] = True
             self.infeasible_mask[self.lower_indices[infeasible_mask]] = True
         sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
         sample_weight[~self.augmented_mask] = 1.0
+        macs.log(**{'time/master': time.time() - self.start_time})
+        self.start_time = None
         return adj, {'sample_weight': sample_weight}
 
 
@@ -129,10 +121,7 @@ class MTRegressionMaster(MTMaster):
         'sae': 'sum_of_absolute_errors',
         'sum_of_absolute_errors': 'sum_of_absolute_errors',
         'sse': 'sum_of_squared_errors',
-        'sum_of_squared_errors': 'sum_of_squared_errors',
-        'bce': 'swapped_binary_crossentropy',
-        'binary_crossentropy': 'swapped_binary_crossentropy',
-        'swapped_binary_crossentropy': 'swapped_binary_crossentropy'
+        'sum_of_squared_errors': 'sum_of_squared_errors'
     }
 
     def __init__(self, monotonicities, augmented_mask, loss_fn='mse', **kwargs):
@@ -145,7 +134,7 @@ class MTRegressionMaster(MTMaster):
         )
 
     def build_variables(self, model, y):
-        return model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=-float('inf'), ub=float('inf'), name='y').values()
+        return model.continuous_var_list(keys=len(y), name='y', lb=-float('inf'), ub=float('inf'))
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         adj, kwargs = super(MTRegressionMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
@@ -157,21 +146,21 @@ class MTRegressionMaster(MTMaster):
 
 
 class MTClassificationMaster(MTMaster):
-    def __init__(self, monotonicities, augmented_mask, use_prob=True, **kwargs):
-        # noinspection PyTypeChecker
+    def __init__(self, monotonicities, augmented_mask, clip_value=1e-6, **kwargs):
         super(MTClassificationMaster, self).__init__(
             monotonicities=monotonicities,
             augmented_mask=augmented_mask,
-            loss_fn=('binary_hamming', 'binary_crossentropy' if use_prob else 'binary_hamming'),
+            loss_fn='binary_crossentropy',
             **kwargs
         )
-        self.use_prob = use_prob
+        # change clip values of binary crossentropy functions
+        y_clip, p_clip = clip_value if isinstance(clip_value, tuple) else (clip_value, clip_value)
+        assert y_clip > 0 and p_clip > 0, "clip_value should be either a positive number or a pair of positive numbers"
+        self.y_loss_fn.clip_value = y_clip
+        self.p_loss_fn.clip_value = p_clip
 
     def build_variables(self, model, y):
-        return model.addVars(len(y), vtype=GRB.BINARY, name='y').values()
-
-    def build_predictions(self, macs, x):
-        return macs.predict(x) if self.use_prob else macs.predict(x).round()
+        return model.continuous_var_list(keys=len(y), name='y', lb=0.0, ub=1.0)
 
     def return_solutions(self, macs, solution, model_info, x, y, iteration):
         adj, kwargs = super(MTClassificationMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)

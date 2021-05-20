@@ -15,20 +15,21 @@ if __name__ == '__main__':
     study = cartesian_product(
         seed=[0, 1, 2],
         alpha=[0.01, 0.1, 1.0],
-        learner_weights=['all'],
-        learner_omega=[1],
-        master_omega=[1],
-        warm_start=[True, False],
-        dataset=['cars univariate']
-    ) + cartesian_product(
-        seed=[0, 1, 2],
-        alpha=[0.01, 0.1, 1.0],
         learner_weights=['all', 'infeasible'],
         learner_omega=[1],
         master_omega=[1],
         warm_start=[True, False],
-        dataset=['cars', 'synthetic', 'puzzles']
+        dataset=['restaurants', 'default', 'law'],
+        kind=[('classes', True), ('probabilities', 'bce')]
     )
+    for s in study:
+        kind, param = s['kind']
+        if kind == 'probabilities':
+            s['loss_fn'] = param
+        elif kind == 'classes':
+            s['use_prob'] = param
+        else:
+            raise ValueError(f"unknown kind '{kind}'")
 
     # begin study
     for i, config in enumerate(study):
@@ -40,8 +41,9 @@ if __name__ == '__main__':
             manager, _ = get_dataset(dataset=dataset)
             manager(
                 seed=config['seed'],
+                kind=config['kind'],
                 warm_start=config['warm_start'],
-                master_args={k: v for k, v in config.items() if k not in ['seed', 'warm_start']}
+                master_args={k: v for k, v in config.items() if k not in ['seed', 'kind', 'warm_start']}
             ).fit(
                 iterations=20,
                 verbose=False,

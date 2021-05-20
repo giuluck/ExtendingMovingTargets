@@ -21,7 +21,7 @@ class DefaultTest(ClassificationTest):
 
 
 class DefaultAdjustments(AnalysisCallback):
-    max_size = 2000
+    max_size = 30
     alpha = 0.8
 
     def __init__(self, **kwargs):
@@ -42,12 +42,10 @@ class DefaultAdjustments(AnalysisCallback):
         label = 'default' if iteration == AnalysisCallback.PRETRAINING else f'adj {iteration}'
         data = self.data.astype({'married': int}).rename(columns={label: 'y', f'sw {iteration}': 'sw'})
         data = data.groupby(['married', 'payment', 'y'])['sw'].sum().reset_index()
-        # normalize sample weights
-        data['sw'] = data['sw'] / data['sw'].sum()
         # dodge based on married value due to visualization reasons
         data['payment'] = [d + (0.1 if m == 0 else -0.1) for d, m in zip(data['payment'], data['married'])]
         # plot mass probabilities and responses
-        sns.scatterplot(data=data, x='payment', y='y', hue='married', size='sw', size_norm=(0, 1), legend=False,
+        sns.scatterplot(data=data, x='payment', y='y', hue='married', size='sw', size_norm=(0, 100), legend=False,
                         sizes=(0, DefaultAdjustments.max_size), alpha=DefaultAdjustments.alpha)
         sns.lineplot(data=self.grid, x='payment', y=f'pred {iteration}', hue='married')
         return f'{iteration}) avg. flips = {np.abs(adj[~np.isnan(y)] - y[~np.isnan(y)]).mean():.4f}'

@@ -34,7 +34,7 @@ class GurobiMaster(Master, ABC):
     def adjust_targets(self, macs, x, y, iteration):
         # build model and get losses
         with Env(empty=True) as env:
-            # env.setParam('OutputFlag', 0)
+            env.setParam('OutputFlag', 0)
             env.start()
             with Model(env=env, name='model') as model:
                 model.setParam('TimeLimit', self.time_limit)

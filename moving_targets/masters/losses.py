@@ -27,12 +27,12 @@ class MeanLoss(SumLoss):
 
 
 class ClippedMeanLoss(MeanLoss):
-    def __init__(self, call_fn, loss_fn, eps=1e-3):
+    def __init__(self, call_fn, loss_fn, clip_value=1e-3):
         super(ClippedMeanLoss, self).__init__(call_fn=call_fn, loss_fn=loss_fn)
-        self.eps = eps
+        self.clip_value = clip_value
 
     def __call__(self, model, numeric_variables, model_variables, sample_weight=None):
-        numeric_variables = np.clip(numeric_variables, a_min=self.eps, a_max=1 - self.eps)
+        numeric_variables = np.clip(numeric_variables, a_min=self.clip_value, a_max=1 - self.clip_value)
         return super(MeanLoss, self).__call__(
             model=model,
             numeric_variables=numeric_variables,
