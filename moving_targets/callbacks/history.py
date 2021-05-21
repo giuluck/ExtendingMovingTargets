@@ -13,7 +13,7 @@ class History(Logger):
         super(History, self).__init__()
         self.history: Any = []
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.history.append(pd.DataFrame([self.cache.values()], columns=self.cache.keys(), index=[iteration]))
         self.cache = {}
 

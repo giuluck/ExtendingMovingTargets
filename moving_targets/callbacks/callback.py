@@ -19,20 +19,20 @@ class Callback:
         self.on_training_end(macs, x, y, val_data, **kwargs)
         self.on_iteration_end(macs, x, y, val_data, **kwargs)
 
-    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         pass
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         pass
 
-    def on_training_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_training_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         pass
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         pass
 
-    def on_adjustment_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_adjustment_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         pass
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         pass

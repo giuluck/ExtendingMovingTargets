@@ -1,9 +1,11 @@
+from typing import Any, Optional
+
 import numpy as np
 from matplotlib.colors import to_rgb, to_hex
 
 
 class ColorFader:
-    def __init__(self, *args, bounds=None, error='raise'):
+    def __init__(self, *args, bounds: Optional[Any] = None, error: str = 'raise'):
         assert np.log2(len(args)) % 1 == 0, "Please provide a number of colors which is a power of two"
         assert error in ['raise', 'input', 'output'], "'error' parameter should be either 'raise', 'input', or 'output'"
         self.dim = int(np.log2(len(args)))

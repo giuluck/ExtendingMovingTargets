@@ -1,3 +1,5 @@
+from typing import Optional, List, Any, Callable
+
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as k
@@ -13,7 +15,7 @@ def hard_tanh(x, factor=10 ** 6):
 
 
 class SBRBatchGenerator(Sequence):
-    def __init__(self, x, y, ground_indices, monotonicities, batch_size):
+    def __init__(self, x, y, ground_indices, monotonicities, batch_size: int):
         super(SBRBatchGenerator, self).__init__()
         # compute number of samples in each group
         self.num_samples = np.sum(ground_indices == 0)
@@ -42,8 +44,8 @@ class SBRBatchGenerator(Sequence):
 
 
 class SBR(MLP):
-    def __init__(self, output_act=None, h_units=None, scalers=None, alpha=None, regularizer_act=None, input_dim=None):
-        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scalers=scalers, input_dim=input_dim)
+    def __init__(self, alpha: Optional[float] = None, regularizer_act: Optional[Callable] = None, **kwargs):
+        super(SBR, self).__init__(**kwargs)
         if alpha is None:
             self.alpha = tf.Variable(0., name='alpha')
             self.alpha_optimizer = Adam()
@@ -115,20 +117,8 @@ class SBR(MLP):
 
 
 class UnivariateSBR(SBR):
-    def __init__(self,
-                 direction=1,
-                 output_act=None,
-                 h_units=None,
-                 scalers=None,
-                 alpha=None,
-                 regularizer_act=None,
-                 input_dim=None):
-        super(UnivariateSBR, self).__init__(output_act=output_act,
-                                            h_units=h_units,
-                                            scalers=scalers,
-                                            alpha=alpha,
-                                            regularizer_act=regularizer_act,
-                                            input_dim=input_dim)
+    def __init__(self, direction: int = 1, **kwargs):
+        super(UnivariateSBR, self).__init__(**kwargs)
         self.direction = direction
 
     def _custom_loss(self, x, y, sign=1):

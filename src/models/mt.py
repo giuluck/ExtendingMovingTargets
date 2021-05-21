@@ -1,11 +1,12 @@
 import time
-from typing import Any
+from typing import Any, Optional, Tuple, List
 
 import numpy as np
 
 from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
+from moving_targets.metrics import Metric
 from moving_targets.metrics.constraints import MonotonicViolation
 from src.models import MLP
 from src.util.dictionaries import merge_dictionaries
@@ -44,8 +45,9 @@ class MTLearner(Learner):
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities, augmented_mask, loss_fn='mean_squared_error', alpha=1.0,
-                 learner_weights='all', learner_omega=1.0, master_omega=None, eps=1e-3, time_limit=30):
+    def __init__(self, monotonicities: List[Tuple[int, int]], augmented_mask: np.ndarray, loss_fn: str,
+                 alpha: float = 1.0, learner_weights: str = 'all', learner_omega: float = 1.0,
+                 master_omega: Optional[float] = None, eps: float = 1e-3, time_limit: float = 30):
         super(MTMaster, self).__init__(alpha=alpha, beta=None, time_limit=time_limit)
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
@@ -76,7 +78,7 @@ class MTMaster(CplexMaster):
     def build_predictions(self, macs, x):
         return macs.predict(x)
 
-    def build_model(self, macs, model, x, y, iteration: int):
+    def build_model(self, macs, model, x, y, iteration: Any):
         self.start_time = time.time()
         # handle 'projection' initial step (p = None)
         pred = None if not macs.fitted else self.build_predictions(macs, x)
@@ -87,20 +89,20 @@ class MTMaster(CplexMaster):
         # return model info
         return var, pred
 
-    def beta_step(self, macs, model, model_info, x, y, iteration: int) -> bool:
+    def beta_step(self, macs, model, model_info, x, y, iteration: Any) -> bool:
         return False
 
-    def y_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
+    def y_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
         return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
-    def p_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
+    def p_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
         var, pred = model_info
         sw = np.where(self.augmented_mask, self.master_omega_p, 1)
         return 0.0 if pred is None else self.p_loss_fn(model, pred, var, sample_weight=sw)
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: int) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
         var, pred = model_info
         adj = np.array([vy.solution_value for vy in var])
         if self.learner_weights == 'infeasible':
@@ -126,7 +128,11 @@ class MTRegressionMaster(MTMaster):
         'sum_of_squared_errors': 'sum_of_squared_errors'
     }
 
-    def __init__(self, monotonicities, augmented_mask, loss_fn='mse', **kwargs):
+    def __init__(self,
+                 monotonicities: List[Tuple[int, int]],
+                 augmented_mask: np.ndarray,
+                 loss_fn: str = 'mse',
+                 **kwargs):
         assert loss_fn in self.losses.keys(), f'loss_fn should be in {list(self.losses.keys())}'
         super(MTRegressionMaster, self).__init__(
             monotonicities=monotonicities,
@@ -138,7 +144,7 @@ class MTRegressionMaster(MTMaster):
     def build_variables(self, model, y):
         return model.continuous_var_list(keys=len(y), name='y', lb=-float('inf'), ub=float('inf'))
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: int) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
         adj, kwargs = super(MTRegressionMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
         mask = ~np.isnan(y)
         macs.log(**{
@@ -148,7 +154,11 @@ class MTRegressionMaster(MTMaster):
 
 
 class MTClassificationMaster(MTMaster):
-    def __init__(self, monotonicities, augmented_mask, clip_value=1e-6, **kwargs):
+    def __init__(self,
+                 monotonicities: List[Tuple[int, int]],
+                 augmented_mask: np.ndarray,
+                 clip_value: float = 1e-15,
+                 **kwargs):
         super(MTClassificationMaster, self).__init__(
             monotonicities=monotonicities,
             augmented_mask=augmented_mask,
@@ -164,7 +174,7 @@ class MTClassificationMaster(MTMaster):
     def build_variables(self, model, y):
         return model.continuous_var_list(keys=len(y), name='y', lb=0.0, ub=1.0)
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: int) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
         adj, kwargs = super(MTClassificationMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
         mask = ~np.isnan(y)
         macs.log(**{
@@ -175,12 +185,13 @@ class MTClassificationMaster(MTMaster):
 
 
 class MT(MACS):
-    def __init__(self, learner, master, init_step='pretraining', metrics=None):
+    def __init__(self, learner: MTLearner, master: MTMaster, init_step: str = 'pretraining',
+                 metrics: Optional[List[Metric]] = None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
         self.violation_metrics = [m for m in self.metrics if isinstance(m, MonotonicViolation)]
         self.metrics = [m for m in self.metrics if not isinstance(m, MonotonicViolation)]
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data, iteration: Any, **kwargs):
         iteration = 0 if iteration == 'pretraining' else iteration
         logs = {'iteration': iteration, 'time/iteration': time.time() - self.time}
         # VIOLATION METRICS (on augmented data)

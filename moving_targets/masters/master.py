@@ -9,20 +9,20 @@ class Master:
         self.alpha: float = alpha
         self.beta: float = beta
 
-    def build_model(self, macs, model, x, y, iteration: int):
+    def build_model(self, macs, model, x, y, iteration: Any):
         raise NotImplementedError("Please implement method 'build_model'")
 
-    def beta_step(self, macs, model, model_info, x, y, iteration: int) -> bool:
+    def beta_step(self, macs, model, model_info, x, y, iteration: Any) -> bool:
         return False
 
-    def y_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
+    def y_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
         return 0.0
 
-    def p_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
+    def p_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
         return 0.0
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: int) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
         raise NotImplementedError("Please implement method 'return_solutions'")
 
-    def adjust_targets(self, macs, x, y, iteration: int) -> Any:
+    def adjust_targets(self, macs, x, y, iteration: Any) -> Any:
         pass

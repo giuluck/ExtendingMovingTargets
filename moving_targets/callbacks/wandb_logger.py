@@ -15,7 +15,7 @@ class WandBLogger(Logger):
     def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         wandb.init(**self.config)
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         wandb.log({k: self.cache[k] for k in sorted(self.cache)})
         self.cache = {}
 

@@ -12,7 +12,7 @@ class BalancedCounts(CplexMaster):
         self.num_classes: int = n_classes
         self.use_prob: bool = use_prob
 
-    def build_model(self, macs, model, x, y, iteration: int):
+    def build_model(self, macs, model, x, y, iteration: Any):
         # if the model has not been fitted yet (i.e., the initial macs step is 'projection') we use the original labels
         # otherwise we use either the predicted classes or the predicted probabilities
         if not macs.fitted:
@@ -44,16 +44,16 @@ class BalancedCounts(CplexMaster):
         # return model info
         return variables, pred, prob, max_count
 
-    def beta_step(self, macs, model, model_info, x, y, iteration: int) -> bool:
+    def beta_step(self, macs, model, model_info, x, y, iteration: Any) -> bool:
         _, pred, _, max_count = model_info
         _, pred_classes_counts = np.unique(pred, return_counts=True)
         return np.all(pred_classes_counts <= max_count)
 
-    def y_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
+    def y_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
         variables, _, _, _ = model_info
         return CplexMaster.losses.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
 
-    def p_loss(self, macs, model, model_info, x, y, iteration: int) -> float:
+    def p_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
         variables, pred, prob, _ = model_info
         if prob is None:
             return CplexMaster.losses.categorical_hamming(
@@ -68,7 +68,7 @@ class BalancedCounts(CplexMaster):
                 model_variables=variables
             )
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: int) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
         variables, _, _, _ = model_info
         y_adj = [sum(c * solution.get_value(variables[i, c]) for c in range(self.num_classes)) for i in range(len(y))]
         y_adj = np.array([int(v) for v in y_adj])

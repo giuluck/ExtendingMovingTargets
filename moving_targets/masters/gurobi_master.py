@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any
+from typing import Any, Optional
 
 from gurobipy import Model, Env, GRB
 
@@ -28,11 +28,11 @@ def _log(model: Model, x):
 class GurobiMaster(Master, ABC):
     losses = LossesHandler(sum_fn=lambda model, x: sum(x), abs_fn=_abs, log_fn=_log)
 
-    def __init__(self, alpha: float = 1., beta: float = 1., time_limit: float = 30.):
+    def __init__(self, alpha: float = 1., beta: Optional[float] = 1., time_limit: float = 30.):
         super(GurobiMaster, self).__init__(alpha=alpha, beta=beta)
         self.time_limit: float = time_limit
 
-    def adjust_targets(self, macs, x, y, iteration: int) -> Any:
+    def adjust_targets(self, macs, x, y, iteration: Any) -> Any:
         # build model and get losses
         with Env(empty=True) as env:
             env.setParam('OutputFlag', 0)

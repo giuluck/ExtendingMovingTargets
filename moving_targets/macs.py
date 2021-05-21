@@ -78,10 +78,10 @@ class MACS(Logger):
         p = self.predict(x)
         return {metric.__name__: metric(x, y, p) for metric in self.metrics}
 
-    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.time = time.time()
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: int, **kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         logs = {'iteration': iteration, 'elapsed time': time.time() - self.time}
         # log metrics on training data
         p = self.predict(x)

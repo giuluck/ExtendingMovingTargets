@@ -1,8 +1,10 @@
+from typing import Callable, Dict, Tuple, Any, Optional
+
 import numpy as np
 import pandas as pd
 
 
-def augment_data(x, y, compute_monotonicities, sampling_functions):
+def augment_data(x, y, compute_monotonicities: Callable, sampling_functions: Dict[str, Tuple[int, Callable]]):
     new_samples = []
     new_info = []
     for ground_index, sample in x.iterrows():
@@ -29,7 +31,7 @@ def augment_data(x, y, compute_monotonicities, sampling_functions):
     return x_aug, y_aug
 
 
-def compute_numeric_monotonicities(samples, references, directions, eps=1e-5):
+def compute_numeric_monotonicities(samples: np.ndarray, references: np.ndarray, directions: Any, eps: float = 1e-5):
     # increase samples dimension to match references
     samples = np.hstack([samples] * len(references)).reshape((len(samples), len(references), -1))
     # compute differences between samples to get the number of different attributes
@@ -43,7 +45,8 @@ def compute_numeric_monotonicities(samples, references, directions, eps=1e-5):
     return monotonicities
 
 
-def get_monotonicities_list(data, kind, label, compute_monotonicities=None, errors='raise'):
+def get_monotonicities_list(data: pd.DataFrame, kind: str, label: Optional[str],
+                            compute_monotonicities: Callable = None, errors: str = 'raise'):
     higher_indices, lower_indices = [], []
     # ground monotonicities: retrieved from the 'monotonicity' field of the dataframe
     if kind == 'ground':
