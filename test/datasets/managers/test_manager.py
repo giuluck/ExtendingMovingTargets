@@ -1,34 +1,42 @@
-import random
-from typing import List, Any, Type, Optional
+"""Test Managers & Callbacks."""
 
-import matplotlib.pyplot as plt
+import random
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
+import matplotlib.pyplot as plt
+from typing import List, Any, Type, Dict, Union, Optional as Opt
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback
 from moving_targets.metrics import MonotonicViolation, MSE, R2, CrossEntropy, Accuracy, Metric
+from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import DataManager
 from src.models import MTLearner, MT, MTRegressionMaster, MTClassificationMaster, MTMaster
 from src.util.augmentation import get_monotonicities_list
 from src.util.dictionaries import merge_dictionaries
 
 
+# noinspection PyMissingOrEmptyDocstring
 class TestManager:
     DATA_ARGS = dict()
     AUGMENTED_ARGS = dict()
     MONOTONICITIES_ARGS = dict(kind='group')
-    LEARNER_ARGS = dict(optimizer='adam', epochs=0, verbose=False,
+    LEARNER_ARGS = dict(optimizer='adam', epochs=200, verbose=False,
                         callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)])
     MASTER_ARGS = dict()
     PLOT_ARGS = dict(figsize=(20, 10), num_columns=4)
     SUMMARY_ARGS = dict()
 
     @staticmethod
-    def setup(seed: int = 0, max_rows: int = 10000, max_columns: int = 10000, width: int = 10000,
-              max_colwidth: int = 10000, float_format: str = '{:.4f}'):
+    def setup(seed: int = 0,
+              max_rows: int = 10000,
+              max_columns: int = 10000,
+              width: int = 10000,
+              max_colwidth: int = 10000,
+              float_format: str = '{:.4f}'):
+        """Sets up the experiment."""
         random.seed(seed)
         np.random.seed(seed)
         tf.random.set_seed(seed)
@@ -38,10 +46,17 @@ class TestManager:
         pd.options.display.max_colwidth = max_colwidth
         pd.options.display.float_format = float_format.format
 
-    def __init__(self, dataset: DataManager, master_type: Type[MTMaster], init_step: str = 'pretraining',
-                 metrics: List[Metric] = None, data_args: Opt = None, augmented_args: Opt = None,
-                 monotonicities_args: Opt = None, learner_args: Opt = None,
-                 master_args: Opt = None, seed: int = 0):
+    def __init__(self,
+                 dataset: DataManager,
+                 master_type: Type[MTMaster],
+                 init_step: str = 'pretraining',
+                 metrics: List[Metric] = None,
+                 data_args: Dict = None,
+                 augmented_args: Dict = None,
+                 monotonicities_args: Dict = None,
+                 learner_args: Dict = None,
+                 master_args: Dict = None,
+                 seed: int = 0):
         # PARAMETERS
         metrics = [] if metrics is None else metrics
         data_args = merge_dictionaries(TestManager.DATA_ARGS, data_args)
@@ -77,7 +92,12 @@ class TestManager:
             ]
         )
 
-    def fit(self, iterations, callbacks=None, verbose=1, plot_args=None, summary_args=None):
+    def fit(self,
+            iterations: int,
+            callbacks: Opt[List[Callback]] = None,
+            verbose: Union[int, bool] = 1,
+            plot_args: Dict = None,
+            summary_args: Dict = None):
         TestManager.setup(seed=self.seed)
         history = self.moving_targets.fit(
             x=self.x,
@@ -95,9 +115,15 @@ class TestManager:
             self.dataset.evaluation_summary(self.moving_targets, **self.data, **summary_args)
 
 
+# noinspection PyMissingOrEmptyDocstring
 class RegressionTest(TestManager):
-    def __init__(self, dataset: DataManager, augmented_args: Opt, monotonicities_args: Opt,
-                 extrapolation: bool = False, warm_start: bool = False, **kwargs):
+    def __init__(self,
+                 dataset: DataManager,
+                 augmented_args: Dict,
+                 monotonicities_args: Dict,
+                 extrapolation: bool = False,
+                 warm_start: bool = False,
+                 **kwargs):
         super(RegressionTest, self).__init__(
             dataset=dataset,
             master_type=MTRegressionMaster,
@@ -110,10 +136,17 @@ class RegressionTest(TestManager):
         )
 
 
+# noinspection PyMissingOrEmptyDocstring
 class ClassificationTest(TestManager):
-    def __init__(self, dataset: DataManager, augmented_args: Opt, monotonicities_args: Opt,
-                 kind: str = 'classification', h_units: tuple = (128, 128), evaluation_metric: Metric = Accuracy(),
-                 warm_start: bool = False, **kwargs):
+    def __init__(self,
+                 dataset: DataManager,
+                 augmented_args: Dict,
+                 monotonicities_args: Dict,
+                 kind: str = 'classification',
+                 h_units: tuple = (128, 128),
+                 evaluation_metric: Metric = Accuracy(),
+                 warm_start: bool = False,
+                 **kwargs):
         if kind == 'classification':
             master_type = MTClassificationMaster
             loss_metric = CrossEntropy(name='loss')
@@ -123,7 +156,7 @@ class ClassificationTest(TestManager):
             loss_metric = MSE(name='loss')
             loss_fn = 'mse'
         else:
-            raise ValueError(f"kind should be either 'classes' or 'probabilities'")
+            raise ValueError(f"kind should be either 'classification' or 'regression'")
         super(ClassificationTest, self).__init__(
             dataset=dataset,
             master_type=master_type,
@@ -137,6 +170,7 @@ class ClassificationTest(TestManager):
         )
 
 
+# noinspection PyMissingOrEmptyDocstring
 class AnalysisCallback(Callback):
     PRETRAINING = 'PT'
     MARKERS = dict(aug='o', label='X')
@@ -148,32 +182,33 @@ class AnalysisCallback(Callback):
         self.sorting_attribute: object = sorting_attribute
         self.file_signature: str = file_signature
         self.do_plot: bool = do_plot
-        self.plot_kwargs: Opt = {'figsize': (20, 10), 'tight_layout': True}
+        self.plot_kwargs: Dict = {'figsize': (20, 10), 'tight_layout': True}
         self.plot_kwargs.update(kwargs)
-        self.data: Optional[pd.DataFrame] = None
+        self.data: Opt[pd.DataFrame] = None
         self.iterations: List[Any] = []
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x.reset_index(drop=True), y.reset_index(drop=True), m), axis=1)
 
-    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
+    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_iteration_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, **kwargs)
         self.on_training_start(macs, x, y, val_data, **kwargs)
 
-    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
+    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_training_end(macs, x, y, val_data, **kwargs)
         self.on_iteration_end(macs, x, y, val_data, **kwargs)
 
-    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
+    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration,
+                           **kwargs):
         self.iterations.append(iteration)
         self.data[f'y {iteration}'] = y
 
-    def on_process_end(self, macs, val_data: Optional[Dataset], **kwargs):
+    def on_process_end(self, macs, val_data: Opt[Dataset], **kwargs):
         # sort values
         if self.sorting_attribute is not None:
             self.data = self.data.sort_values(self.sorting_attribute)
@@ -194,32 +229,34 @@ class AnalysisCallback(Callback):
                 ax.set_title(f'{it})' if title is None else title)
             plt.show()
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Opt[str]:
         pass
 
 
+# noinspection PyMissingOrEmptyDocstring
 class DistanceAnalysis(AnalysisCallback):
     def __init__(self, ground_only: bool = True, num_columns=1, **kwargs):
         super(DistanceAnalysis, self).__init__(num_columns=num_columns, **kwargs)
         self.ground_only: bool = ground_only
-        self.y: Optional[str] = None
+        self.y: Opt[str] = None
 
-    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
+    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         self.y = y.name
         super(DistanceAnalysis, self).on_pretraining_start(macs, x, y, val_data, **kwargs)
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Opt[Dataset],
+                          iteration: Iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
 
-    def on_process_end(self, macs, val_data: Optional[Dataset], **kwargs):
+    def on_process_end(self, macs, val_data: Opt[Dataset], **kwargs):
         if self.ground_only:
             self.data = self.data[self.data['mask'] == 'label']
         super(DistanceAnalysis, self).on_process_end(macs, val_data)
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Opt[str]:
         x = np.arange(len(self.data))
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         style = self.data['mask']
@@ -235,23 +272,25 @@ class DistanceAnalysis(AnalysisCallback):
         return f'{iteration}) pred. distance = {avg_pred_distance:.4f}, label distance = {avg_label_distance:.4f}'
 
 
+# noinspection PyMissingOrEmptyDocstring
 class BoundsAnalysis(AnalysisCallback):
     def __init__(self, num_columns: int = 1, **kwargs):
         super(BoundsAnalysis, self).__init__(num_columns=num_columns, **kwargs)
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **kwargs)
         hi, li = macs.master.higher_indices, macs.master.lower_indices
         self.data['lower'] = self.data.index.map(lambda i: li[hi == i])
         self.data['higher'] = self.data.index.map(lambda i: hi[li == i])
 
-    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
+    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         pass
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self._insert_bounds(macs.predict(x), 'pred', iteration)
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Opt[Dataset],
+                          iteration: Iteration, **kwargs):
         self._insert_bounds(adjusted_y, 'adj', iteration)
 
     def _insert_bounds(self, v: np.ndarray, label: str, iteration: Iteration):
@@ -259,7 +298,7 @@ class BoundsAnalysis(AnalysisCallback):
         self.data[f'{label} lb {iteration}'] = self.data['lower'].map(lambda i: v[i].max() if len(i) > 0 else None)
         self.data[f'{label} ub {iteration}'] = self.data['higher'].map(lambda i: v[i].min() if len(i) > 0 else None)
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Opt[str]:
         x = np.arange(len(self.data))
         avg_bound = {}
         for label, color in dict(adj='blue', pred='red').items():

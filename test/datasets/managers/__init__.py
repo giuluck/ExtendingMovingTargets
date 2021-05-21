@@ -1,3 +1,5 @@
+"""__init__.py file for test.datasets.managers package."""
+
 from test.datasets.managers.cars_test import CarsTest, CarsUnivariateTest, CarsAdjustments
 from test.datasets.managers.default_test import DefaultTest, DefaultAdjustments
 from test.datasets.managers.law_test import LawTest, LawAdjustments, LawResponse

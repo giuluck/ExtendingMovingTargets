@@ -1,4 +1,4 @@
-"""__init__.py file for src.models package"""
+"""__init__.py file for src.models package."""
 
 from src.models.mlp import MLP
 from src.models.mt import MT, MTLearner, MTMaster, MTRegressionMaster, MTClassificationMaster

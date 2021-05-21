@@ -1,3 +1,5 @@
+"""Experiments Script."""
+
 import os
 
 os.environ['WANDB_SILENT'] = 'true'

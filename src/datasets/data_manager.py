@@ -10,8 +10,8 @@ import seaborn as sns
 from moving_targets.util.typing import Monotonicities, Vector, Matrix, Data, Dataset
 from src.util.augmentation import get_monotonicities_list, augment_data
 from src.util.model import violations_summary, metrics_summary
-from src.util.preprocessing import Scaler
-from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, TightLayout, Scalers, AugmentedData, Rng
+from src.util.preprocessing import Scaler, Scalers
+from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, TightLayout, AugmentedData, Rng
 
 
 class DataManager:

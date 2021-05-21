@@ -1,3 +1,3 @@
-"""__init__.py file for src package"""
+"""__init__.py file for src package."""
 
 from src import models, datasets, util

@@ -6,8 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model
 
-from src.util.preprocessing import Scaler
-from src.util.typing import Scalers
+from src.util.preprocessing import Scaler, Scalers
 
 
 class MLP(Model):

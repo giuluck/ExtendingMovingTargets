@@ -1,4 +1,4 @@
-"""__init__.py file for moving_targets.metrics package"""
+"""__init__.py file for moving_targets.metrics package."""
 
 from moving_targets.metrics.classification import Accuracy, AUC, ClassificationMetric, CrossEntropy, F1, Precision
 from moving_targets.metrics.classification import Recall

@@ -1,4 +1,4 @@
-"""__init__.py file for src.datasets package"""
+"""__init__.py file for src.datasets package."""
 
 from src.datasets.cars_manager import CarsManager
 from src.datasets.data_manager import DataManager

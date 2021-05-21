@@ -1,3 +1,5 @@
+"""Preprocessing Tests."""
+
 import unittest
 
 import numpy as np
@@ -19,8 +21,8 @@ class TestCustomScalers(unittest.TestCase):
             self.assertAlmostEqual(df_custom.values.std(), 1.0, msg=f'std deviation is {df_custom.values.std()}')
             scikit_scaler = StandardScaler()
         elif method == 'norm':
-            self.assertAlmostEqual(df_custom.values.min(), 0.0, msg=f'norm min is {df_custom.values.min()}')
-            self.assertAlmostEqual(df_custom.values.max(), 1.0, msg=f'norm max is {df_custom.values.max()}')
+            self.assertAlmostEqual(np.min(df_custom.values), 0.0, msg=f'norm min is {np.min(df_custom.values)}')
+            self.assertAlmostEqual(np.max(df_custom.values), 1.0, msg=f'norm max is {np.max(df_custom.values)}')
             scikit_scaler = MinMaxScaler()
         else:
             raise ValueError("method should be either 'std' or 'norm'")

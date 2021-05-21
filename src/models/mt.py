@@ -13,7 +13,7 @@ from moving_targets.metrics.constraints import MonotonicViolation
 from moving_targets.util.typing import Matrix, Vector, Iteration, Monotonicities
 from src.models import MLP
 from src.util.dictionaries import merge_dictionaries
-from src.util.typing import Scalers
+from src.util.preprocessing import Scalers
 
 
 class MTLearner(Learner):

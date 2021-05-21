@@ -1,6 +1,7 @@
-from typing import List, Optional, Type, Tuple, Dict
+"""Testing Script."""
 
 import numpy as np
+from typing import List, Optional, Type, Tuple, Dict, Any
 
 from moving_targets.callbacks import FileLogger, Callback
 from src.datasets import DataManager
@@ -11,8 +12,11 @@ from test.datasets.managers import DistanceAnalysis, SyntheticAdjustments2D, Syn
     TestManager
 
 
-def get_dataset(dataset: str, num_col: int = 1,
-                callback_functions: Optional[List[str]] = None) -> Tuple[Type[:DataManager], List[Callback]]:
+def get_dataset(dataset: str,
+                num_col: int = 1,
+                callback_functions: Optional[List[str]] = None) -> Tuple[Any, List[Callback]]:
+    """Gets the chosen `DataManager` with its respective callbacks."""
+
     # DATASET AND CALLBACKS
     callback_functions: List[str] = [] if callback_functions is None else callback_functions
     ds: Optional[Type[:DataManager]] = None
@@ -22,88 +26,130 @@ def get_dataset(dataset: str, num_col: int = 1,
     if dataset == 'cars univariate':
         ds = CarsUnivariateTest
         if 'distance' in callback_functions:
-            cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='price',
+            cb.append(DistanceAnalysis(ground_only=True,
+                                       num_columns=num_col,
+                                       sorting_attribute='price',
                                        file_signature='temp/cars_univariate_distance'))
         if 'adjustments' in callback_functions:
-            cb.append(CarsAdjustments(num_columns=num_col, sorting_attribute='price', plot_kind='scatter',
+            cb.append(CarsAdjustments(num_columns=num_col,
+                                      sorting_attribute='price',
+                                      plot_kind='scatter',
                                       file_signature='temp/cars_univariate_adjustments'))
     elif dataset == 'cars':
         ds = CarsTest
         if 'distance' in callback_functions:
-            cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='price',
+            cb.append(DistanceAnalysis(ground_only=True,
+                                       num_columns=num_col,
+                                       sorting_attribute='price',
                                        file_signature='temp/cars_distance'))
         if 'adjustments' in callback_functions:
-            cb.append(CarsAdjustments(num_columns=num_col, sorting_attribute='price', plot_kind='scatter',
+            cb.append(CarsAdjustments(num_columns=num_col,
+                                      sorting_attribute='price',
+                                      plot_kind='scatter',
                                       file_signature='temp/cars_adjustments'))
     elif dataset == 'synthetic':
         ds = SyntheticTest
         if 'distance' in callback_functions:
-            cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='a',
+            cb.append(DistanceAnalysis(ground_only=True,
+                                       num_columns=num_col,
+                                       sorting_attribute='a',
                                        file_signature='temp/synthetic_distance'))
         if 'adjustments' in callback_functions:
             cb += [
-                SyntheticAdjustments2D(num_columns=num_col, sorting_attribute=None,
+                SyntheticAdjustments2D(num_columns=num_col,
+                                       sorting_attribute=None,
                                        file_signature='temp/synthetic_adjustment_2D'),
-                SyntheticAdjustments3D(num_columns=num_col, sorting_attribute=None, data_points=True,
+                SyntheticAdjustments3D(num_columns=num_col,
+                                       sorting_attribute=None,
+                                       data_points=True,
                                        file_signature='temp/synthetic_adjustment_3D')
             ]
         if 'adjustments2D' in callback_functions:
-            cb.append(SyntheticAdjustments2D(num_columns=num_col, sorting_attribute=None,
+            cb.append(SyntheticAdjustments2D(num_columns=num_col,
+                                             sorting_attribute=None,
                                              file_signature='temp/synthetic_adjustment_2D'))
         if 'adjustments3D' in callback_functions:
-            cb.append(SyntheticAdjustments3D(num_columns=num_col, sorting_attribute=None, data_points=True,
+            cb.append(SyntheticAdjustments3D(num_columns=num_col,
+                                             sorting_attribute=None,
+                                             data_points=True,
                                              file_signature='temp/synthetic_adjustment_3D'))
         if 'response' in callback_functions:
-            cb.append(SyntheticResponse(num_columns=num_col, sorting_attribute='a',
+            cb.append(SyntheticResponse(num_columns=num_col,
+                                        sorting_attribute='a',
                                         file_signature='temp/synthetic_response'))
     elif dataset == 'puzzles':
         ds = PuzzlesTest
         if 'distance' in callback_functions:
-            cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute=None,
+            cb.append(DistanceAnalysis(ground_only=True,
+                                       num_columns=num_col,
+                                       sorting_attribute=None,
                                        file_signature='temp/puzzles_distance'))
         if 'response' in callback_functions:
             cb += [
-                PuzzlesResponse(feature='word_count', num_columns=num_col, sorting_attribute='word_count',
+                PuzzlesResponse(feature='word_count',
+                                num_columns=num_col,
+                                sorting_attribute='word_count',
                                 file_signature='temp/puzzles_response_word_count'),
-                PuzzlesResponse(feature='star_rating', num_columns=num_col, sorting_attribute='star_rating',
+                PuzzlesResponse(feature='star_rating',
+                                num_columns=num_col,
+                                sorting_attribute='star_rating',
                                 file_signature='temp/puzzles_response_star_rating'),
-                PuzzlesResponse(feature='num_reviews', num_columns=num_col, sorting_attribute='num_reviews',
+                PuzzlesResponse(feature='num_reviews',
+                                num_columns=num_col,
+                                sorting_attribute='num_reviews',
                                 file_signature='temp/puzzles_response_num_reviews')
             ]
     elif dataset == 'law':
         ds = LawTest
         if 'adjustments' in callback_functions:
-            cb.append(LawAdjustments(num_columns=num_col, sorting_attribute=None, data_points=True,
+            cb.append(LawAdjustments(num_columns=num_col,
+                                     sorting_attribute=None,
+                                     data_points=True,
                                      file_signature='temp/law_adjustments'))
         if 'response' in callback_functions:
             cb += [
-                LawResponse(feature='lsat', num_columns=num_col, sorting_attribute='lsat',
+                LawResponse(feature='lsat',
+                            num_columns=num_col,
+                            sorting_attribute='lsat',
                             file_signature='temp/law_response_lsat'),
-                LawResponse(feature='ugpa', num_columns=num_col, sorting_attribute='ugpa',
+                LawResponse(feature='ugpa',
+                            num_columns=num_col,
+                            sorting_attribute='ugpa',
                             file_signature='temp/law_response_ugpa')
             ]
     elif dataset == 'default':
         ds = DefaultTest
         if 'adjustments' in callback_functions:
-            cb.append(DefaultAdjustments(num_columns=num_col, sorting_attribute='payment',
+            cb.append(DefaultAdjustments(num_columns=num_col,
+                                         sorting_attribute='payment',
                                          file_signature='temp/default_adjustments'))
     elif dataset == 'restaurants':
         ds = RestaurantsTest
         if 'response' in callback_functions:
             cb += [
-                RestaurantsAdjustment(rating='D', num_columns=num_col, data_points=False,
+                RestaurantsAdjustment(rating='D',
+                                      num_columns=num_col,
+                                      data_points=False,
                                       file_signature='temp/restaurant_response_D'),
-                RestaurantsAdjustment(rating='DD', num_columns=num_col, data_points=False,
+                RestaurantsAdjustment(rating='DD',
+                                      num_columns=num_col,
+                                      data_points=False,
                                       file_signature='temp/restaurant_response_DD'),
-                RestaurantsAdjustment(rating='DDD', num_columns=num_col, data_points=False,
+                RestaurantsAdjustment(rating='DDD',
+                                      num_columns=num_col,
+                                      data_points=False,
                                       file_signature='temp/restaurant_response_DDD'),
-                RestaurantsAdjustment(rating='DDDD', num_columns=num_col, data_points=False,
+                RestaurantsAdjustment(rating='DDDD',
+                                      num_columns=num_col,
+                                      data_points=False,
                                       file_signature='temp/restaurant_response_DDDD'),
             ]
     return ds, cb
 
 
 def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
+    """Gets the dictionary with the list of columns to plot."""
+
     return dict(columns=[
         'learner/loss',
         'metrics/train loss',
@@ -122,14 +168,13 @@ def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
 
 if __name__ == '__main__':
     iterations: int = 1
-    dataset_info: Tuple[Type[:DataManager], List[Callback]] = get_dataset(
-        dataset='restaurants',
+    manager_type, callbacks = get_dataset(
+        dataset='law',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['adjustments', 'response']
     )
-    manager_type, callbacks = dataset_info
-    manager: TestManager = manager_type(
-        kind='classification',
+    manager = manager_type(
+        # kind='classification',
         warm_start=False,
         master_args=dict(
             alpha=1.0,

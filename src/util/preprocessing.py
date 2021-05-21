@@ -1,6 +1,6 @@
 """Processing utils."""
 
-from typing import Union, Dict, Optional as Opt
+from typing import Union, Dict, Tuple, Optional as Opt
 
 import numpy as np
 import pandas as pd
@@ -119,6 +119,9 @@ class Scaler:
             A blank scaler.
         """
         return Scaler(methods=None).fit(data=[[0.] * num_features])
+
+
+Scalers = Union[None, Scaler, Tuple[Scaler, Scaler]]
 
 
 def split_dataset(*arg: Union[Matrix, Vector],

@@ -1,3 +1,5 @@
+"""Losses Tests."""
+
 import unittest
 
 import numpy as np
@@ -13,20 +15,20 @@ NUM_KEYS = 50
 NUM_TESTS = 100
 
 
-def custom_loss(name):
-    if name == 'sae':
-        return lambda yt, yp, sample_weight: NUM_KEYS * mean_absolute_error(yt, yp, sample_weight=sample_weight)
-    elif name == 'sse':
-        return lambda yt, yp, sample_weight: NUM_KEYS * mean_squared_error(yt, yp, sample_weight=sample_weight)
-    elif name == 'swapped bce':
-        return lambda yt, yp, sample_weight: log_loss(yp, yt, sample_weight=sample_weight)
-    elif name == 'categorical precision':
-        return lambda yt, yp, sample_weight: precision_score(yt, yp, sample_weight=sample_weight, average='micro')
-    else:
-        raise ValueError(f'{name} is not a valid loss')
-
-
 class TestLosses:
+    @staticmethod
+    def _custom_loss(name):
+        if name == 'sae':
+            return lambda yt, yp, sample_weight: NUM_KEYS * mean_absolute_error(yt, yp, sample_weight=sample_weight)
+        elif name == 'sse':
+            return lambda yt, yp, sample_weight: NUM_KEYS * mean_squared_error(yt, yp, sample_weight=sample_weight)
+        elif name == 'swapped bce':
+            return lambda yt, yp, sample_weight: log_loss(yp, yt, sample_weight=sample_weight)
+        elif name == 'categorical precision':
+            return lambda yt, yp, sample_weight: precision_score(yt, yp, sample_weight=sample_weight, average='micro')
+        else:
+            raise ValueError(f'{name} is not a valid loss')
+
     def _losses(self):
         raise NotImplementedError(f"Please implement method '_losses'")
 
@@ -36,7 +38,7 @@ class TestLosses:
     def test_sae(self):
         self._test(
             model_loss=self._losses().sum_of_absolute_errors,
-            scikit_loss=custom_loss('sae'),
+            scikit_loss=TestLosses._custom_loss('sae'),
             classes=None,
             weights=False
         )
@@ -44,7 +46,7 @@ class TestLosses:
     def test_sae_weights(self):
         self._test(
             model_loss=self._losses().sum_of_absolute_errors,
-            scikit_loss=custom_loss('sae'),
+            scikit_loss=TestLosses._custom_loss('sae'),
             classes=None,
             weights=True
         )
@@ -52,7 +54,7 @@ class TestLosses:
     def test_sse(self):
         self._test(
             model_loss=self._losses().sum_of_squared_errors,
-            scikit_loss=custom_loss('sse'),
+            scikit_loss=TestLosses._custom_loss('sse'),
             classes=None,
             weights=False
         )
@@ -60,7 +62,7 @@ class TestLosses:
     def test_sse_weights(self):
         self._test(
             model_loss=self._losses().sum_of_squared_errors,
-            scikit_loss=custom_loss('sse'),
+            scikit_loss=TestLosses._custom_loss('sse'),
             classes=None,
             weights=True
         )
@@ -131,7 +133,7 @@ class TestLosses:
     def test_swapped_bce(self):
         self._test(
             model_loss=self._losses().swapped_binary_crossentropy,
-            scikit_loss=custom_loss('swapped bce'),
+            scikit_loss=TestLosses._custom_loss('swapped bce'),
             classes=(2, 'swapped'),
             weights=False
         )
@@ -139,7 +141,7 @@ class TestLosses:
     def test_swapped_bce_weights(self):
         self._test(
             model_loss=self._losses().swapped_binary_crossentropy,
-            scikit_loss=custom_loss('swapped bce'),
+            scikit_loss=TestLosses._custom_loss('swapped bce'),
             classes=(2, 'swapped'),
             weights=True
         )
@@ -147,7 +149,7 @@ class TestLosses:
     def test_ch(self):
         self._test(
             model_loss=self._losses().categorical_hamming,
-            scikit_loss=custom_loss('categorical precision'),
+            scikit_loss=TestLosses._custom_loss('categorical precision'),
             classes=(5, 'indicator'),
             weights=False
         )
@@ -155,7 +157,7 @@ class TestLosses:
     def test_ch_weights(self):
         self._test(
             model_loss=self._losses().categorical_hamming,
-            scikit_loss=custom_loss('categorical precision'),
+            scikit_loss=TestLosses._custom_loss('categorical precision'),
             classes=(5, 'indicator'),
             weights=True
         )
