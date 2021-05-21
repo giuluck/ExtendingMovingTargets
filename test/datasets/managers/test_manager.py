@@ -141,11 +141,11 @@ class AnalysisCallback(Callback):
     PRETRAINING = 'PT'
     MARKERS = dict(aug='o', label='X')
 
-    def __init__(self, num_columns: int = 5, sorting_attribute: Any = None, file_signature: str = None,
+    def __init__(self, num_columns: int = 5, sorting_attribute: object = None, file_signature: str = None,
                  do_plot: bool = True, **kwargs):
         super(AnalysisCallback, self).__init__()
         self.num_columns: int = num_columns
-        self.sorting_attribute: Any = sorting_attribute
+        self.sorting_attribute: object = sorting_attribute
         self.file_signature: str = file_signature
         self.do_plot: bool = do_plot
         self.plot_kwargs: Dict[str, Any] = {'figsize': (20, 10), 'tight_layout': True}
@@ -153,27 +153,27 @@ class AnalysisCallback(Callback):
         self.data: Optional[pd.DataFrame] = None
         self.iterations: List[Any] = []
 
-    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x.reset_index(drop=True), y.reset_index(drop=True), m), axis=1)
 
-    def on_pretraining_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_iteration_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, **kwargs)
         self.on_training_start(macs, x, y, val_data, **kwargs)
 
-    def on_pretraining_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_training_end(macs, x, y, val_data, **kwargs)
         self.on_iteration_end(macs, x, y, val_data, **kwargs)
 
-    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.iterations.append(iteration)
         self.data[f'y {iteration}'] = y
 
-    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_process_end(self, macs, val_data: Optional[Dataset], **kwargs):
         # sort values
         if self.sorting_attribute is not None:
             self.data = self.data.sort_values(self.sorting_attribute)
@@ -194,7 +194,7 @@ class AnalysisCallback(Callback):
                 ax.set_title(f'{it})' if title is None else title)
             plt.show()
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         pass
 
 
@@ -204,22 +204,22 @@ class DistanceAnalysis(AnalysisCallback):
         self.ground_only: bool = ground_only
         self.y: Optional[str] = None
 
-    def on_pretraining_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         self.y = y.name
         super(DistanceAnalysis, self).on_pretraining_start(macs, x, y, val_data, **kwargs)
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
 
-    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_process_end(self, macs, val_data: Optional[Dataset], **kwargs):
         if self.ground_only:
             self.data = self.data[self.data['mask'] == 'label']
         super(DistanceAnalysis, self).on_process_end(macs, val_data)
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         x = np.arange(len(self.data))
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         style = self.data['mask']
@@ -239,27 +239,27 @@ class BoundsAnalysis(AnalysisCallback):
     def __init__(self, num_columns: int = 1, **kwargs):
         super(BoundsAnalysis, self).__init__(num_columns=num_columns, **kwargs)
 
-    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **kwargs)
         hi, li = macs.master.higher_indices, macs.master.lower_indices
         self.data['lower'] = self.data.index.map(lambda i: li[hi == i])
         self.data['higher'] = self.data.index.map(lambda i: hi[li == i])
 
-    def on_pretraining_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         pass
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self._insert_bounds(macs.predict(x), 'pred', iteration)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self._insert_bounds(adjusted_y, 'adj', iteration)
 
-    def _insert_bounds(self, v: np.ndarray, label: str, iteration: Any):
+    def _insert_bounds(self, v: np.ndarray, label: str, iteration: Iteration):
         self.data[f'{label} {iteration}'] = v
         self.data[f'{label} lb {iteration}'] = self.data['lower'].map(lambda i: v[i].max() if len(i) > 0 else None)
         self.data[f'{label} ub {iteration}'] = self.data['higher'].map(lambda i: v[i].min() if len(i) > 0 else None)
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         x = np.arange(len(self.data))
         avg_bound = {}
         for label, color in dict(adj='blue', pred='red').items():

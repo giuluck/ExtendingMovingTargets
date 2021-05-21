@@ -1,17 +1,31 @@
+"""File Logger Callback"""
+
 import sys
-from typing import Any, Tuple, Dict, List, Optional, Set
+from typing import List, Set, Optional as Opt
 
 from moving_targets.callbacks.logger import Logger
+from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
 
 SEPARATOR: str = '--------------------------------------------------'
 
 
 class FileLogger(Logger):
-    def __init__(self, filepath: str = None, routines: Optional[List[str]] = None, log_empty: bool = False,
+    """Logs the training data and information on a specified filepath or on the standard output.
+
+    Args:
+        filepath: path string in which to put the log. If None, writes in the standard output.
+        routines: list of routine names after which log the cached data. If None, logs after each routine.
+        log_empty: whether or not to log the routine name if there is no cached data.
+        sort_keys: whether or not to sort the cache data by key before logging.
+        separator: string separator written between each routine.
+        end: line end.
+    """
+
+    def __init__(self, filepath: Opt[str] = None, routines: Opt[List[str]] = None, log_empty: bool = False,
                  sort_keys: bool = False, separator: str = SEPARATOR, end: str = '\n'):
         super(FileLogger, self).__init__()
         self.filepath: str = filepath
-        self.routines: Optional[Set[str]] = None if routines is None else set(routines)
+        self.routines: Opt[Set[str]] = None if routines is None else set(routines)
         self.log_empty: bool = log_empty
         self.sort_keys: bool = sort_keys
         self.separator: str = separator
@@ -21,34 +35,45 @@ class FileLogger(Logger):
         if self.filepath is not None:
             open(filepath, 'w').close()
 
-    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         self._write_on_file('START PROCESS', 'on_process_start')
 
-    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_process_end(self, macs, val_data: Opt[Dataset], **kwargs):
         self._write_on_file('END PROCESS', 'on_process_end')
 
-    def on_pretraining_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         self._write_on_file('START PRETRAINING', 'on_pretraining_start')
 
-    def on_pretraining_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], **kwargs):
         self._write_on_file('END PRETRAINING', 'on_pretraining_end')
 
-    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self._write_on_file(f'START ITERATION', 'on_iteration_start')
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self._write_on_file(f'END ITERATION', 'on_iteration_end')
 
-    def on_training_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_training_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self._write_on_file('START TRAINING', 'on_training_start')
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self._write_on_file('END TRAINING', 'on_training_end')
 
-    def on_adjustment_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_adjustment_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self._write_on_file('START ADJUSTMENT', 'on_adjustment_start')
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Opt[Dataset],
+                          iteration: Iteration, **kwargs):
         self._write_on_file('END ADJUSTMENT', 'on_adjustment_end')
 
     def _write_on_file(self, message: str, routine_name: str):

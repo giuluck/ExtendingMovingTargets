@@ -13,7 +13,7 @@ from src.util.augmentation import compute_numeric_monotonicities
 
 
 class LawManager(DataManager):
-    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm', test_size: float = 0.8,
+    def __init__(self, filepath: str, x_scaling: object = 'std', y_scaling: object = 'norm', test_size: float = 0.8,
                  res: int = 64):
         self.filepath: str = filepath
         self.test_size: float = test_size

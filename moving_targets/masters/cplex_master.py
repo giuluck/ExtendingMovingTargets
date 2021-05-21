@@ -1,20 +1,29 @@
-from abc import ABC
-from typing import Any, Optional
+"""Cplex Master interface."""
 
+from abc import ABC
 from docplex.mp.model import Model
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
+from moving_targets.utils.typing import Matrix, Vector, Iteration
 
 
 class CplexMaster(Master, ABC):
+    """Master interface to Cplex solver.
+
+    Args:
+        time_limit: the maximal time for which the master can run during each iteration.
+        **kwargs: super-class arguments.
+    """
+
     losses = LossesHandler(sum_fn=lambda model, x: model.sum(x), abs_fn=lambda model, x: model.abs(x), log_fn=None)
 
-    def __init__(self, alpha: float = 1., beta: Optional[float] = 1., time_limit: float = 30.):
-        super(CplexMaster, self).__init__(alpha=alpha, beta=beta)
+    def __init__(self, time_limit: float = 30., **kwargs):
+        super(CplexMaster, self).__init__(**kwargs)
         self.time_limit: float = time_limit
 
-    def adjust_targets(self, macs, x, y, iteration: Any) -> Any:
+    # noinspection PyMissingOrEmptyDocstring
+    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
         # build model and get losses
         model = Model(name='model')
         model.set_time_limit(self.time_limit)

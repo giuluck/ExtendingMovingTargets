@@ -29,10 +29,10 @@ class PuzzlesResponse(AnalysisCallback):
         self.grid: pd.DataFrame = pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(self.features, grid)})
         self.feature: str = feature
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.grid[f'pred {iteration}'] = macs.predict(self.grid[self.features])
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         fi, fj = [f for f in self.features if f != self.feature]
         li, ui = self.grid[fi].min(), self.grid[fi].max()
         lj, uj = self.grid[fj].min(), self.grid[fj].max()

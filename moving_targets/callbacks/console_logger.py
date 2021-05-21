@@ -1,21 +1,29 @@
-import time
-from typing import Dict, Tuple, Any, Optional
+"""Console Logger Callback."""
 
-from moving_targets.callbacks import Callback
+import time
+from typing import Optional as Opt
+
+from moving_targets.callbacks.callback import Callback
+from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
 
 
 class ConsoleLogger(Callback):
+    """Callback which logs basic information on screen during the MACS training."""
+
     def __init__(self):
         super(ConsoleLogger, self).__init__()
-        self.time: Optional[float] = None
+        self.time: Opt[float] = None
 
-    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         print(f'-------------------- ITERATION: {iteration:02} --------------------')
         self.time = time.time()
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         print(f'Time: {time.time() - self.time:.4f} s')
         self.time = None
 
-    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_process_end(self, macs, val_data: Opt[Dataset], **kwargs):
         print('-------------------------------------------------------')

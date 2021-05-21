@@ -31,7 +31,7 @@ def augment_data(x, y, compute_monotonicities: Callable, sampling_functions: Dic
     return x_aug, y_aug
 
 
-def compute_numeric_monotonicities(samples: np.ndarray, references: np.ndarray, directions: Any, eps: float = 1e-5):
+def compute_numeric_monotonicities(samples: np.ndarray, references: np.ndarray, directions: object, eps: float = 1e-5):
     # increase samples dimension to match references
     samples = np.hstack([samples] * len(references)).reshape((len(samples), len(references), -1))
     # compute differences between samples to get the number of different attributes

@@ -2,12 +2,12 @@ import unittest
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 
 from moving_targets import MACS
 from moving_targets.learners import LogisticRegression
 from moving_targets.masters import BalancedCounts
 from moving_targets.metrics import Accuracy, ClassFrequenciesStd
-from src.util.preprocessing import Scaler
 
 SEED = 0
 DATASETS = {
@@ -114,9 +114,9 @@ class TestBalancedCounts(unittest.TestCase):
         num_classes = len(np.unique(y))
         # train/val split and scaling
         x_train, x_val, y_train, y_val = train_test_split(x, y)
-        scaler = Scaler(methods='norm')
-        x_train = scaler.fit_transform(x_train).values
-        x_val = scaler.transform(x_val).values
+        scaler = MinMaxScaler()
+        x_train = scaler.fit_transform(x_train)
+        x_val = scaler.transform(x_val)
         # define model pieces
         metrics = [Accuracy(name='acc'), ClassFrequenciesStd(classes=num_classes, name='std')]
         learner = LogisticRegression()

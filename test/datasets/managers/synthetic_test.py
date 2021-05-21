@@ -24,20 +24,20 @@ class SyntheticAdjustments2D(AnalysisCallback):
     max_size = 30
     alpha = 0.4
 
-    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data, **kwargs)
         self.data['ground'] = SyntheticManager.function(self.data['a'], self.data['b'])
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
         self.data[f'pred err {iteration}'] = self.data[f'pred {iteration}'] - self.data['ground']
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'adj err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         def synthetic_inverse(column):
             b = np.sin(np.pi * (self.data['b'] - 0.01)) ** 2 + 1
             return (self.data[column] - b) * b
@@ -66,22 +66,22 @@ class SyntheticAdjustments3D(AnalysisCallback):
         self.data_points: bool = data_points
         self.val: Optional[pd.DataFrame] = None
 
-    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **kwargs):
         super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data, **kwargs)
         # swap values and data in order to print the grid
         self.val = self.data.copy()
         a, b = np.meshgrid(np.linspace(-1, 1, self.res), np.linspace(-1, 1, self.res))
         self.data = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.val[f'pred {iteration}'] = macs.predict(x)
         self.data[f'z {iteration}'] = macs.predict(self.data[['a', 'b']])
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.val[f'adj {iteration}'] = adjusted_y
         self.val[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.val['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         # plot 3D response
         ga = self.data['a'].values.reshape(self.res, self.res)
         gb = self.data['b'].values.reshape(self.res, self.res)
@@ -103,11 +103,11 @@ class SyntheticResponse(AnalysisCallback):
         self.grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.fader = ColorFader('red', 'blue', bounds=(-1, 1))
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         input_grid = self.grid[['a', 'b']]
         self.grid[f'pred {iteration}'] = macs.predict(input_grid)
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         for idx, group in self.grid.groupby('b'):
             label = f'b = {idx:.0f}' if idx in [-1, 1] else None
             sns.lineplot(data=group, x='a', y=f'pred {iteration}', color=self.fader(idx), alpha=0.4, label=label)

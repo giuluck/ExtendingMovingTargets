@@ -1,3 +1,5 @@
+"""__init__.py file for moving_targets.learners package"""
+
 from moving_targets.learners.learner import Learner
-from moving_targets.learners.linear_regression import LinearRegression
-from moving_targets.learners.logistic_regression import LogisticRegression
+from moving_targets.learners.scikit_learners import ScikitLearner, ScikitRegressor, ScikitClassifier, \
+    LinearRegression, LogisticRegression

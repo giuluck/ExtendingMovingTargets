@@ -1,26 +1,40 @@
-from typing import Dict, Tuple, Any, List, Optional
+"""History Callback"""
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from typing import List, Optional as Opt
 
 from moving_targets.callbacks.logger import Logger
+from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
 
 
 class History(Logger):
+    """Collects the training information and eventually plots it."""
+
     def __init__(self):
         super(History, self).__init__()
-        self.history: Any = []
+        self.history: List = []
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self.history.append(pd.DataFrame([self.cache.values()], columns=self.cache.keys(), index=[iteration]))
         self.cache = {}
 
-    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_process_end(self, macs, val_data: Opt[Dataset], **kwargs):
         self.history = pd.concat(self.history)
 
-    def plot(self, columns: Optional[List[str]] = None, num_columns: int = 4, show: bool = True, **kwargs):
+    def plot(self, columns: Opt[List[str]] = None, num_columns: int = 4, show: bool = True, **kwargs):
+        """Plot the training information.
+
+        Args:
+            columns: list of strings representing the names of the columns to plot. If None, plots all the columns.
+            num_columns: number of columns in the final subplot.
+            show: whether or not to call matplotlib.pyplot.show().
+            **kwargs: additional plot arguments.
+        """
         # handle columns and number of rows
         assert isinstance(self.history, pd.DataFrame), 'Process did not end correctly, therefore no dataframe was built'
         columns = self.history.columns if columns is None else columns

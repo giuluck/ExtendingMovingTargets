@@ -35,17 +35,17 @@ class LawAdjustments(AnalysisCallback):
         self.res: int = res
         self.data_points: bool = data_points
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         grid = self.grid[['lsat', 'ugpa']]
         data = self.data[['lsat', 'ugpa']]
         self.grid[f'pred {iteration}'] = macs.predict(grid)
         self.data[f'pred {iteration}'] = macs.predict(data)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         # plot 3D response
         lsat = self.grid['lsat'].values.reshape(self.res, self.res)
         ugpa = self.grid['ugpa'].values.reshape(self.res, self.res)
@@ -68,11 +68,11 @@ class LawResponse(AnalysisCallback):
         self.fader: ColorFader = ColorFader('red', 'blue', bounds=(0, 4) if feature == 'lsat' else (0, 50))
         self.features: Tuple[str, str] = ('lsat', 'ugpa') if feature == 'lsat' else ('ugpa', 'lsat')
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         input_grid = self.grid[['lsat', 'ugpa']]
         self.grid[f'pred {iteration}'] = macs.predict(input_grid)
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         feat, group_feat = self.features
         for group_val, group in self.grid.groupby([group_feat]):
             sns.lineplot(data=group, x=feat, y=f'pred {iteration}', color=self.fader(group_val), alpha=0.6)

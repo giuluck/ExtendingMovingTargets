@@ -1,10 +1,11 @@
-from abc import ABC
-from typing import Any, Optional
+"""Gurobi Master interface."""
 
+from abc import ABC
 from gurobipy import Model, Env, GRB
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
+from moving_targets.utils.typing import Matrix, Vector, Iteration
 
 
 def _abs(model: Model, x):
@@ -26,13 +27,21 @@ def _log(model: Model, x):
 
 
 class GurobiMaster(Master, ABC):
+    """Master interface to Gurobi solver.
+
+    Args:
+        time_limit: the maximal time for which the master can run during each iteration.
+        **kwargs: super-class arguments.
+    """
+
     losses = LossesHandler(sum_fn=lambda model, x: sum(x), abs_fn=_abs, log_fn=_log)
 
-    def __init__(self, alpha: float = 1., beta: Optional[float] = 1., time_limit: float = 30.):
-        super(GurobiMaster, self).__init__(alpha=alpha, beta=beta)
+    def __init__(self, time_limit: float = 30., **kwargs):
+        super(GurobiMaster, self).__init__(**kwargs)
         self.time_limit: float = time_limit
 
-    def adjust_targets(self, macs, x, y, iteration: Any) -> Any:
+    # noinspection PyMissingOrEmptyDocstring
+    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
         # build model and get losses
         with Env(empty=True) as env:
             env.setParam('OutputFlag', 0)

@@ -12,7 +12,7 @@ class Scaler:
         self.translation: Optional[np.ndarray] = None
         self.scaling: Optional[np.ndarray] = None
 
-    def fit(self, data: Any):
+    def fit(self, data: object):
         # handle non-pandas data
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame(np.array(data))
@@ -48,21 +48,21 @@ class Scaler:
                 raise ValueError(f'Method {method} is not supported')
         return self
 
-    def transform(self, data: Any):
+    def transform(self, data: object):
         return (data - self.translation) / self.scaling
 
-    def fit_transform(self, data: Any):
+    def fit_transform(self, data: object):
         return self.fit(data).transform(data)
 
-    def inverse_transform(self, data: Any):
+    def inverse_transform(self, data: object):
         return (data * self.scaling) + self.translation
 
     @staticmethod
-    def get_default(num_features: int) -> Any:
+    def get_default(num_features: int) -> object:
         return Scaler(methods=None).fit(data=[[0.] * num_features])
 
 
-def split_dataset(*arg, test_size: float = 0.2, val_size: Optional[float] = None, extrapolation: Any = None, **kwargs):
+def split_dataset(*arg, test_size: float = 0.2, val_size: Optional[float] = None, extrapolation: object = None, **kwargs):
     # handle default values
     val_size = test_size if val_size is None else val_size
     val_size = val_size if isinstance(val_size, float) else val_size / len(arg[0])

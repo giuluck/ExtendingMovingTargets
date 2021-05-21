@@ -13,7 +13,7 @@ from src.util.plot import ColorFader
 
 
 class PuzzlesManager(DataManager):
-    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm', res: int = 20,
+    def __init__(self, filepath: str, x_scaling: object = 'std', y_scaling: object = 'norm', res: int = 20,
                  bound: Optional[Dict[str, Tuple[int, int]]] = None):
         self.filepath: str = filepath
         self.bound: Dict[str, Tuple[int, int]] = {

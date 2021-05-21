@@ -37,14 +37,14 @@ class CarsAdjustments(AnalysisCallback):
         assert plot_kind in ['line', 'scatter'], "plot_kind should be either 'line' or 'scatter'"
         self.plot_kind: str = plot_kind
 
-    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset], iteration: Iteration, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Any) -> Optional[str]:
+    def plot_function(self, iteration: Iteration) -> Optional[str]:
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha

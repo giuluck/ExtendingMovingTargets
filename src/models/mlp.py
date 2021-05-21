@@ -8,7 +8,7 @@ from src.util.preprocessing import Scaler
 
 
 class MLP(Model):
-    def __init__(self, output_act: Optional[str] = None, h_units: Optional[List[int]] = None, scalers: Any = None,
+    def __init__(self, output_act: Optional[str] = None, h_units: Optional[List[int]] = None, scalers: object = None,
                  input_dim: Optional[int] = None):
         super(MLP, self).__init__()
         # scalers

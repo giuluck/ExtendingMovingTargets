@@ -1,3 +1,5 @@
+"""__init__.py file for moving_targets.callbacks package"""
+
 from moving_targets.callbacks.callback import Callback
 from moving_targets.callbacks.console_logger import ConsoleLogger
 from moving_targets.callbacks.file_logger import FileLogger

@@ -24,7 +24,7 @@ class MTLearner(Learner):
         self.fit_args = kwargs
         self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=self.scalers)
 
-    def fit(self, macs, x, y, iteration, **kwargs):
+    def fit(self, macs, x: Matrix, y: Vector, iteration, **kwargs):
         start_time = time.time()
         # re-initialize weights if warm start is not enabled, re-initialize optimizer in any case
         if not self.warm_start:
@@ -78,7 +78,7 @@ class MTMaster(CplexMaster):
     def build_predictions(self, macs, x):
         return macs.predict(x)
 
-    def build_model(self, macs, model, x, y, iteration: Any):
+    def build_model(self, macs, model, x, y, iteration: Iteration):
         self.start_time = time.time()
         # handle 'projection' initial step (p = None)
         pred = None if not macs.fitted else self.build_predictions(macs, x)
@@ -89,20 +89,20 @@ class MTMaster(CplexMaster):
         # return model info
         return var, pred
 
-    def beta_step(self, macs, model, model_info, x, y, iteration: Any) -> bool:
+    def beta_step(self, macs, model, model_info, x, y, iteration: Iteration) -> bool:
         return False
 
-    def y_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
+    def y_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
         return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
-    def p_loss(self, macs, model, model_info, x, y, iteration: Any) -> float:
+    def p_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
         var, pred = model_info
         sw = np.where(self.augmented_mask, self.master_omega_p, 1)
         return 0.0 if pred is None else self.p_loss_fn(model, pred, var, sample_weight=sw)
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
         var, pred = model_info
         adj = np.array([vy.solution_value for vy in var])
         if self.learner_weights == 'infeasible':
@@ -144,7 +144,7 @@ class MTRegressionMaster(MTMaster):
     def build_variables(self, model, y):
         return model.continuous_var_list(keys=len(y), name='y', lb=-float('inf'), ub=float('inf'))
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
         adj, kwargs = super(MTRegressionMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
         mask = ~np.isnan(y)
         macs.log(**{
@@ -174,7 +174,7 @@ class MTClassificationMaster(MTMaster):
     def build_variables(self, model, y):
         return model.continuous_var_list(keys=len(y), name='y', lb=0.0, ub=1.0)
 
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: Any) -> Any:
+    def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
         adj, kwargs = super(MTClassificationMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
         mask = ~np.isnan(y)
         macs.log(**{
@@ -191,7 +191,7 @@ class MT(MACS):
         self.violation_metrics = [m for m in self.metrics if isinstance(m, MonotonicViolation)]
         self.metrics = [m for m in self.metrics if not isinstance(m, MonotonicViolation)]
 
-    def on_iteration_end(self, macs, x, y, val_data, iteration: Any, **kwargs):
+    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data, iteration: Iteration, **kwargs):
         iteration = 0 if iteration == 'pretraining' else iteration
         logs = {'iteration': iteration, 'time/iteration': time.time() - self.time}
         # VIOLATION METRICS (on augmented data)

@@ -21,13 +21,13 @@ class DataManager:
         output.update(kwargs)
         return output
 
-    def __init__(self, x_columns: List[str], x_scaling: Any, y_column: str, y_scaling: Any, metric: Callable,
+    def __init__(self, x_columns: List[str], x_scaling: object, y_column: str, y_scaling: object, metric: Callable,
                  grid: pd.DataFrame, data_kwargs: Dict[str, Any], augmented_kwargs: Dict[str, Any],
                  summary_kwargs: Dict[str, Any], metric_name: str = None, post_process: Callable = None):
         self.x_columns: List[str] = x_columns
-        self.x_scaling: Any = x_scaling
+        self.x_scaling: object = x_scaling
         self.y_column: str = y_column
-        self.y_scaling: Any = y_scaling
+        self.y_scaling: object = y_scaling
         self.metric: Callable = metric
         self.metric_name: str = metric_name
         self.post_process: Callable = post_process

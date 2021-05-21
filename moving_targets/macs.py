@@ -1,15 +1,30 @@
+"""Core of the Moving Target algorithm."""
+
 import time
-from typing import List, Optional, Tuple, Any, Dict, Callable
+from typing import List, Any, Dict, Callable, Union, Optional as Opt
 
 from moving_targets.callbacks import Logger, FileLogger, History, ConsoleLogger, Callback
 from moving_targets.learners import Learner
 from moving_targets.masters import Master
 from moving_targets.metrics import Metric
+from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
 
 
 class MACS(Logger):
-    def __init__(self, learner: Learner, master: Master, init_step: str = 'pretraining',
-                 metrics: Optional[List[Metric]] = None):
+    """Model-Agnostic Constraint Satisfaction algorithm core.
+
+    Args:
+        learner: a `Learner` instance.
+        master: a `Master` instance.
+        init_step: the initial step of the algorithm, either 'pretraining' or 'projection'.
+        metrics: a list of `Metric` instances to evaluate the final solution.
+    """
+
+    def __init__(self,
+                 learner: Learner,
+                 master: Master,
+                 init_step: str = 'pretraining',
+                 metrics: Opt[List[Metric]] = None):
         super(MACS, self).__init__()
         assert init_step in ['pretraining', 'projection'], "initial step should be 'pretraining' or 'projection'"
         self.learner: Learner = learner
@@ -18,10 +33,27 @@ class MACS(Logger):
         self.metrics: List[Metric] = [] if metrics is None else metrics
         self.history: History = History()
         self.fitted: bool = False
-        self.time: Optional[float] = None
+        self.time: Opt[float] = None
 
-    def fit(self, x, y, iterations: int = 1, val_data: Dict[str, Tuple[Any, Any]] = None,
-            callbacks: Optional[List[Callback]] = None, verbose: Any = 2):
+    def fit(self, x: Matrix, y: Vector, iterations: int = 1, val_data: Opt[Dataset] = None,
+            callbacks: Opt[List[Callback]] = None, verbose: Union[int, bool] = 2) -> History:
+        """Starts the Moving Target algorithm by iteratively learning and constraining the predictions for the given
+           number of iterations using the learner and master instances.
+
+        Args:
+            x: the matrix/dataframe of training samples.
+            y: the vector of training labels.
+            iterations: the number of algorithm iterations.
+            val_data: a dictionary containing the validation data, indicated as a tuple (xv, yv).
+            callbacks: a list of `Callback` instances.
+            verbose: either a boolean or an int representing the verbosity value.
+
+        Returns:
+            An instance of the `History` object containing the training history.
+
+        Raises:
+            `AssertionError` if the number of iteration is negative, or if zero and the initial step is 'pretraining'.
+        """
         # check user input
         assert iterations >= 0, 'the number of iterations should be non-negative'
         assert iterations > 0 or self.init_step == 'pretraining', 'if projection, iterations should be a positive value'
@@ -39,7 +71,7 @@ class MACS(Logger):
         self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x=x, y=y, val_data=val_data))
 
         # handle pretraining
-        kwargs = dict(x=x, y=y, val_data=val_data, iteration=0)
+        kwargs: Dict[str, Any] = dict(x=x, y=y, val_data=val_data, iteration=0)
         if self.init_step == 'pretraining':
             self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, **kwargs))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------
@@ -70,18 +102,40 @@ class MACS(Logger):
         self._update_callbacks(callbacks, lambda c: c.on_process_end(self, val_data=val_data))
         return self.history
 
-    def predict(self, x):
+    def predict(self, x: Matrix) -> Vector:
+        """Uses the learner to predict labels from input samples.
+
+        Args:
+            x: the matrix/dataframe of input samples.
+
+        Returns:
+            The vector of predicted labels.
+
+        Raises:
+            `AssertionError` if the learner has not been fitted yet.
+        """
         assert self.fitted, 'The model has not been fitted yet, please call method .fit()'
         return self.learner.predict(x)
 
-    def evaluate(self, x, y):
+    def evaluate(self, x: Matrix, y: Vector) -> Dict[str, float]:
+        """Evaluates the performances of the model based on the given set of metrics.
+
+        Args:
+            x: the matrix/dataframe of training samples.
+            y: the vector of training labels.
+
+        Returns:
+            The dictionary of evaluated metrics.
+        """
         p = self.predict(x)
         return {metric.__name__: metric(x, y, p) for metric in self.metrics}
 
-    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         self.time = time.time()
 
-    def on_iteration_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
+    # noinspection PyMissingOrEmptyDocstring
+    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):
         logs = {'iteration': iteration, 'elapsed time': time.time() - self.time}
         # log metrics on training data
         p = self.predict(x)

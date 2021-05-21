@@ -12,7 +12,7 @@ from src.util.augmentation import compute_numeric_monotonicities
 
 
 class CarsManager(DataManager):
-    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm',
+    def __init__(self, filepath: str, x_scaling: object = 'std', y_scaling: object = 'norm',
                  bound: Tuple[int, int] = (0, 100), res: int = 700):
         self.filepath: str = filepath
         self.bound: Tuple[int, int] = bound
