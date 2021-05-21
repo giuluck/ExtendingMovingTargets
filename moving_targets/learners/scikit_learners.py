@@ -3,7 +3,7 @@
 import sklearn.linear_model as lm
 
 from moving_targets.learners.learner import Learner
-from moving_targets.utils.typing import Matrix, Vector, Iteration
+from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
 class ScikitLearner(Learner):

@@ -1,18 +1,24 @@
-from typing import Any, Tuple
+"""Cars Data Manager."""
 
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
+from typing import Tuple
 from sklearn.metrics import r2_score
 
+from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
-from src.util.preprocessing import split_dataset
 from src.util.augmentation import compute_numeric_monotonicities
+from src.util.preprocessing import split_dataset
+from src.util.typing import Augmented, SamplingFunctions, Methods, Rng
 
 
 class CarsManager(DataManager):
-    def __init__(self, filepath: str, x_scaling: object = 'std', y_scaling: object = 'norm',
+    """Data Manager for the Cars Dataset."""
+
+    def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',
                  bound: Tuple[int, int] = (0, 100), res: int = 700):
         self.filepath: str = filepath
         self.bound: Tuple[int, int] = bound
@@ -29,10 +35,12 @@ class CarsManager(DataManager):
             summary_kwargs=dict(figsize=(10, 4), res=100, ylim=(-5, 125))
         )
 
-    def compute_monotonicities(self, samples, references, eps=1e-5):
+    # noinspection PyMissingOrEmptyDocstring
+    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[-1], eps=eps)
 
-    def _load_splits(self, extrapolation=False):
+    def _load_splits(self, **kwargs) -> Dataset:
+        extrapolation = kwargs.pop('extrapolation')
         # preprocess data
         df = pd.read_csv(self.filepath).rename(
             columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
@@ -43,21 +51,25 @@ class CarsManager(DataManager):
         else:
             return split_dataset(df[['price']], df['sales'], extrapolation=None, test_size=0.2, random_state=0)
 
-    def _get_sampling_functions(self, num_augmented, rng):
+    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}
 
-    def _data_plot(self, figsize, tight_layout, **kwargs):
+    def _data_plot(self, **kwargs):
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         _, axes = plt.subplots(1, len(kwargs), sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
         for ax, (title, (x, y)) in zip(axes, kwargs.items()):
             sns.scatterplot(x=x['price'], y=y, ax=ax).set(xlabel='price', ylabel='sales', title=title.capitalize())
 
-    # noinspection PyMethodOverriding
-    def _augmented_plot(self, aug, figsize, **kwargs):
+    def _augmented_plot(self, aug: pd.DataFrame, **kwargs):
+        figsize = kwargs.pop('figsize')
         plt.figure(figsize=figsize)
         sns.histplot(data=aug, x='price', hue='Augmented')
 
-    # noinspection PyMethodOverriding
-    def _summary_plot(self, model, res, ylim, figsize, **kwargs):
+    def _summary_plot(self, model, **kwargs):
+        res = kwargs.pop('res')
+        ylim = kwargs.pop('ylim')
+        figsize = kwargs.pop('figsize')
         plt.figure(figsize=figsize)
         for title, (x, y) in kwargs.items():
             sns.scatterplot(x=x['price'], y=y, alpha=0.25, sizes=0.25, label=title.capitalize())

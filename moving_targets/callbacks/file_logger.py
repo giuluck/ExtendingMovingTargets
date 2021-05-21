@@ -4,7 +4,7 @@ import sys
 from typing import List, Set, Optional as Opt
 
 from moving_targets.callbacks.logger import Logger
-from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 
 SEPARATOR: str = '--------------------------------------------------'
 

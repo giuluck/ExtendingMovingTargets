@@ -1,11 +1,11 @@
 import random
-from typing import List, Dict, Any, Type, Tuple, Optional
+from typing import List, Any, Type, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import seaborn as sns
-import matplotlib.pyplot as plt
+import tensorflow as tf
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback
@@ -39,9 +39,9 @@ class TestManager:
         pd.options.display.float_format = float_format.format
 
     def __init__(self, dataset: DataManager, master_type: Type[MTMaster], init_step: str = 'pretraining',
-                 metrics: List[Metric] = None, data_args: Dict[str, Any] = None, augmented_args: Dict[str, Any] = None,
-                 monotonicities_args: Dict[str, Any] = None, learner_args: Dict[str, Any] = None,
-                 master_args: Dict[str, Any] = None, seed: int = 0):
+                 metrics: List[Metric] = None, data_args: Opt = None, augmented_args: Opt = None,
+                 monotonicities_args: Opt = None, learner_args: Opt = None,
+                 master_args: Opt = None, seed: int = 0):
         # PARAMETERS
         metrics = [] if metrics is None else metrics
         data_args = merge_dictionaries(TestManager.DATA_ARGS, data_args)
@@ -96,7 +96,7 @@ class TestManager:
 
 
 class RegressionTest(TestManager):
-    def __init__(self, dataset: DataManager, augmented_args: Dict[str, Any], monotonicities_args: Dict[str, Any],
+    def __init__(self, dataset: DataManager, augmented_args: Opt, monotonicities_args: Opt,
                  extrapolation: bool = False, warm_start: bool = False, **kwargs):
         super(RegressionTest, self).__init__(
             dataset=dataset,
@@ -111,7 +111,7 @@ class RegressionTest(TestManager):
 
 
 class ClassificationTest(TestManager):
-    def __init__(self, dataset: DataManager, augmented_args: Dict[str, Any], monotonicities_args: Dict[str, Any],
+    def __init__(self, dataset: DataManager, augmented_args: Opt, monotonicities_args: Opt,
                  kind: str = 'classification', h_units: tuple = (128, 128), evaluation_metric: Metric = Accuracy(),
                  warm_start: bool = False, **kwargs):
         if kind == 'classification':
@@ -148,7 +148,7 @@ class AnalysisCallback(Callback):
         self.sorting_attribute: object = sorting_attribute
         self.file_signature: str = file_signature
         self.do_plot: bool = do_plot
-        self.plot_kwargs: Dict[str, Any] = {'figsize': (20, 10), 'tight_layout': True}
+        self.plot_kwargs: Opt = {'figsize': (20, 10), 'tight_layout': True}
         self.plot_kwargs.update(kwargs)
         self.data: Optional[pd.DataFrame] = None
         self.iterations: List[Any] = []

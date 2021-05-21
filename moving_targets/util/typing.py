@@ -1,7 +1,8 @@
 """Type aliases."""
-from typing import Union, List, Tuple, Dict
+
 import numpy as np
 import pandas as pd
+from typing import Union, List, Tuple, Dict
 
 Number = Union[int, float]
 Vector = Union[pd.Series, np.ndarray, List[Number]]

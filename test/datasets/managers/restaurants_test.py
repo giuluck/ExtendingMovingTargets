@@ -1,9 +1,9 @@
-from typing import Any, Tuple, Dict, Optional
+from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 from moving_targets.metrics import AUC
 from src.datasets import RestaurantsManager

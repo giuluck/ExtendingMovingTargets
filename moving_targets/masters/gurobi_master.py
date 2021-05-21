@@ -1,11 +1,12 @@
 """Gurobi Master interface."""
 
 from abc import ABC
+
 from gurobipy import Model, Env, GRB
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
-from moving_targets.utils.typing import Matrix, Vector, Iteration
+from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
 def _abs(model: Model, x):

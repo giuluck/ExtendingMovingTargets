@@ -1,11 +1,12 @@
 """Classification Metrics."""
 
-import numpy as np
 from typing import Callable, Optional
+
+import numpy as np
 from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score, log_loss
 
 from moving_targets.metrics.metric import Metric
-from moving_targets.utils.typing import Classes, Matrix, Vector
+from moving_targets.util.typing import Classes, Matrix, Vector
 
 
 class ClassificationMetric(Metric):

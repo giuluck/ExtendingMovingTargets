@@ -1,9 +1,10 @@
 """Losses utilities."""
 
-import numpy as np
 from typing import Callable, Optional
 
-from moving_targets.utils.typing import Vector
+import numpy as np
+
+from moving_targets.util.typing import Vector
 
 
 class SumLoss:

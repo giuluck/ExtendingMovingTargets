@@ -1,5 +1,5 @@
 """Basic Metric Interface."""
-from moving_targets.utils.typing import Matrix, Vector
+from moving_targets.util.typing import Matrix, Vector
 
 
 class Metric:

@@ -1,13 +1,13 @@
 """Core of the Moving Target algorithm."""
 
 import time
-from typing import List, Any, Dict, Callable, Union, Optional as Opt
+from typing import List, Dict, Callable, Union, Optional as Opt
 
 from moving_targets.callbacks import Logger, FileLogger, History, ConsoleLogger, Callback
 from moving_targets.learners import Learner
 from moving_targets.masters import Master
 from moving_targets.metrics import Metric
-from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 
 
 class MACS(Logger):
@@ -71,7 +71,7 @@ class MACS(Logger):
         self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x=x, y=y, val_data=val_data))
 
         # handle pretraining
-        kwargs: Dict[str, Any] = dict(x=x, y=y, val_data=val_data, iteration=0)
+        kwargs: Dict = dict(x=x, y=y, val_data=val_data, iteration=0)
         if self.init_step == 'pretraining':
             self._update_callbacks(callbacks, lambda c: c.on_pretraining_start(self, **kwargs))
             # ---------------------------------------------- LEARNER STEP ----------------------------------------------

@@ -1,5 +1,7 @@
+"""Moving Target Models."""
+
 import time
-from typing import Any, Optional, Tuple, List
+from typing import Optional, List
 
 import numpy as np
 
@@ -8,12 +10,33 @@ from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster
 from moving_targets.metrics import Metric
 from moving_targets.metrics.constraints import MonotonicViolation
+from moving_targets.util.typing import Matrix, Vector, Iteration, Monotonicities
 from src.models import MLP
 from src.util.dictionaries import merge_dictionaries
+from src.util.typing import Scalers
 
 
 class MTLearner(Learner):
-    def __init__(self, loss, optimizer='adam', output_act=None, h_units=None, scalers=None, warm_start=False, **kwargs):
+    """Custom Moving Target Learner.
+
+    Args:
+        loss: the neural network loss function.
+        optimizer: the neural network optimizer.
+        output_act: the neural network output activation.
+        h_units: the neural network hidden units.
+        scalers: the x/y scalers.
+        warm_start: whether or not to use warm start during the moving targets iterations..
+        **kwargs: super-class arguments.
+    """
+
+    def __init__(self,
+                 loss: str,
+                 optimizer: str = 'adam',
+                 output_act: Optional[str] = None,
+                 h_units: Optional[List[int]] = None,
+                 scalers: Scalers = None,
+                 warm_start: bool = False,
+                 **kwargs):
         super(MTLearner, self).__init__()
         self.output_act = output_act
         self.h_units = h_units
@@ -24,6 +47,7 @@ class MTLearner(Learner):
         self.fit_args = kwargs
         self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=self.scalers)
 
+    # noinspection PyMissingOrEmptyDocstring
     def fit(self, macs, x: Matrix, y: Vector, iteration, **kwargs):
         start_time = time.time()
         # re-initialize weights if warm start is not enabled, re-initialize optimizer in any case
@@ -40,15 +64,37 @@ class MTLearner(Learner):
             'learner/loss': fit.history['loss'][-1] if len(fit.epoch) > 0 else np.nan
         })
 
+    # noinspection PyMissingOrEmptyDocstring
     def predict(self, x):
         return self.model.predict(x).flatten()
 
 
 class MTMaster(CplexMaster):
-    def __init__(self, monotonicities: List[Tuple[int, int]], augmented_mask: np.ndarray, loss_fn: str,
-                 alpha: float = 1.0, learner_weights: str = 'all', learner_omega: float = 1.0,
-                 master_omega: Optional[float] = None, eps: float = 1e-3, time_limit: float = 30):
-        super(MTMaster, self).__init__(alpha=alpha, beta=None, time_limit=time_limit)
+    """Custom Moving Target Master Interface.
+
+    Args:
+        monotonicities: list of monotonicities.
+        augmented_mask: boolean mask to distinguish between original and augmented samples.
+        loss_fn: the master loss.
+        alpha: the non-negative real number which is used to calibrate the two losses in the alpha step.
+        learner_weights: either 'all' or 'infeasible'.
+        learner_omega: real number that decides the weight of augmented samples during the learning step.
+        master_omega: real number that decides the weight of augmented samples during the master step.
+        eps: the slack value under which a violation is considered to be acceptable.
+        time_limit: the maximal time for which the master can run during each iteration.
+    """
+
+    def __init__(self,
+                 monotonicities: Monotonicities,
+                 augmented_mask: Vector,
+                 loss_fn: str,
+                 alpha: float = 1.0,
+                 learner_weights: str = 'all',
+                 learner_omega: float = 1.0,
+                 master_omega: Optional[float] = None,
+                 eps: float = 1e-3,
+                 time_limit: float = 30):
+        super(MTMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit)
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
         self.lower_indices = np.array([li for _, li in monotonicities])
         self.augmented_mask = augmented_mask
@@ -71,13 +117,15 @@ class MTMaster(CplexMaster):
         self.eps = eps
         self.start_time = None
 
+    # noinspection PyMissingOrEmptyDocstring
     def build_variables(self, model, y):
         raise NotImplementedError("Please implement method 'build variables'")
 
-    # noinspection PyMethodMayBeStatic
+    # noinspection PyMissingOrEmptyDocstring, PyMethodMayBeStatic
     def build_predictions(self, macs, x):
         return macs.predict(x)
 
+    # noinspection PyMissingOrEmptyDocstring
     def build_model(self, macs, model, x, y, iteration: Iteration):
         self.start_time = time.time()
         # handle 'projection' initial step (p = None)
@@ -89,19 +137,23 @@ class MTMaster(CplexMaster):
         # return model info
         return var, pred
 
+    # noinspection PyMissingOrEmptyDocstring
     def beta_step(self, macs, model, model_info, x, y, iteration: Iteration) -> bool:
         return False
 
+    # noinspection PyMissingOrEmptyDocstring
     def y_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
         return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
+    # noinspection PyMissingOrEmptyDocstring
     def p_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
         var, pred = model_info
         sw = np.where(self.augmented_mask, self.master_omega_p, 1)
         return 0.0 if pred is None else self.p_loss_fn(model, pred, var, sample_weight=sw)
 
+    # noinspection PyMissingOrEmptyDocstring
     def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
         var, pred = model_info
         adj = np.array([vy.solution_value for vy in var])
@@ -117,6 +169,15 @@ class MTMaster(CplexMaster):
 
 
 class MTRegressionMaster(MTMaster):
+    """Custom Moving Target Master for Regression Problems.
+
+    Args:
+        monotonicities: list of monotonicities.
+        augmented_mask: boolean mask to distinguish between original and augmented samples.
+        loss_fn: the master loss.
+        **kwargs: super-class arguments.
+    """
+
     losses = {
         'mae': 'mean_absolute_error',
         'mean_absolute_error': 'mean_absolute_error',
@@ -129,8 +190,8 @@ class MTRegressionMaster(MTMaster):
     }
 
     def __init__(self,
-                 monotonicities: List[Tuple[int, int]],
-                 augmented_mask: np.ndarray,
+                 monotonicities: Monotonicities,
+                 augmented_mask: Vector,
                  loss_fn: str = 'mse',
                  **kwargs):
         assert loss_fn in self.losses.keys(), f'loss_fn should be in {list(self.losses.keys())}'
@@ -141,9 +202,11 @@ class MTRegressionMaster(MTMaster):
             **kwargs
         )
 
+    # noinspection PyMissingOrEmptyDocstring
     def build_variables(self, model, y):
         return model.continuous_var_list(keys=len(y), name='y', lb=-float('inf'), ub=float('inf'))
 
+    # noinspection PyMissingOrEmptyDocstring
     def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
         adj, kwargs = super(MTRegressionMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
         mask = ~np.isnan(y)
@@ -154,9 +217,18 @@ class MTRegressionMaster(MTMaster):
 
 
 class MTClassificationMaster(MTMaster):
+    """Custom Moving Target Master for Classification Problems.
+
+    Args:
+        monotonicities: list of monotonicities.
+        augmented_mask: boolean mask to distinguish between original and augmented samples.
+        clip_value: the clipping value to be used to avoid numerical errors with the log.
+        **kwargs: super-class arguments.
+    """
+
     def __init__(self,
-                 monotonicities: List[Tuple[int, int]],
-                 augmented_mask: np.ndarray,
+                 monotonicities: Monotonicities,
+                 augmented_mask: Vector,
                  clip_value: float = 1e-15,
                  **kwargs):
         super(MTClassificationMaster, self).__init__(
@@ -171,9 +243,11 @@ class MTClassificationMaster(MTMaster):
         self.y_loss_fn.clip_value = y_clip
         self.p_loss_fn.clip_value = p_clip
 
+    # noinspection PyMissingOrEmptyDocstring
     def build_variables(self, model, y):
         return model.continuous_var_list(keys=len(y), name='y', lb=0.0, ub=1.0)
 
+    # noinspection PyMissingOrEmptyDocstring
     def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
         adj, kwargs = super(MTClassificationMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
         mask = ~np.isnan(y)
@@ -185,12 +259,25 @@ class MTClassificationMaster(MTMaster):
 
 
 class MT(MACS):
-    def __init__(self, learner: MTLearner, master: MTMaster, init_step: str = 'pretraining',
+    """Custom Model-Agnostic Constraint Satisfaction instance.
+
+    Args:
+        learner: a `MTLearner` instance.
+        master: a `MTMaster` instance.
+        init_step: the initial step of the algorithm, either 'pretraining' or 'projection'.
+        metrics: a list of `Metric` instances to evaluate the final solution.
+    """
+
+    def __init__(self,
+                 learner: MTLearner,
+                 master: MTMaster,
+                 init_step: str = 'pretraining',
                  metrics: Optional[List[Metric]] = None):
         super(MT, self).__init__(learner=learner, master=master, init_step=init_step, metrics=metrics)
         self.violation_metrics = [m for m in self.metrics if isinstance(m, MonotonicViolation)]
         self.metrics = [m for m in self.metrics if not isinstance(m, MonotonicViolation)]
 
+    # noinspection PyMissingOrEmptyDocstring
     def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data, iteration: Iteration, **kwargs):
         iteration = 0 if iteration == 'pretraining' else iteration
         logs = {'iteration': iteration, 'time/iteration': time.time() - self.time}

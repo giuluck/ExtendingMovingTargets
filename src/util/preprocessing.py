@@ -1,18 +1,45 @@
-from typing import Optional, Any
+"""Processing utils."""
+
+from typing import Union, Dict, Optional as Opt
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from moving_targets.util.typing import Matrix, Vector
+from src.util.typing import Methods, Extrapolation
+
 
 class Scaler:
-    def __init__(self, methods: Optional[str] = 'std'):
-        super(Scaler, self).__init__()
-        self.methods: Optional[str] = methods
-        self.translation: Optional[np.ndarray] = None
-        self.scaling: Optional[np.ndarray] = None
+    """Custom scaler that is able to treat each feature separately.
 
-    def fit(self, data: object):
+    Args:
+        methods: either a string/tuple, a list of strings/tuples, or a dictionary of strings/tuples.
+                 Each string/tuple represents a method:
+                 - 'std', or 'standardize', standardizes the feature
+                 - 'norm', or 'normalize', or 'minmax', normalizes the feature from (min, max) into (0, 1)
+                 - 'zero', or 'max', or 'zeromax', normalizes the feature from (0, max) into (0, 1)
+                 - Tuple[Number, Number], normalizes the feature from (t1, t2) into (0, 1)
+                 - None, performs no scaling
+                 If a single value is passed, all the features are scaled with the same method.
+                 If a list or a dictionary is passed, each feature is scaled with the respective method.
+    """
+
+    def __init__(self, methods: Methods = 'std'):
+        super(Scaler, self).__init__()
+        self.methods = methods
+        self.translation: Opt[np.ndarray] = None
+        self.scaling: Opt[np.ndarray] = None
+
+    def fit(self, data: Matrix):
+        """Fits the scaler parameters.
+
+        Args:
+            data: the matrix/dataframe of samples.
+
+        Returns:
+            The scaler itself.
+        """
         # handle non-pandas data
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame(np.array(data))
@@ -48,21 +75,69 @@ class Scaler:
                 raise ValueError(f'Method {method} is not supported')
         return self
 
-    def transform(self, data: object):
+    def transform(self, data: Matrix) -> Matrix:
+        """Transforms the data according to the scaler parameters.
+
+        Args:
+            data: the matrix/dataframe of samples.
+
+        Returns:
+            The scaled data.
+        """
         return (data - self.translation) / self.scaling
 
-    def fit_transform(self, data: object):
+    def fit_transform(self, data: Matrix) -> Matrix:
+        """Fits the scaler parameters.
+
+        Args:
+            data: the matrix/dataframe of samples.
+
+        Returns:
+            The scaled data.
+        """
         return self.fit(data).transform(data)
 
-    def inverse_transform(self, data: object):
+    def inverse_transform(self, data: Matrix) -> Matrix:
+        """Inverts the scaling according to the scaler parameters.
+
+        Args:
+            data: the previously scaled matrix/dataframe of samples.
+
+        Returns:
+            The original data.
+        """
         return (data * self.scaling) + self.translation
 
     @staticmethod
     def get_default(num_features: int) -> object:
+        """Builds a blank scaler which works on data with the given number of features.
+
+        Args:
+            num_features: the number of features.
+
+        Returns:
+            A blank scaler.
+        """
         return Scaler(methods=None).fit(data=[[0.] * num_features])
 
 
-def split_dataset(*arg, test_size: float = 0.2, val_size: Optional[float] = None, extrapolation: object = None, **kwargs):
+def split_dataset(*arg: Union[Matrix, Vector],
+                  test_size: float = 0.2,
+                  val_size: Opt[float] = None,
+                  extrapolation: Extrapolation = None,
+                  **kwargs) -> Dict:
+    """Splits the input data.
+
+    Args:
+        *arg: the input data vectors.
+        test_size: the percentage of data left for testing.
+        val_size: the percentage of data left for validation. If None, no validation set is returned.
+        extrapolation: whether to split the data randomly or to test on a given percentage of extrapolated data.
+        **kwargs: 'sklearn.model_selection.train_test_split' arguments.
+
+    Returns:
+        A dictionary of datasets.
+    """
     # handle default values
     val_size = test_size if val_size is None else val_size
     val_size = val_size if isinstance(val_size, float) else val_size / len(arg[0])

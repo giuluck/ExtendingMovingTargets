@@ -1,20 +1,24 @@
-from typing import Any
+"""Default Data Manager."""
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
 
+from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
-from src.util.preprocessing import split_dataset
 from src.util.augmentation import compute_numeric_monotonicities
+from src.util.preprocessing import split_dataset
+from src.util.typing import Augmented, SamplingFunctions, Rng
 
 
 class DefaultManager(DataManager):
+    """Data Manager for the Default Dataset."""
+
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
-    def __init__(self, filepath: str, x_scaling: object = 'std', y_scaling: object = 'norm', test_size: float = 0.8):
+    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm', test_size: float = 0.8):
         self.filepath: str = filepath
         self.test_size: float = test_size
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
@@ -32,10 +36,11 @@ class DefaultManager(DataManager):
             summary_kwargs=dict(figsize=(10, 4))
         )
 
-    def compute_monotonicities(self, samples, references, eps=1e-5):
+    # noinspection PyMissingOrEmptyDocstring
+    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[0, 1], eps=eps)
 
-    def _load_splits(self):
+    def _load_splits(self, **kwargs) -> Dataset:
         # preprocess data
         df = pd.read_csv(self.filepath)[['MARRIAGE', 'PAY_0', 'default']]
         df = df.dropna().reset_index(drop=True)
@@ -46,26 +51,29 @@ class DefaultManager(DataManager):
         x, y = df[['married', 'payment']], df['default']
         return split_dataset(x, y, test_size=self.test_size, val_size=0.5, random_state=0)
 
-    def _get_sampling_functions(self, num_augmented, rng):
+    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'payment': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s))}
 
-    def _data_plot(self, figsize, tight_layout, **kwargs):
+    def _data_plot(self, **kwargs):
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         _, axes = plt.subplots(len(kwargs), 1, sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)
         for ax, (title, (x, y)) in zip(axes, kwargs.items()):
             data = pd.concat((x, y), axis=1).astype(int)
             sns.pointplot(data=data, x='payment', y='default', hue='married', scale=0.8, markers=DefaultManager.MARKERS,
                           ci=99, errwidth=1.5, capsize=0.1, dodge=0.25, join=False, ax=ax).set(title=title.capitalize())
 
-    # noinspection PyMethodOverriding
-    def _augmented_plot(self, aug, figsize, tight_layout, **kwargs):
+    def _augmented_plot(self, aug: pd.DataFrame, **kwargs):
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         _, axes = plt.subplots(1, len(self.x_columns), sharey='all', figsize=figsize, tight_layout=tight_layout)
         for ax, feature in zip(axes, self.x_columns):
             sns.histplot(data=aug, x=feature, hue='Augmented', discrete=True, ax=ax)
             ticks = np.unique(ax.get_xticks().round().astype(int))
             ax.set_xticks([t for t in ticks if t in range(aug[feature].min(), aug[feature].max() + 1)])
 
-    # noinspection PyMethodOverriding
-    def _summary_plot(self, model, figsize, **kwargs):
+    def _summary_plot(self, model, **kwargs):
+        figsize = kwargs.pop('figsize')
         plt.figure(figsize=figsize)
         plt.title('Estimated Function')
         y = model.predict(self.grid).flatten()

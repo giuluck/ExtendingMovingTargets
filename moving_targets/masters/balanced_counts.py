@@ -3,7 +3,7 @@
 import numpy as np
 
 from moving_targets.masters.cplex_master import CplexMaster
-from moving_targets.utils.typing import Matrix, Vector, Iteration
+from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
 class BalancedCounts(CplexMaster):

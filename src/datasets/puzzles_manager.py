@@ -1,26 +1,27 @@
-from typing import Any, Dict, Tuple, Optional
+"""Puzzles Data Manager."""
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
+from typing import Optional, Dict, Tuple
 from sklearn.metrics import r2_score
 
+from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
-from src.util.preprocessing import split_dataset
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
+from src.util.preprocessing import split_dataset
+from src.util.typing import Methods, Augmented, Rng, SamplingFunctions
 
 
 class PuzzlesManager(DataManager):
-    def __init__(self, filepath: str, x_scaling: object = 'std', y_scaling: object = 'norm', res: int = 20,
+    """Data Manager for the Puzzles Dataset."""
+
+    def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm', res: int = 20,
                  bound: Optional[Dict[str, Tuple[int, int]]] = None):
         self.filepath: str = filepath
-        self.bound: Dict[str, Tuple[int, int]] = {
-            'word_count': (0, 230),
-            'star_rating': (0, 5),
-            'num_reviews': (0, 70)
-        } if bound is None else bound
+        self.bound = {'word_count': (0, 230), 'star_rating': (0, 5), 'num_reviews': (0, 70)} if bound is None else bound
         wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),
             np.linspace(self.bound['star_rating'][0], self.bound['star_rating'][1], res),
@@ -39,10 +40,12 @@ class PuzzlesManager(DataManager):
             summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=5)
         )
 
-    def compute_monotonicities(self, samples, references, eps=1e-5):
+    # noinspection PyMissingOrEmptyDocstring
+    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[-1, 1, 1], eps=eps)
 
-    def _load_splits(self, extrapolation=False):
+    def _load_splits(self, **kwargs) -> Dataset:
+        extrapolation = kwargs.pop('extrapolation')
         df = pd.read_csv(self.filepath)
         for col in df.columns:
             if col not in ['label', 'split']:
@@ -58,7 +61,7 @@ class PuzzlesManager(DataManager):
         else:
             return {s: (x[df['split'] == s], y[df['split'] == s]) for s in ['train', 'validation', 'test']}
 
-    def _get_sampling_functions(self, num_augmented, rng):
+    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         if isinstance(num_augmented, int):
             num_augmented = [num_augmented] * 3
         elif isinstance(num_augmented, dict):
@@ -70,7 +73,8 @@ class PuzzlesManager(DataManager):
             'num_reviews': (num_augmented[0], lambda s: rng.uniform(b['num_reviews'][0], b['num_reviews'][1], size=s))
         }
 
-    def _data_plot(self, figsize, **kwargs):
+    def _data_plot(self, **kwargs):
+        figsize = kwargs.pop('figsize')
         dfs, info = [], []
         for key, (x, y) in kwargs.items():
             df = pd.concat((x, y), axis=1)
@@ -79,8 +83,10 @@ class PuzzlesManager(DataManager):
         w, h = figsize
         sns.pairplot(data=pd.concat(dfs), hue='Key', plot_kws={'alpha': 0.7}, height=h / 4, aspect=w / h)
 
-    # noinspection PyMethodOverriding
-    def _summary_plot(self, model, res, figsize, tight_layout, **kwargs):
+    def _summary_plot(self, model, **kwargs):
+        res = kwargs.pop('res')
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         fig, axes = plt.subplots(1, 3, sharey='all', tight_layout=tight_layout, figsize=figsize)
         wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),
@@ -94,7 +100,7 @@ class PuzzlesManager(DataManager):
             fi, fj = [f for f in grid.columns if f not in [feat, 'pred']]
             li, ui = grid[fi].min(), grid[fi].max()
             lj, uj = grid[fj].min(), grid[fj].max()
-            fader = ColorFader('black', 'magenta', 'cyan', 'yellow', bounds=(li, lj, ui, uj))
+            fader = ColorFader('black', 'magenta', 'cyan', 'yellow', bounds=[li, lj, ui, uj])
             for (i, j), group in grid.groupby([fi, fj]):
                 label = f'{fi}: {i:.0f}, {fj}: {j:.0f}' if (i in [li, ui] and j in [lj, uj]) else None
                 sns.lineplot(data=group, x=feat, y='pred', color=fader(i, j), alpha=0.6, label=label, ax=ax)

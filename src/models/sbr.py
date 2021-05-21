@@ -1,4 +1,6 @@
-from typing import Optional, List, Any, Callable
+"""Semantic-Based Regularized MLP Model."""
+
+from typing import Optional, Callable
 
 import numpy as np
 import tensorflow as tf
@@ -7,15 +9,35 @@ from tensorflow.keras.metrics import Mean
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import Sequence
 
+from moving_targets.util.typing import Matrix, Vector
 from src.models.mlp import MLP
 
 
 def hard_tanh(x, factor=10 ** 6):
+    """Approximated sign function using the hyperbolic tangent.
+
+    Args:
+        x: the input vector.
+        factor: the vector scaling factor.
+
+    Returns:
+        An approximated sign function.
+    """
     return k.tanh(factor * x)
 
 
 class SBRBatchGenerator(Sequence):
-    def __init__(self, x, y, ground_indices, monotonicities, batch_size: int):
+    """A Batch Generator to be used in Keras model's training.
+
+    Args:
+        x: the matrix/dataframe of augmented training samples.
+        y: the vector of augmented training labels.
+        ground_indices: the ground index of each augmented sample.
+        monotonicities: the monotonicity of each augmented sample wrt its ground index.
+        batch_size: the batch size.
+    """
+
+    def __init__(self, x: Matrix, y: Vector, ground_indices: Vector, monotonicities: Vector, batch_size: int):
         super(SBRBatchGenerator, self).__init__()
         # compute number of samples in each group
         self.num_samples = np.sum(ground_indices == 0)
@@ -44,6 +66,15 @@ class SBRBatchGenerator(Sequence):
 
 
 class SBR(MLP):
+    """A Semantic-Based Regularized MLP architecture for monotonicity shape constraints built with Keras.
+
+    Args:
+        alpha: the alpha value for balancing compiled and regularized loss. If None, this is iteratively modified in
+               order to be effective at most via Lagrangian dual techniques.
+        regularizer_act: the regularizer activation function.
+        **kwargs: super-class arguments.
+    """
+
     def __init__(self, alpha: Optional[float] = None, regularizer_act: Optional[Callable] = None, **kwargs):
         super(SBR, self).__init__(**kwargs)
         if alpha is None:
@@ -78,6 +109,7 @@ class SBR(MLP):
         # final losses
         return sign * (def_loss + self.alpha * reg_loss), def_loss, reg_loss
 
+    # noinspection PyMissingOrEmptyDocstring
     def train_step(self, d):
         # unpack training data
         x, y = d
@@ -117,6 +149,13 @@ class SBR(MLP):
 
 
 class UnivariateSBR(SBR):
+    """A Semantic-Based Regularized MLP architecture for monotonic univariate functions built with Keras.
+
+    Args:
+        direction: the monotonicity direction.
+        **kwargs: super-class arguments.
+    """
+
     def __init__(self, direction: int = 1, **kwargs):
         super(UnivariateSBR, self).__init__(**kwargs)
         self.direction = direction

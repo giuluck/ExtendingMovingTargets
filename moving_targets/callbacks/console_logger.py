@@ -4,7 +4,7 @@ import time
 from typing import Optional as Opt
 
 from moving_targets.callbacks.callback import Callback
-from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 
 
 class ConsoleLogger(Callback):

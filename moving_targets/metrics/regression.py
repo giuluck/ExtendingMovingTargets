@@ -1,10 +1,11 @@
 """Regression Metrics."""
 
 from typing import Callable
+
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from moving_targets.metrics.metric import Metric
-from moving_targets.utils.typing import Matrix, Vector
+from moving_targets.util.typing import Matrix, Vector
 
 
 class RegressionMetric(Metric):

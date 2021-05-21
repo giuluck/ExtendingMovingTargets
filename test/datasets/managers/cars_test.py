@@ -1,8 +1,8 @@
-from typing import Any, Tuple, Dict, Optional
+from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 from src.datasets import CarsManager
 from test.datasets.managers.test_manager import AnalysisCallback, RegressionTest

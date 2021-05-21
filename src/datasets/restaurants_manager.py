@@ -1,22 +1,31 @@
+"""Restaurants Data Manager."""
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
+from typing import Tuple
 from sklearn.metrics import roc_auc_score, r2_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
+from moving_targets.util.typing import Vector, Dataset
 from src.datasets.data_manager import DataManager
+from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
 
 
 class RestaurantsManager(DataManager):
+    """Data Manager for the Restaurant Dataset."""
+
     @staticmethod
-    def ctr_estimate(avg_ratings, num_reviews, dollar_ratings):
+    def ctr_estimate(avg_ratings: Vector, num_reviews: Vector, dollar_ratings: Vector) -> Vector:
+        """Computes the real click-trough rate estimate"""
         dollar_rating_baseline = {'D': 3, 'DD': 2, 'DDD': 4, 'DDDD': 4.5}
         dollar_ratings = np.array([dollar_rating_baseline[d] for d in dollar_ratings])
         return 1 / (1 + np.exp(dollar_ratings - avg_ratings * np.log1p(num_reviews) / 4))
 
     @staticmethod
-    def predict(dataframe):
+    def predict(dataframe: pd.DataFrame) -> Vector:
+        """Predicts the real click-trough rate estimate from a dataframe"""
         return RestaurantsManager.ctr_estimate(
             avg_ratings=dataframe['avg_rating'],
             num_reviews=dataframe['num_reviews'],
@@ -24,7 +33,8 @@ class RestaurantsManager(DataManager):
         ).values
 
     @staticmethod
-    def sample_restaurants(n, rng):
+    def sample_restaurants(n: int, rng: Rng) -> Tuple[Vector, Vector, Vector, Vector]:
+        """Samples ground truth about restaurants."""
         avg_ratings = rng.uniform(1.0, 5.0, n)
         num_reviews = np.round(np.exp(rng.uniform(0.0, np.log(200), n)))
         dollar_ratings = rng.choice(['D', 'DD', 'DDD', 'DDDD'], n)
@@ -32,7 +42,8 @@ class RestaurantsManager(DataManager):
         return avg_ratings, num_reviews, dollar_ratings, ctr_labels
 
     @staticmethod
-    def sample_dataset(n, rng, testing_set=True):
+    def sample_dataset(n: int, rng: Rng, testing_set: bool = True) -> pd.DataFrame:
+        """Sample data points from the restaurants."""
         (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = RestaurantsManager.sample_restaurants(n, rng)
         # testing has a more uniform distribution over all restaurants
         # while training/validation datasets have more views on popular restaurants
@@ -48,7 +59,9 @@ class RestaurantsManager(DataManager):
         })
 
     @staticmethod
-    def plot_conclusions(models, figsize=(10, 10), tight_layout=True, res=100, orient_columns=True):
+    def plot_conclusions(models, figsize: Figsize = (10, 10), tight_layout: TightLayout = True,
+                         res: int = 100, orient_columns: bool = True):
+        """Plots the conclusions by comparing different models."""
         avg_ratings, num_reviews = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res))
         rows, cols = (4, len(models)) if orient_columns else (len(models), 4)
         _, axes = plt.subplots(rows, cols, sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
@@ -68,7 +81,8 @@ class RestaurantsManager(DataManager):
         plt.show()
 
     @staticmethod
-    def process_data(dataset):
+    def process_data(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+        """Processes the dataframe by applying one-hot encoding and computing the ground truths if needed."""
         for rating in ['DDDD', 'DDD', 'DD', 'D']:
             dataset.insert(2, rating, dataset['dollar_rating'] == rating)
         dataset = dataset.drop('dollar_rating', axis=1)
@@ -99,11 +113,13 @@ class RestaurantsManager(DataManager):
         )
 
     def compute_ground_r2(self, model):
+        """Computes the R2 score wrt the ground truths over the whole input space."""
         pred = model.predict(self.grid)
         return r2_score(self.ground_truth, pred)
 
-    def compute_monotonicities(self, samples, references, eps=1e-5):
-        def categorical_monotonicities(diffs):
+    # noinspection PyMissingOrEmptyDocstring
+    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
+        def _categorical_monotonicities(diffs):
             mono = 1 * (diffs == 1) - 1 * (diffs == -1)  # DD (2) > D    (1) -> DD - D = 1, D - DD = -1
             mono += 1 * (diffs == -6) - 1 * (diffs == 6)  # DD (2) > DDDD (8) -> DD - DDDD = -6, DDDD - DD = 6
             return mono
@@ -121,21 +137,13 @@ class RestaurantsManager(DataManager):
         differences[np.abs(differences) < eps] = 0.
         num_differences = np.sign(np.abs(differences)).sum(axis=0)
         # convert categorical differences to monotonicities and get whole monotonicity (sum of monotonicity signs)
-        differences[-1] = categorical_monotonicities(differences[-1])
+        differences[-1] = _categorical_monotonicities(differences[-1])
         monotonicities = np.sign(differences).sum(axis=0).transpose()
         # the final monotonicities are masked for pairs with just one different attribute
         monotonicities = monotonicities.astype('int') * (num_differences == 1)
         return monotonicities
 
-    def _load_splits(self):
-        rng = np.random.default_rng(seed=0)
-        return {
-            'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
-            'validation': self.process_data(self.sample_dataset(600, rng, testing_set=False)),
-            'test': self.process_data(self.sample_dataset(600, rng, testing_set=True))
-        }
-
-    def _get_sampling_functions(self, num_augmented, rng):
+    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         dollar_rating = ('D', 'DD', 'DDD', 'DDDD')
         return {
             'avg_rating': (num_augmented // 3, lambda s: rng.uniform(1.0, 5.0, size=s)),
@@ -143,7 +151,17 @@ class RestaurantsManager(DataManager):
             dollar_rating: (num_augmented // 3, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
-    def _data_plot(self, figsize, tight_layout, kind='distributions', **kwargs):
+    def _load_splits(self, **kwargs) -> Dataset:
+        rng = np.random.default_rng(seed=0)
+        return {
+            'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
+            'validation': self.process_data(self.sample_dataset(600, rng, testing_set=False)),
+            'test': self.process_data(self.sample_dataset(600, rng, testing_set=True))
+        }
+
+    def _data_plot(self, **kwargs):
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         _, ax = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
         ax = ax.reshape((-1, 3))
         for i, (title, (x, y)) in enumerate(kwargs.items()):
@@ -151,15 +169,18 @@ class RestaurantsManager(DataManager):
             sns.kdeplot(x=x['num_reviews'], hue=y, ax=ax[i, 1])
             sns.countplot(x=x[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1), hue=y, ax=ax[i, 2])
 
-    # noinspection PyMethodOverriding
-    def _augmented_plot(self, aug, figsize, tight_layout, **kwargs):
+    def _augmented_plot(self, aug: pd.DataFrame, **kwargs):
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         _, axes = plt.subplots(1, 3, sharex='col', sharey='row', figsize=figsize, tight_layout=tight_layout)
         aug['dollar_rating'] = aug[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1)
         for ax, feature in zip(axes, ['avg_rating', 'num_reviews', 'dollar_rating']):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
-    # noinspection PyMethodOverriding
-    def _summary_plot(self, model, res, figsize, tight_layout, **kwargs):
+    def _summary_plot(self, model, **kwargs):
+        res = kwargs.pop('res')
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         print(f'{self.compute_ground_r2(model):.4} (ground r2)')
         self.plot_conclusions(figsize=figsize, tight_layout=tight_layout, res=res, orient_columns=False, models={
             'Estimated CTR': model,

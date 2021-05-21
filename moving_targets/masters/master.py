@@ -1,6 +1,6 @@
 """Basic Master Interface."""
 
-from moving_targets.utils.typing import Matrix, Vector, Iteration
+from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
 class Master:

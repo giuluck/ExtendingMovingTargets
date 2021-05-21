@@ -1,10 +1,11 @@
 """Constraints Metrics."""
 
-import numpy as np
 from typing import Optional
 
+import numpy as np
+
 from moving_targets.metrics.metric import Metric
-from moving_targets.utils.typing import Classes, Monotonicities, Matrix, Vector
+from moving_targets.util.typing import Classes, Monotonicities, Matrix, Vector
 
 
 class ClassFrequenciesStd(Metric):
@@ -35,10 +36,10 @@ class MonotonicViolation(Metric):
     Args:
         monotonicities: the list of pair of indices for which a monotonicity constraint must hold.
         aggregation: the aggregation type:
-                       - 'average', which computes the average constraint violation in terms of pure output
-                       - 'percentage', which computes the constraint violation in terms of average number of violations
-                       - 'feasible', which returns a binary value depending on whether there is at least on violation
-        eps: the slack value under which a violation is considered to be acceptable
+                       - 'average', which computes the average constraint violation in terms of pure output.
+                       - 'percentage', which computes the constraint violation in terms of average number of violations.
+                       - 'feasible', which returns a binary value depending on whether there is at least on violation.
+        eps: the slack value under which a violation is considered to be acceptable.
         name: the name of the metric.
     """
 

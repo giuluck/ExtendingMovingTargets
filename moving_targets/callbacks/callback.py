@@ -2,7 +2,7 @@
 
 from typing import Optional as Opt
 
-from moving_targets.utils.typing import Dataset, Vector, Matrix, Iteration
+from moving_targets.util.typing import Dataset, Vector, Matrix, Iteration
 
 
 class Callback:

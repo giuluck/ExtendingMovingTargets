@@ -1,11 +1,12 @@
 """Cplex Master interface."""
 
 from abc import ABC
+
 from docplex.mp.model import Model
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
-from moving_targets.utils.typing import Matrix, Vector, Iteration
+from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
 class CplexMaster(Master, ABC):

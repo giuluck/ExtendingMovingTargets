@@ -1,13 +1,14 @@
 """History Callback"""
 
+from typing import List, Optional as Opt
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from typing import List, Optional as Opt
 
 from moving_targets.callbacks.logger import Logger
-from moving_targets.utils.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 
 
 class History(Logger):

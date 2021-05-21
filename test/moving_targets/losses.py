@@ -1,6 +1,6 @@
 import unittest
-import numpy as np
 
+import numpy as np
 from docplex.mp.model import Model as CplexModel
 from gurobipy import Model as GurobiModel, Env, GRB
 from sklearn.metrics import mean_squared_error, mean_absolute_error, log_loss, precision_score

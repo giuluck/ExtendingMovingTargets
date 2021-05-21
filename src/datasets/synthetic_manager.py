@@ -1,18 +1,26 @@
+"""Synthetic Data Manager."""
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
+from typing import Union
 from sklearn.metrics import r2_score
 
+from moving_targets.util.typing import Number, Vector, Dataset
 from src.datasets.data_manager import DataManager
-from src.util.preprocessing import split_dataset
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
+from src.util.preprocessing import split_dataset
+from src.util.typing import Augmented, Rng, SamplingFunctions
 
 
 class SyntheticManager(DataManager):
+    """Data Manager for the Synthetic Dataset."""
+
     @staticmethod
-    def function(a, b):
+    def function(a: Union[Vector, Number], b: Union[Vector, Number]) -> Union[Vector, Number]:
+        """Ground function."""
         a = a ** 3
         b = np.sin(np.pi * (b - 0.01)) ** 2 + 1
         return a / b + b
@@ -33,10 +41,12 @@ class SyntheticManager(DataManager):
             summary_kwargs=dict(figsize=(10, 4), tight_layout=True, res=50)
         )
 
-    def compute_monotonicities(self, samples, references, eps=1e-5):
+    # noinspection PyMissingOrEmptyDocstring
+    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[1, 0], eps=eps)
 
-    def _load_splits(self, extrapolation=False):
+    def _load_splits(self, **kwargs) -> Dataset:
+        extrapolation = kwargs.pop('extrapolation')
         # generate and split data
         rng = np.random.default_rng(seed=0)
         if extrapolation:
@@ -57,15 +67,16 @@ class SyntheticManager(DataManager):
         # assign y values
         outputs = {}
         for s, x in splits.items():
-            y = pd.Series(SyntheticManager.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise,
-                                                                                                size=len(x))
+            y = pd.Series(self.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise, size=len(x))
             outputs[s] = (x, y)
         return outputs
 
-    def _get_sampling_functions(self, num_augmented, rng):
+    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}
 
-    def _data_plot(self, figsize, tight_layout, **kwargs):
+    def _data_plot(self, **kwargs):
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
         _, ax = plt.subplots(len(kwargs), 3, sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
         # hue/size bounds
         ybn = np.concatenate([[y.min(), y.max()] for _, y in kwargs.values()])
@@ -81,13 +92,16 @@ class SyntheticManager(DataManager):
             sns.scatterplot(x=a, y=b, hue=y, hue_norm=ybn, size=y, size_norm=ybn, ax=ax[2, i], legend=False)
             ax[2, i].legend([f'label ({ybn[0]:.0f}, {ybn[1]:.0f})'], markerscale=0, handlelength=0)
 
-    # noinspection PyMethodOverriding
-    def _summary_plot(self, model, res, figsize, tight_layout, **kwargs):
+    def _summary_plot(self, model, **kwargs):
+        res = kwargs.pop('res')
+        figsize = kwargs.pop('figsize')
+        tight_layout = kwargs.pop('tight_layout')
+        # get data
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         grid['pred'] = model.predict(grid)
         grid['label'] = SyntheticManager.function(grid['a'], grid['b'])
-        fader = ColorFader('red', 'blue', bounds=(-1, 1))
+        fader = ColorFader('red', 'blue', bounds=[-1, 1])
         _, axes = plt.subplots(2, 3, figsize=figsize, tight_layout=tight_layout)
         for ax, (title, y) in zip(axes, {'Ground Truth': 'label', 'Estimated Function': 'pred'}.items()):
             # plot bivariate function

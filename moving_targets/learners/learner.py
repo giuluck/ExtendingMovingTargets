@@ -1,6 +1,6 @@
 """Basic Learner Interface."""
 
-from moving_targets.utils.typing import Vector, Iteration, Matrix
+from moving_targets.util.typing import Vector, Iteration, Matrix
 
 
 class Learner:
