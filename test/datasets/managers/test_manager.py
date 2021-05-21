@@ -1,4 +1,6 @@
 import random
+from typing import List, Dict, Any, Type, Tuple, Optional
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -7,8 +9,9 @@ import matplotlib.pyplot as plt
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback
-from moving_targets.metrics import MonotonicViolation, MSE, R2, CrossEntropy, Accuracy
-from src.models import MTLearner, MT, MTRegressionMaster, MTClassificationMaster
+from moving_targets.metrics import MonotonicViolation, MSE, R2, CrossEntropy, Accuracy, Metric
+from src.datasets import DataManager
+from src.models import MTLearner, MT, MTRegressionMaster, MTClassificationMaster, MTMaster
 from src.util.augmentation import get_monotonicities_list
 from src.util.dictionaries import merge_dictionaries
 
@@ -24,7 +27,8 @@ class TestManager:
     SUMMARY_ARGS = dict()
 
     @staticmethod
-    def setup(seed=0, max_rows=10000, max_columns=10000, width=10000, max_colwidth=10000, float_format='{:.4f}'):
+    def setup(seed: int = 0, max_rows: int = 10000, max_columns: int = 10000, width: int = 10000,
+              max_colwidth: int = 10000, float_format: str = '{:.4f}'):
         random.seed(seed)
         np.random.seed(seed)
         tf.random.set_seed(seed)
@@ -34,8 +38,10 @@ class TestManager:
         pd.options.display.max_colwidth = max_colwidth
         pd.options.display.float_format = float_format.format
 
-    def __init__(self, dataset, master_type, init_step='pretraining', metrics=None, data_args=None, augmented_args=None,
-                 monotonicities_args=None, learner_args=None, master_args=None, seed=0):
+    def __init__(self, dataset: DataManager, master_type: Type[MTMaster], init_step: str = 'pretraining',
+                 metrics: List[Metric] = None, data_args: Dict[str, Any] = None, augmented_args: Dict[str, Any] = None,
+                 monotonicities_args: Dict[str, Any] = None, learner_args: Dict[str, Any] = None,
+                 master_args: Dict[str, Any] = None, seed: int = 0):
         # PARAMETERS
         metrics = [] if metrics is None else metrics
         data_args = merge_dictionaries(TestManager.DATA_ARGS, data_args)
@@ -45,7 +51,7 @@ class TestManager:
         master_args = merge_dictionaries(TestManager.MASTER_ARGS, master_args)
         self.seed = seed
         # DATA
-        self.dataset = dataset
+        self.dataset: DataManager = dataset
         self.data, _ = dataset.load_data(**data_args)
         (self.x, self.y), self.scalers = self.dataset.get_augmented_data(
             x=self.data['train'][0],
@@ -90,7 +96,8 @@ class TestManager:
 
 
 class RegressionTest(TestManager):
-    def __init__(self, dataset, augmented_args, monotonicities_args, extrapolation=False, warm_start=False, **kwargs):
+    def __init__(self, dataset: DataManager, augmented_args: Dict[str, Any], monotonicities_args: Dict[str, Any],
+                 extrapolation: bool = False, warm_start: bool = False, **kwargs):
         super(RegressionTest, self).__init__(
             dataset=dataset,
             master_type=MTRegressionMaster,
@@ -104,8 +111,9 @@ class RegressionTest(TestManager):
 
 
 class ClassificationTest(TestManager):
-    def __init__(self, dataset, augmented_args, monotonicities_args, kind='classification', h_units=(128, 128),
-                 evaluation_metric=Accuracy(), warm_start=False, **kwargs):
+    def __init__(self, dataset: DataManager, augmented_args: Dict[str, Any], monotonicities_args: Dict[str, Any],
+                 kind: str = 'classification', h_units: tuple = (128, 128), evaluation_metric: Metric = Accuracy(),
+                 warm_start: bool = False, **kwargs):
         if kind == 'classification':
             master_type = MTClassificationMaster
             loss_metric = CrossEntropy(name='loss')
@@ -133,38 +141,39 @@ class AnalysisCallback(Callback):
     PRETRAINING = 'PT'
     MARKERS = dict(aug='o', label='X')
 
-    def __init__(self, num_columns=5, sorting_attribute=None, file_signature=None, do_plot=True, **kwargs):
+    def __init__(self, num_columns: int = 5, sorting_attribute: Any = None, file_signature: str = None,
+                 do_plot: bool = True, **kwargs):
         super(AnalysisCallback, self).__init__()
-        self.num_columns = num_columns
-        self.sorting_attribute = sorting_attribute
-        self.file_signature = file_signature
-        self.do_plot = do_plot
-        self.plot_kwargs = {'figsize': (20, 10), 'tight_layout': True}
+        self.num_columns: int = num_columns
+        self.sorting_attribute: Any = sorting_attribute
+        self.file_signature: str = file_signature
+        self.do_plot: bool = do_plot
+        self.plot_kwargs: Dict[str, Any] = {'figsize': (20, 10), 'tight_layout': True}
         self.plot_kwargs.update(kwargs)
-        self.data = None
-        self.iterations = []
+        self.data: Optional[pd.DataFrame] = None
+        self.iterations: List[Any] = []
 
-    def on_process_start(self, macs, x, y, val_data, **kwargs):
+    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
         self.data = pd.concat((x.reset_index(drop=True), y.reset_index(drop=True), m), axis=1)
 
-    def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
+    def on_pretraining_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_iteration_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_start(macs, x, y, val_data, **kwargs)
         self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, **kwargs)
         self.on_training_start(macs, x, y, val_data, **kwargs)
 
-    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
+    def on_pretraining_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         kwargs['iteration'] = AnalysisCallback.PRETRAINING
         self.on_training_end(macs, x, y, val_data, **kwargs)
         self.on_iteration_end(macs, x, y, val_data, **kwargs)
 
-    def on_iteration_start(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.iterations.append(iteration)
         self.data[f'y {iteration}'] = y
 
-    def on_process_end(self, macs, val_data, **kwargs):
+    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         # sort values
         if self.sorting_attribute is not None:
             self.data = self.data.sort_values(self.sorting_attribute)
@@ -185,32 +194,32 @@ class AnalysisCallback(Callback):
                 ax.set_title(f'{it})' if title is None else title)
             plt.show()
 
-    def plot_function(self, iteration):
+    def plot_function(self, iteration: Any) -> Optional[str]:
         pass
 
 
 class DistanceAnalysis(AnalysisCallback):
-    def __init__(self, ground_only=True, num_columns=1, **kwargs):
+    def __init__(self, ground_only: bool = True, num_columns=1, **kwargs):
         super(DistanceAnalysis, self).__init__(num_columns=num_columns, **kwargs)
-        self.ground_only = ground_only
-        self.y = None
+        self.ground_only: bool = ground_only
+        self.y: Optional[str] = None
 
-    def on_pretraining_start(self, macs, x, y, val_data, **kwargs):
+    def on_pretraining_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         self.y = y.name
         super(DistanceAnalysis, self).on_pretraining_start(macs, x, y, val_data, **kwargs)
 
-    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
 
-    def on_process_end(self, macs, val_data, **kwargs):
+    def on_process_end(self, macs, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         if self.ground_only:
             self.data = self.data[self.data['mask'] == 'label']
         super(DistanceAnalysis, self).on_process_end(macs, val_data)
 
-    def plot_function(self, iteration):
+    def plot_function(self, iteration: Any) -> Optional[str]:
         x = np.arange(len(self.data))
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         style = self.data['mask']
@@ -227,30 +236,30 @@ class DistanceAnalysis(AnalysisCallback):
 
 
 class BoundsAnalysis(AnalysisCallback):
-    def __init__(self, num_columns=1, **kwargs):
+    def __init__(self, num_columns: int = 1, **kwargs):
         super(BoundsAnalysis, self).__init__(num_columns=num_columns, **kwargs)
 
-    def on_process_start(self, macs, x, y, val_data, **kwargs):
+    def on_process_start(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **kwargs)
         hi, li = macs.master.higher_indices, macs.master.lower_indices
         self.data['lower'] = self.data.index.map(lambda i: li[hi == i])
         self.data['higher'] = self.data.index.map(lambda i: hi[li == i])
 
-    def on_pretraining_end(self, macs, x, y, val_data, **kwargs):
+    def on_pretraining_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], **kwargs):
         pass
 
-    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self._insert_bounds(macs.predict(x), 'pred', iteration)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self._insert_bounds(adjusted_y, 'adj', iteration)
 
-    def _insert_bounds(self, v, label, iteration):
+    def _insert_bounds(self, v: np.ndarray, label: str, iteration: Any):
         self.data[f'{label} {iteration}'] = v
         self.data[f'{label} lb {iteration}'] = self.data['lower'].map(lambda i: v[i].max() if len(i) > 0 else None)
         self.data[f'{label} ub {iteration}'] = self.data['higher'].map(lambda i: v[i].min() if len(i) > 0 else None)
 
-    def plot_function(self, iteration):
+    def plot_function(self, iteration: Any) -> Optional[str]:
         x = np.arange(len(self.data))
         avg_bound = {}
         for label, color in dict(adj='blue', pred='red').items():

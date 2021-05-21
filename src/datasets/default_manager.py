@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -12,9 +14,9 @@ from src.util.augmentation import compute_numeric_monotonicities
 class DefaultManager(DataManager):
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
-    def __init__(self, filepath, x_scaling='std', y_scaling='norm', test_size=0.8):
-        self.filepath = filepath
-        self.test_size = test_size
+    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm', test_size: float = 0.8):
+        self.filepath: str = filepath
+        self.test_size: float = test_size
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
         super(DefaultManager, self).__init__(
             x_columns=['married', 'payment'],

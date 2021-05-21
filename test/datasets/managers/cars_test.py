@@ -1,3 +1,5 @@
+from typing import Any, Tuple, Dict, Optional
+
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -7,7 +9,7 @@ from test.datasets.managers.test_manager import AnalysisCallback, RegressionTest
 
 
 class CarsTest(RegressionTest):
-    def __init__(self, filepath='../../res/cars.csv', **kwargs):
+    def __init__(self, filepath: str = '../../res/cars.csv', **kwargs):
         super(CarsTest, self).__init__(
             dataset=CarsManager(filepath=filepath),
             augmented_args=dict(num_augmented=15),
@@ -17,7 +19,7 @@ class CarsTest(RegressionTest):
 
 
 class CarsUnivariateTest(RegressionTest):
-    def __init__(self, filepath='../../res/cars.csv', **kwargs):
+    def __init__(self, filepath: str = '../../res/cars.csv', **kwargs):
         super(CarsUnivariateTest, self).__init__(
             dataset=CarsManager(filepath=filepath),
             augmented_args=dict(num_augmented=0),
@@ -30,19 +32,19 @@ class CarsAdjustments(AnalysisCallback):
     max_size = 50
     alpha = 0.4
 
-    def __init__(self, plot_kind='scatter', **kwargs):
+    def __init__(self, plot_kind: str = 'scatter', **kwargs):
         super(CarsAdjustments, self).__init__(**kwargs)
         assert plot_kind in ['line', 'scatter'], "plot_kind should be either 'line' or 'scatter'"
-        self.plot_kind = plot_kind
+        self.plot_kind: str = plot_kind
 
-    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration):
+    def plot_function(self, iteration: Any) -> Optional[str]:
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha

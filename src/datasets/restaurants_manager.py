@@ -78,7 +78,7 @@ class RestaurantsManager(DataManager):
         else:
             return dataset, RestaurantsManager.predict(dataset)
 
-    def __init__(self, x_scaling='std', res=40):
+    def __init__(self, x_scaling: str = 'std', res: int = 40):
         ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res), ['D', 'DD', 'DDD', 'DDDD'])
         grid, self.ground_truth = self.process_data(pd.DataFrame.from_dict({
             'avg_rating': ar.flatten(),

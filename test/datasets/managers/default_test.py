@@ -1,3 +1,5 @@
+from typing import Any, Tuple, Dict, Optional
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -8,10 +10,11 @@ from test.datasets.managers.test_manager import ClassificationTest, AnalysisCall
 
 
 class DefaultTest(ClassificationTest):
-    def __init__(self, kind='probabilities', filepath='../../res/default.csv', test_size=0.8, **kwargs):
+    def __init__(self, kind: str = 'probabilities', filepath: str = '../../res/default.csv', test_size: float = 0.8,
+                 **kwargs):
         super(DefaultTest, self).__init__(
             kind=kind,
-            h_units=[128, 128],
+            h_units=(128, 128),
             evaluation_metric=Accuracy(name='metric'),
             dataset=DefaultManager(filepath=filepath, test_size=test_size),
             augmented_args=dict(num_augmented=15),
@@ -29,15 +32,15 @@ class DefaultAdjustments(AnalysisCallback):
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
         self.grid = pd.DataFrame.from_dict({'married': married.flatten(), 'payment': payment.flatten()})
 
-    def on_training_end(self, macs, x, y, val_data, iteration, **kwargs):
+    def on_training_end(self, macs, x, y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.data[f'pred {iteration}'] = macs.predict(x)
         self.grid[f'pred {iteration}'] = macs.predict(self.grid[['married', 'payment']])
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data, iteration, **kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Dict[str, Tuple[Any, Any]], iteration: Any, **kwargs):
         self.data[f'adj {iteration}'] = adjusted_y
         self.data[f'sw {iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration):
+    def plot_function(self, iteration: Any) -> Optional[str]:
         y, adj = self.data['default'], self.data[f'adj {iteration}']
         label = 'default' if iteration == AnalysisCallback.PRETRAINING else f'adj {iteration}'
         data = self.data.astype({'married': int}).rename(columns={label: 'y', f'sw {iteration}': 'sw'})

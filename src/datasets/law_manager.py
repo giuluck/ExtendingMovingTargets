@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -11,9 +13,10 @@ from src.util.augmentation import compute_numeric_monotonicities
 
 
 class LawManager(DataManager):
-    def __init__(self, filepath, x_scaling='std', y_scaling='norm', test_size=0.8, res=64):
-        self.filepath = filepath
-        self.test_size = test_size
+    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm', test_size: float = 0.8,
+                 res: int = 64):
+        self.filepath: str = filepath
+        self.test_size: float = test_size
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         super(LawManager, self).__init__(
             x_columns=['lsat', 'ugpa'],

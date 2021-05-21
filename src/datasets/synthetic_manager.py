@@ -17,8 +17,8 @@ class SyntheticManager(DataManager):
         b = np.sin(np.pi * (b - 0.01)) ** 2 + 1
         return a / b + b
 
-    def __init__(self, noise=0.0, x_scaling='std', y_scaling='norm', res=80):
-        self.noise = noise
+    def __init__(self, noise: float = 0.0, x_scaling: str = 'std', y_scaling: str = 'norm', res: int = 80):
+        self.noise: float = noise
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         super(SyntheticManager, self).__init__(
             x_columns=['a', 'b'],

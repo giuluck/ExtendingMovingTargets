@@ -1,16 +1,22 @@
+from typing import List, Optional, Type, Tuple, Dict
+
 import numpy as np
 
-from moving_targets.callbacks import FileLogger
+from moving_targets.callbacks import FileLogger, Callback
+from src.datasets import DataManager
 from src.models import MTRegressionMaster
 from test.datasets.managers import DistanceAnalysis, SyntheticAdjustments2D, SyntheticAdjustments3D, \
     SyntheticResponse, CarsAdjustments, PuzzlesResponse, CarsTest, CarsUnivariateTest, SyntheticTest, PuzzlesTest, \
-    RestaurantsTest, RestaurantsAdjustment, LawTest, LawAdjustments, LawResponse, DefaultTest, DefaultAdjustments
+    RestaurantsTest, RestaurantsAdjustment, LawTest, LawAdjustments, LawResponse, DefaultTest, DefaultAdjustments, \
+    TestManager
 
 
-def get_dataset(dataset, num_col=1, callback_functions=None):
+def get_dataset(dataset: str, num_col: int = 1,
+                callback_functions: Optional[List[str]] = None) -> Tuple[Type[:DataManager], List[Callback]]:
     # DATASET AND CALLBACKS
-    callback_functions = [] if callback_functions is None else callback_functions
-    ds, cb = None, []
+    callback_functions: List[str] = [] if callback_functions is None else callback_functions
+    ds: Optional[Type[:DataManager]] = None
+    cb: List[Callback] = []
     if 'logger' in callback_functions:
         cb.append(FileLogger('temp/log.txt', routines=['on_iteration_end']))
     if dataset == 'cars univariate':
@@ -97,7 +103,7 @@ def get_dataset(dataset, num_col=1, callback_functions=None):
     return ds, cb
 
 
-def get_plot_args(mng):
+def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
     return dict(columns=[
         'learner/loss',
         'metrics/train loss',
@@ -115,13 +121,14 @@ def get_plot_args(mng):
 
 
 if __name__ == '__main__':
-    iterations = 1
-    manager, callbacks = get_dataset(
+    iterations: int = 1
+    dataset_info: Tuple[Type[:DataManager], List[Callback]] = get_dataset(
         dataset='restaurants',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['adjustments', 'response']
     )
-    manager = manager(
+    manager_type, callbacks = dataset_info
+    manager: TestManager = manager_type(
         kind='classification',
         warm_start=False,
         master_args=dict(

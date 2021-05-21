@@ -1,3 +1,5 @@
+from typing import Any, Tuple
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -10,9 +12,10 @@ from src.util.augmentation import compute_numeric_monotonicities
 
 
 class CarsManager(DataManager):
-    def __init__(self, filepath, x_scaling='std', y_scaling='norm', bound=(0, 100), res=700):
-        self.filepath = filepath
-        self.bound = bound
+    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm',
+                 bound: Tuple[int, int] = (0, 100), res: int = 700):
+        self.filepath: str = filepath
+        self.bound: Tuple[int, int] = bound
         super(CarsManager, self).__init__(
             x_columns=['price'],
             x_scaling=x_scaling,

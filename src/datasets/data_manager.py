@@ -1,3 +1,5 @@
+from typing import List, Any, Dict, Callable, Tuple
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -19,26 +21,27 @@ class DataManager:
         output.update(kwargs)
         return output
 
-    def __init__(self, x_columns, x_scaling, y_column, y_scaling, metric, grid, data_kwargs, augmented_kwargs,
-                 summary_kwargs, metric_name=None, post_process=None):
-        self.x_columns = x_columns
-        self.x_scaling = x_scaling
-        self.y_column = y_column
-        self.y_scaling = y_scaling
-        self.metric = metric
-        self.metric_name = metric_name
-        self.post_process = post_process
-        self.grid = grid
-        self.monotonicities = get_monotonicities_list(
+    def __init__(self, x_columns: List[str], x_scaling: Any, y_column: str, y_scaling: Any, metric: Callable,
+                 grid: pd.DataFrame, data_kwargs: Dict[str, Any], augmented_kwargs: Dict[str, Any],
+                 summary_kwargs: Dict[str, Any], metric_name: str = None, post_process: Callable = None):
+        self.x_columns: List[str] = x_columns
+        self.x_scaling: Any = x_scaling
+        self.y_column: str = y_column
+        self.y_scaling: Any = y_scaling
+        self.metric: Callable = metric
+        self.metric_name: str = metric_name
+        self.post_process: Callable = post_process
+        self.grid: pd.DataFrame = grid
+        self.monotonicities: List[Tuple[int, int]] = get_monotonicities_list(
             data=self.grid,
             label=None,
             kind='all',
             errors='ignore',
             compute_monotonicities=self.compute_monotonicities
         )
-        self.data_kwargs = data_kwargs
-        self.augmented_kwargs = augmented_kwargs
-        self.summary_kwargs = summary_kwargs
+        self.data_kwargs: Dict[str, Any] = data_kwargs
+        self.augmented_kwargs: Dict[str, Any] = augmented_kwargs
+        self.summary_kwargs: Dict[str, Any] = summary_kwargs
 
     def _load_splits(self, **kwargs):
         raise NotImplementedError("please implement method '_load_splits'")
@@ -58,7 +61,7 @@ class DataManager:
     def _summary_plot(self, model, **kwargs):
         raise NotImplementedError("please implement method '_summary_plot'")
 
-    def compute_monotonicities(self, samples, references, eps=1e-5):
+    def compute_monotonicities(self, samples, references, eps: float = 1e-5):
         raise NotImplementedError("please implement method '_compute_monotonicities'")
 
     def get_scalers(self, x, y):

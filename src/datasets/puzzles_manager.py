@@ -1,3 +1,5 @@
+from typing import Any, Dict, Tuple, Optional
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -11,9 +13,14 @@ from src.util.plot import ColorFader
 
 
 class PuzzlesManager(DataManager):
-    def __init__(self, filepath, x_scaling='std', y_scaling='norm', res=20, bound=None):
-        self.filepath = filepath
-        self.bound = {'word_count': (0, 230), 'star_rating': (0, 5), 'num_reviews': (0, 70)} if bound is None else bound
+    def __init__(self, filepath: str, x_scaling: Any = 'std', y_scaling: Any = 'norm', res: int = 20,
+                 bound: Optional[Dict[str, Tuple[int, int]]] = None):
+        self.filepath: str = filepath
+        self.bound: Dict[str, Tuple[int, int]] = {
+            'word_count': (0, 230),
+            'star_rating': (0, 5),
+            'num_reviews': (0, 70)
+        } if bound is None else bound
         wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),
             np.linspace(self.bound['star_rating'][0], self.bound['star_rating'][1], res),
