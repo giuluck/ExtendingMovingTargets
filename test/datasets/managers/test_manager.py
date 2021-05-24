@@ -16,19 +16,11 @@ from src.datasets import DataManager
 from src.models import MTLearner, MT, MTRegressionMaster, MTClassificationMaster, MTMaster
 from src.util.augmentation import get_monotonicities_list
 from src.util.dictionaries import merge_dictionaries
+from src.util.typing import Augmented
 
 
 # noinspection PyMissingOrEmptyDocstring
 class TestManager:
-    DATA_ARGS = dict()
-    AUGMENTED_ARGS = dict()
-    MONOTONICITIES_ARGS = dict(kind='group')
-    LEARNER_ARGS = dict(optimizer='adam', epochs=200, verbose=False,
-                        callbacks=[EarlyStopping(monitor='loss', patience=10, min_delta=1e-4)])
-    MASTER_ARGS = dict()
-    PLOT_ARGS = dict(figsize=(20, 10), num_columns=4)
-    SUMMARY_ARGS = dict()
-
     @staticmethod
     def setup(seed: int = 0,
               max_rows: int = 10000,
@@ -36,7 +28,6 @@ class TestManager:
               width: int = 10000,
               max_colwidth: int = 10000,
               float_format: str = '{:.4f}'):
-        """Sets up the experiment."""
         random.seed(seed)
         np.random.seed(seed)
         tf.random.set_seed(seed)
@@ -48,90 +39,151 @@ class TestManager:
 
     def __init__(self,
                  dataset: DataManager,
-                 master_type: Type[MTMaster],
-                 init_step: str = 'pretraining',
-                 metrics: List[Metric] = None,
-                 data_args: Dict = None,
-                 augmented_args: Dict = None,
-                 monotonicities_args: Dict = None,
-                 learner_args: Dict = None,
-                 master_args: Dict = None,
+                 master_kind: str,
+                 lrn_loss: str,
+                 aug_num_augmented: Augmented = 15,
+                 aug_num_random: int = 0,
+                 aug_num_ground: Opt[int] = None,
+                 mono_kind: str = 'group',
+                 mono_errors: str = 'raise',
+                 lrn_optimizer: str = 'adam',
+                 lrn_output_act: Opt[str] = None,
+                 lrn_h_units: Opt[List[int]] = None,
+                 lrn_warm_start: bool = False,
+                 lrn_epochs: int = 200,
+                 lrn_verbose: bool = False,
+                 lrn_early_stopping: EarlyStopping = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4),
+                 mst_alpha: float = 1.0,
+                 mst_learner_weights: str = 'all',
+                 mst_learner_omega: float = 1.0,
+                 mst_master_omega: Opt[float] = None,
+                 mst_eps: float = 1e-3,
+                 mst_time_limit: float = 30,
+                 mst_custom_args: Dict = None,
+                 mt_init_step: str = 'pretraining',
+                 mt_metrics: List[Metric] = None,
+                 plt_figsize=(20, 10),
+                 plt_num_columns=4,
                  seed: int = 0):
-        # PARAMETERS
-        metrics = [] if metrics is None else metrics
-        data_args = merge_dictionaries(TestManager.DATA_ARGS, data_args)
-        augmented_args = merge_dictionaries(TestManager.AUGMENTED_ARGS, augmented_args)
-        monotonicities_args = merge_dictionaries(TestManager.MONOTONICITIES_ARGS, monotonicities_args)
-        learner_args = merge_dictionaries(TestManager.LEARNER_ARGS, learner_args)
-        master_args = merge_dictionaries(TestManager.MASTER_ARGS, master_args)
-        self.seed = seed
-        # DATA
         self.dataset: DataManager = dataset
-        self.data, _ = dataset.load_data(**data_args)
-        (self.x, self.y), self.scalers = self.dataset.get_augmented_data(
-            x=self.data['train'][0],
-            y=self.data['train'][1],
-            **augmented_args,
+        if master_kind in ['cls', 'classification']:
+            self.master_class: Type[MTMaster] = MTClassificationMaster
+        elif master_kind in ['reg', 'regression']:
+            self.master_class: Type[MTMaster] = MTRegressionMaster
+        else:
+            raise ValueError("'master_kind' should be either 'classification' or 'regression'")
+        self.augmented_args: Dict = dict(
+            num_augmented=aug_num_augmented,
+            num_random=aug_num_random,
+            num_ground=aug_num_ground
         )
-        self.monotonicities = get_monotonicities_list(
-            data=pd.concat((self.x, self.y), axis=1),
-            compute_monotonicities=self.dataset.compute_monotonicities,
-            label=self.dataset.y_column,
-            **monotonicities_args
+        self.monotonicities_args: Dict = dict(
+            kind=mono_kind,
+            errors=mono_errors
         )
-        self.y = self.y[self.dataset.y_column]
-        # MOVING TARGETS
-        self.moving_targets = MT(
-            learner=MTLearner(scalers=self.scalers, **learner_args),
-            master=master_type(monotonicities=self.monotonicities, augmented_mask=np.isnan(self.y), **master_args),
-            init_step=init_step,
-            metrics=metrics + [
-                MonotonicViolation(monotonicities=self.monotonicities, aggregation='average', name='avg. violation'),
-                MonotonicViolation(monotonicities=self.monotonicities, aggregation='percentage', name='pct. violation'),
-                MonotonicViolation(monotonicities=self.monotonicities, aggregation='feasible', name='is feasible')
+        self.learner_args: Dict = dict(
+            loss=lrn_loss,
+            optimizer=lrn_optimizer,
+            output_act=lrn_output_act,
+            h_units=lrn_h_units,
+            warm_start=lrn_warm_start,
+            epochs=lrn_epochs,
+            verbose=lrn_verbose,
+            callbacks=[lrn_early_stopping]
+        )
+        self.master_args = dict(
+            alpha=mst_alpha,
+            learner_weights=mst_learner_weights,
+            learner_omega=mst_learner_omega,
+            master_omega=mst_master_omega,
+            eps=mst_eps,
+            time_limit=mst_time_limit,
+            **({} if mst_custom_args is None else mst_custom_args)
+        )
+        self.mt_init_step: str = mt_init_step
+        self.mt_metrics: List[Metric] = [] if mt_metrics is None else mt_metrics
+        self.seed: int = seed
+        self.plot_args: Dict = dict(
+            figsize=plt_figsize,
+            num_columns=plt_num_columns
+        )
+        self.summary_args: Dict = dict()
+
+    def get_folds(self, num_folds: int, extrapolation: bool):
+        folds: List[Dict] = []
+        for data, _ in self.dataset.load_data(num_folds=num_folds, extrapolation=extrapolation):
+            (x_aug, y_aug), scalers = self.dataset.get_augmented_data(
+                x=data['train'][0],
+                y=data['train'][1],
+                **self.augmented_args
+            )
+            monotonicities = get_monotonicities_list(
+                data=pd.concat((x_aug, y_aug), axis=1),
+                label=self.dataset.y_column,
+                compute_monotonicities=self.dataset.compute_monotonicities,
+                **self.monotonicities_args
+            )
+            folds.append({
+                'data': (x_aug, y_aug[self.dataset.y_column]),
+                'scalers': scalers,
+                'monotonicities': monotonicities,
+                'validation': data
+            })
+        return folds
+
+    def get_model(self, fold_info: Dict):
+        (_, y), scalers, monotonicities, val_data = fold_info.values()
+        return MT(
+            learner=MTLearner(scalers=scalers, **self.learner_args),
+            master=self.master_class(monotonicities=monotonicities, augmented_mask=np.isnan(y), **self.master_args),
+            init_step=self.mt_init_step,
+            metrics=self.mt_metrics + [
+                MonotonicViolation(monotonicities=monotonicities, aggregation='average', name='avg. violation'),
+                MonotonicViolation(monotonicities=monotonicities, aggregation='percentage', name='pct. violation'),
+                MonotonicViolation(monotonicities=monotonicities, aggregation='feasible', name='is feasible')
             ]
         )
 
-    def fit(self,
-            iterations: int,
-            callbacks: Opt[List[Callback]] = None,
-            verbose: Union[int, bool] = 1,
-            plot_args: Dict = None,
-            summary_args: Dict = None):
+    def validate(self, iterations: int, num_folds: int = 10, verbose: Union[int, bool, str] = 'folds'):
+        pass
+
+    def test(self,
+             iterations: int,
+             callbacks: Opt[List[Callback]] = None,
+             verbose: Union[int, bool] = 1,
+             plot_args: Dict = None,
+             summary_args: Dict = None,
+             extrapolation: bool = False):
         TestManager.setup(seed=self.seed)
-        history = self.moving_targets.fit(
-            x=self.x,
-            y=self.y,
+        fold = self.get_folds(num_folds=1, extrapolation=extrapolation)[0]
+        model = self.get_model(fold)
+        history = model.fit(
+            x=fold['data'][0],
+            y=fold['data'][1],
             iterations=iterations,
-            val_data=self.data,
+            val_data=fold['validation'],
             callbacks=callbacks,
             verbose=verbose
         )
         if plot_args is not None:
-            plot_args = merge_dictionaries(TestManager.PLOT_ARGS, plot_args)
+            plot_args = merge_dictionaries(self.plot_args, plot_args)
             history.plot(**plot_args)
         if summary_args is not None:
-            summary_args = merge_dictionaries(TestManager.SUMMARY_ARGS, summary_args)
-            self.dataset.evaluation_summary(self.moving_targets, **self.data, **summary_args)
+            summary_args = merge_dictionaries(self.summary_args, summary_args)
+            self.dataset.evaluation_summary(model, **fold['validation'], **summary_args)
 
 
 # noinspection PyMissingOrEmptyDocstring
 class RegressionTest(TestManager):
     def __init__(self,
                  dataset: DataManager,
-                 augmented_args: Dict,
-                 monotonicities_args: Dict,
-                 extrapolation: bool = False,
-                 warm_start: bool = False,
                  **kwargs):
         super(RegressionTest, self).__init__(
             dataset=dataset,
-            master_type=MTRegressionMaster,
-            metrics=[MSE(name='loss'), R2(name='metric')],
-            data_args=dict(extrapolation=extrapolation),
-            augmented_args=augmented_args,
-            monotonicities_args=monotonicities_args,
-            learner_args=dict(output_act=None, h_units=[16] * 4, optimizer='adam', loss='mse', warm_start=warm_start),
+            master_kind='regression',
+            mt_metrics=[MSE(name='loss'), R2(name='metric')],
+            lrn_loss='mse',
+            lrn_output_act=None,
             **kwargs
         )
 
@@ -140,32 +192,21 @@ class RegressionTest(TestManager):
 class ClassificationTest(TestManager):
     def __init__(self,
                  dataset: DataManager,
-                 augmented_args: Dict,
-                 monotonicities_args: Dict,
-                 kind: str = 'classification',
-                 h_units: tuple = (128, 128),
-                 evaluation_metric: Metric = Accuracy(),
-                 warm_start: bool = False,
+                 master_kind: str = 'classification',
+                 mst_evaluation_metric: Metric = Accuracy(),
                  **kwargs):
-        if kind == 'classification':
-            master_type = MTClassificationMaster
+        if master_kind == 'classification':
             loss_metric = CrossEntropy(name='loss')
             loss_fn = 'binary_crossentropy'
-        elif kind == 'regression':
-            master_type = MTRegressionMaster
+        else:
             loss_metric = MSE(name='loss')
             loss_fn = 'mse'
-        else:
-            raise ValueError(f"kind should be either 'classification' or 'regression'")
         super(ClassificationTest, self).__init__(
             dataset=dataset,
-            master_type=master_type,
-            metrics=[loss_metric, evaluation_metric],
-            data_args=dict(),
-            augmented_args=augmented_args,
-            monotonicities_args=monotonicities_args,
-            learner_args=dict(output_act='sigmoid', h_units=h_units, optimizer='adam', loss=loss_fn,
-                              warm_start=warm_start),
+            master_kind=master_kind,
+            mt_metrics=[loss_metric, mst_evaluation_metric],
+            lrn_loss=loss_fn,
+            lrn_output_act='sigmoid',
             **kwargs
         )
 

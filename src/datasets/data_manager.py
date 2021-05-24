@@ -80,7 +80,7 @@ class DataManager:
         self.augmented_kwargs: Opt = augmented_kwargs
         self.summary_kwargs: Opt = summary_kwargs
 
-    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         raise NotImplementedError("please implement method '_load_splits'")
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
@@ -107,19 +107,19 @@ class DataManager:
         y_scaler = None if self.y_scaling is None else Scaler(self.y_scaling).fit(y)
         return x_scaler, y_scaler
 
-    def load_data(self, n_folds: Opt[int] = None, extrapolation: bool = False) -> Union[DataInfo, List[DataInfo]]:
+    def load_data(self, num_folds: Opt[int] = None, extrapolation: bool = False) -> Union[DataInfo, List[DataInfo]]:
         """Loads the dataset.
 
         With n_folds = None directly returns the tuple with train/val/test splits and scalers.
         With n_folds = 1 returns a list with a single tuple with train/val/test splits and scalers.
         With n_folds > 1 returns a list of tuples with train/val splits and their respective scalers.
         """
-        real_folds = 1 if n_folds is None else n_folds
+        real_folds = 1 if num_folds is None else num_folds
         assert real_folds > 0, "'n_folds' should be either None or a positive integer"
         assert real_folds == 1 or not extrapolation, "if 'n_folds' is not one, then extrapolation must be False"
-        splits = self._load_splits(n_folds=real_folds, extrapolation=extrapolation)
+        splits = self._load_splits(num_folds=real_folds, extrapolation=extrapolation)
         splits = [(s, self.get_scalers(s['train'][0], s['train'][1])) for s in splits]
-        return splits[0] if n_folds is None else splits
+        return splits[0] if num_folds is None else splits
 
     def get_augmented_data(self,
                            x: Matrix,

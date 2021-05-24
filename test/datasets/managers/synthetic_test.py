@@ -14,11 +14,10 @@ from test.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 # noinspection PyMissingOrEmptyDocstring
 class SyntheticTest(RegressionTest):
-    def __init__(self, noise: float = 0.0, **kwargs):
+    def __init__(self, noise: float = 0.0, lrn_h_units: tuple = (16,) * 4, **kwargs):
         super(SyntheticTest, self).__init__(
             dataset=SyntheticManager(noise=noise),
-            augmented_args=dict(num_augmented=15),
-            monotonicities_args=dict(kind='group'),
+            lrn_h_units=lrn_h_units,
             **kwargs
         )
 

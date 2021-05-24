@@ -14,13 +14,11 @@ from test.datasets.managers.test_manager import ClassificationTest, AnalysisCall
 
 # noinspection PyMissingOrEmptyDocstring
 class RestaurantsTest(ClassificationTest):
-    def __init__(self, **kwargs):
+    def __init__(self, lrn_h_units: tuple = (16, 8, 8), **kwargs):
         super(RestaurantsTest, self).__init__(
-            h_units=(16, 8, 8),
-            evaluation_metric=AUC(name='metric'),
             dataset=RestaurantsManager(),
-            augmented_args=dict(num_augmented=15),
-            monotonicities_args=dict(kind='group'),
+            lrn_h_units=lrn_h_units,
+            mst_evaluation_metric=AUC(name='metric'),
             **kwargs
         )
 

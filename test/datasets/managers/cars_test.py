@@ -12,22 +12,23 @@ from test.datasets.managers.test_manager import AnalysisCallback, RegressionTest
 
 # noinspection PyMissingOrEmptyDocstring
 class CarsTest(RegressionTest):
-    def __init__(self, filepath: str = '../../res/cars.csv', **kwargs):
+    def __init__(self, filepath: str = '../../res/cars.csv', lrn_h_units: tuple = (16,) * 4, **kwargs):
         super(CarsTest, self).__init__(
             dataset=CarsManager(filepath=filepath),
-            augmented_args=dict(num_augmented=15),
-            monotonicities_args=dict(kind='group'),
+            lrn_h_units=lrn_h_units,
             **kwargs
         )
 
 
 # noinspection PyMissingOrEmptyDocstring
 class CarsUnivariateTest(RegressionTest):
-    def __init__(self, filepath: str = '../../res/cars.csv', **kwargs):
+    def __init__(self, filepath: str = '../../res/cars.csv', lrn_h_units: tuple = (16,) * 4, **kwargs):
         super(CarsUnivariateTest, self).__init__(
             dataset=CarsManager(filepath=filepath),
-            augmented_args=dict(num_augmented=0),
-            monotonicities_args=dict(kind='all', errors='ignore'),
+            lrn_h_units=lrn_h_units,
+            aug_num_augmented=0,
+            mono_kind='all',
+            mono_errors='ignore',
             **kwargs
         )
 

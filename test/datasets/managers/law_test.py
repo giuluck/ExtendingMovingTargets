@@ -18,13 +18,12 @@ class LawTest(ClassificationTest):
     def __init__(self,
                  filepath: str = '../../res/law.csv',
                  test_size: float = 0.8,
+                 lrn_h_units: tuple = (128, 128),
                  **kwargs):
         super(LawTest, self).__init__(
-            h_units=(128, 128),
-            evaluation_metric=Accuracy(name='metric'),
             dataset=LawManager(filepath=filepath, test_size=test_size),
-            augmented_args=dict(num_augmented=15),
-            monotonicities_args=dict(kind='group'),
+            lrn_h_units=lrn_h_units,
+            mst_evaluation_metric=Accuracy(name='metric'),
             **kwargs
         )
 

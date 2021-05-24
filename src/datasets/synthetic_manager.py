@@ -54,10 +54,10 @@ class SyntheticManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[1, 0], eps=eps)
 
-    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         rng = np.random.default_rng(seed=0)
         # generate and split data
-        if n_folds == 1:
+        if num_folds == 1:
             if extrapolation:
                 x, y = self.sample_dataset(n=700, noise=self.noise, rng=rng, testing_set=True)
                 fold = split_dataset(x, y, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)

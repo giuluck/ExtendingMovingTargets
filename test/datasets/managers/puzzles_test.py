@@ -8,16 +8,23 @@ from typing import Optional as Opt
 from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import PuzzlesManager
 from src.util.plot import ColorFader
+from src.util.typing import Augmented
 from test.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring
 class PuzzlesTest(RegressionTest):
-    def __init__(self, filepath: str = '../../res/puzzles.csv', **kwargs):
+    def __init__(self,
+                 filepath: str = '../../res/puzzles.csv',
+                 lrn_h_units: tuple = (16,) * 4,
+                 aug_num_augmented: Augmented = (3, 4, 8),
+                 aug_num_random: int = 465,
+                 **kwargs):
         super(PuzzlesTest, self).__init__(
             dataset=PuzzlesManager(filepath=filepath),
-            augmented_args=dict(num_random=465, num_augmented=[3, 4, 8]),
-            monotonicities_args=dict(kind='group'),
+            lrn_h_units=lrn_h_units,
+            aug_num_augmented=aug_num_augmented,
+            aug_num_random=aug_num_random,
             **kwargs
         )
 

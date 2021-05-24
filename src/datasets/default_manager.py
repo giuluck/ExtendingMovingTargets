@@ -41,7 +41,7 @@ class DefaultManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[0, 1], eps=eps)
 
-    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         assert extrapolation is False, "'extrapolation' is not supported for Default dataset"
         # preprocess data
         df = pd.read_csv(self.filepath)[['MARRIAGE', 'PAY_0', 'default']]
@@ -51,7 +51,7 @@ class DefaultManager(DataManager):
         df = df.rename(columns={'MARRIAGE': 'married', 'PAY_0': 'payment'}).astype(float)
         x, y = df[['married', 'payment']], df['default']
         # split data
-        if n_folds == 1:
+        if num_folds == 1:
             assert self.test_size is not None, "'self.test_size' required if 'n_folds' is one"
             return [split_dataset(x, y, test_size=self.test_size, val_size=0.5, random_state=0)]
         else:

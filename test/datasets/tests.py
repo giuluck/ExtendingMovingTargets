@@ -1,7 +1,7 @@
 """Testing Script."""
 
 import numpy as np
-from typing import List, Optional, Type, Tuple, Dict, Any
+from typing import List, Optional, Type, Tuple, Dict
 
 from moving_targets.callbacks import FileLogger, Callback
 from src.datasets import DataManager
@@ -14,7 +14,7 @@ from test.datasets.managers import DistanceAnalysis, SyntheticAdjustments2D, Syn
 
 def get_dataset(dataset: str,
                 num_col: int = 1,
-                callback_functions: Optional[List[str]] = None) -> Tuple[Any, List[Callback]]:
+                callback_functions: Optional[List[str]] = None) -> Tuple[Type, List[Callback]]:
     """Gets the chosen `DataManager` with its respective callbacks."""
 
     # DATASET AND CALLBACKS
@@ -159,7 +159,7 @@ def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
         'metrics/validation loss',
         'metrics/validation metric',
         'metrics/pct. violation',
-        f'master/{"adj. mse" if issubclass(mng.moving_targets.master.__class__, MTRegressionMaster) else "avg. flips"}',
+        f'master/{"adj. mse" if issubclass(mng.master_class, MTRegressionMaster) else "avg. flips"}',
         'metrics/test loss',
         'metrics/test metric',
         'metrics/avg. violation'
@@ -169,18 +169,16 @@ def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
 if __name__ == '__main__':
     iterations: int = 1
     manager_type, callbacks = get_dataset(
-        dataset='law',
+        dataset='restaurants',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
-        callback_functions=['adjustments', 'response']
+        callback_functions=[]  # ['adjustments', 'response']
     )
-    manager = manager_type(
-        # kind='classification',
-        warm_start=False,
-        master_args=dict(
-            alpha=1.0,
-            master_omega=1.0,
-            learner_omega=1.0,
-            learner_weights='all'
-        )
+    manager: TestManager = manager_type(
+        # master_kind='classification',
+        lrn_warm_start=False,
+        mst_alpha=1.0,
+        mst_master_omega=1.0,
+        mst_learner_omega=1.0,
+        mst_learner_weights='all'
     )
-    manager.fit(iterations=iterations, callbacks=callbacks, plot_args=get_plot_args(manager), summary_args={})
+    manager.test(iterations=iterations, callbacks=callbacks, plot_args=get_plot_args(manager), summary_args={})

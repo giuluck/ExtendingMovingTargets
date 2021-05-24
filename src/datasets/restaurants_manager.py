@@ -151,11 +151,11 @@ class RestaurantsManager(DataManager):
             dollar_rating: (num_augmented // 3, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
-    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         assert extrapolation is False, "'extrapolation' is not supported for Restaurants dataset"
         rng = np.random.default_rng(seed=0)
         # generate and split data
-        if n_folds == 1:
+        if num_folds == 1:
             fold = {
                 'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
                 'validation': self.process_data(self.sample_dataset(600, rng, testing_set=False)),

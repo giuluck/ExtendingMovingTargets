@@ -44,7 +44,7 @@ class PuzzlesManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[-1, 1, 1], eps=eps)
 
-    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         # preprocess data
         df = pd.read_csv(self.filepath)
         for col in df.columns:
@@ -56,7 +56,7 @@ class PuzzlesManager(DataManager):
         x['num_reviews'] = df['star_rating'].map(lambda l: len(l))
         y = df['label']
         # split data
-        if n_folds == 1:
+        if num_folds == 1:
             if extrapolation:
                 fold = split_dataset(x, y, val_size=0.2, extrapolation=0.2)
             else:

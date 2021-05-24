@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Tuple, List, Optional as Opt
+from typing import Tuple, List
 from sklearn.metrics import r2_score
 
 from moving_targets.util.typing import Dataset
@@ -38,13 +38,13 @@ class CarsManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[-1], eps=eps)
 
-    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         # preprocess data
         df = pd.read_csv(self.filepath).rename(columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
         df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
         x, y = df[['price']], df['sales']
         # split data
-        if n_folds == 1:
+        if num_folds == 1:
             extrapolation = 0.2 if extrapolation else None
             fold = split_dataset(x, y, extrapolation=extrapolation, test_size=0.2, val_size=0.2, random_state=0)
             return [fold]

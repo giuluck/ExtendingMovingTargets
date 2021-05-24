@@ -5,7 +5,7 @@ from typing import Union, List, Dict, Callable, Tuple, Optional, Any
 
 from moving_targets.util.typing import Matrix, Number
 
-Augmented = Union[int, List[int], Dict[str, int]]
+Augmented = Union[int, Tuple[int], List[int], Dict[str, int]]
 AugmentedData = Tuple[Matrix, Matrix]
 SamplingFunctions = Dict[str, Tuple[int, Callable]]
 Directions = Union[int, List[int], np.ndarray]
