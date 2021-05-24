@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Union
+from typing import Union, List
 from sklearn.metrics import r2_score
 
 from moving_targets.util.typing import Number, Vector, Dataset
@@ -12,7 +12,7 @@ from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
-from src.util.typing import Augmented, Rng, SamplingFunctions
+from src.util.typing import Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
 class SyntheticManager(DataManager):
@@ -24,6 +24,15 @@ class SyntheticManager(DataManager):
         a = a ** 3
         b = np.sin(np.pi * (b - 0.01)) ** 2 + 1
         return a / b + b
+
+    @staticmethod
+    def sample_dataset(n, noise, rng, testing_set=True):
+        """Sample data points with the given amount of noise."""
+        a = rng.uniform(low=-1, high=1, size=n) if testing_set else rng.normal(scale=0.3, size=n).clip(min=-1, max=1)
+        b = rng.uniform(low=-1, high=1, size=n)
+        x = pd.DataFrame.from_dict({'a': a, 'b': b})
+        y = pd.Series(SyntheticManager.function(a, b), name='label') + rng.normal(scale=noise, size=len(x))
+        return x, y
 
     def __init__(self, noise: float = 0.0, x_scaling: str = 'std', y_scaling: str = 'norm', res: int = 80):
         self.noise: float = noise
@@ -45,38 +54,27 @@ class SyntheticManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[1, 0], eps=eps)
 
-    def _load_splits(self, **kwargs) -> Dataset:
-        extrapolation = kwargs.pop('extrapolation')
-        # generate and split data
+    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
         rng = np.random.default_rng(seed=0)
-        if extrapolation:
-            df = pd.DataFrame.from_dict({
-                'a': rng.uniform(low=-1, high=1, size=700),
-                'b': rng.uniform(low=-1, high=1, size=700)
-            })
-            splits = split_dataset(df, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
+        # generate and split data
+        if n_folds == 1:
+            if extrapolation:
+                x, y = self.sample_dataset(n=700, noise=self.noise, rng=rng, testing_set=True)
+                fold = split_dataset(x, y, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
+            else:
+                fold = {
+                    'train': SyntheticManager.sample_dataset(n=150, noise=self.noise, rng=rng, testing_set=False),
+                    'validation': SyntheticManager.sample_dataset(n=50, noise=self.noise, rng=rng, testing_set=False),
+                    'test': SyntheticManager.sample_dataset(n=500, noise=self.noise, rng=rng, testing_set=True)
+                }
+            return [fold]
         else:
-            df = [
-                {'a': rng.normal(scale=0.3, size=150).clip(min=-1, max=1),
-                 'b': rng.uniform(low=-1, high=1, size=150)},
-                {'a': rng.normal(scale=0.3, size=50).clip(min=-1, max=1),
-                 'b': rng.uniform(low=-1, high=1, size=50)},
-                {'a': rng.uniform(low=-1, high=1, size=500), 'b': rng.uniform(low=-1, high=1, size=500)}
-            ]
-            splits = {s: pd.DataFrame.from_dict(x) for s, x in zip(['train', 'validation', 'test'], df)}
-        # assign y values
-        outputs = {}
-        for s, x in splits.items():
-            y = pd.Series(self.function(x['a'], x['b']), name='label') + rng.normal(scale=self.noise, size=len(x))
-            outputs[s] = (x, y)
-        return outputs
+            raise NotImplementedError('K-fold cross-validation not implemented for Synthetic dataset')
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}
 
-    def _data_plot(self, **kwargs):
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, ax = plt.subplots(len(kwargs), 3, sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
         # hue/size bounds
         ybn = np.concatenate([[y.min(), y.max()] for _, y in kwargs.values()])
@@ -92,10 +90,8 @@ class SyntheticManager(DataManager):
             sns.scatterplot(x=a, y=b, hue=y, hue_norm=ybn, size=y, size_norm=ybn, ax=ax[2, i], legend=False)
             ax[2, i].legend([f'label ({ybn[0]:.0f}, {ybn[1]:.0f})'], markerscale=0, handlelength=0)
 
-    def _summary_plot(self, model, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         res = kwargs.pop('res')
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
         # get data
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})

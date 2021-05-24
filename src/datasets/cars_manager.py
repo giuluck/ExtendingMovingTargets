@@ -1,18 +1,17 @@
 """Cars Data Manager."""
 
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Tuple
+from typing import Tuple, List, Optional as Opt
 from sklearn.metrics import r2_score
 
 from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.preprocessing import split_dataset
-from src.util.typing import Augmented, SamplingFunctions, Methods, Rng
+from src.util.typing import Augmented, SamplingFunctions, Methods, Rng, Figsize, TightLayout
 
 
 class CarsManager(DataManager):
@@ -39,37 +38,34 @@ class CarsManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[-1], eps=eps)
 
-    def _load_splits(self, **kwargs) -> Dataset:
-        extrapolation = kwargs.pop('extrapolation')
+    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
         # preprocess data
-        df = pd.read_csv(self.filepath).rename(
-            columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
+        df = pd.read_csv(self.filepath).rename(columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
         df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
+        x, y = df[['price']], df['sales']
         # split data
-        if extrapolation:
-            return split_dataset(df[['price']], df['sales'], extrapolation=0.2, val_size=0.2, random_state=0)
+        if n_folds == 1:
+            extrapolation = 0.2 if extrapolation else None
+            fold = split_dataset(x, y, extrapolation=extrapolation, test_size=0.2, val_size=0.2, random_state=0)
+            return [fold]
         else:
-            return split_dataset(df[['price']], df['sales'], extrapolation=None, test_size=0.2, random_state=0)
+            raise NotImplementedError('K-fold cross-validation not implemented for Cars dataset')
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}
 
-    def _data_plot(self, **kwargs):
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, axes = plt.subplots(1, len(kwargs), sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
         for ax, (title, (x, y)) in zip(axes, kwargs.items()):
             sns.scatterplot(x=x['price'], y=y, ax=ax).set(xlabel='price', ylabel='sales', title=title.capitalize())
 
-    def _augmented_plot(self, aug: pd.DataFrame, **kwargs):
-        figsize = kwargs.pop('figsize')
+    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         plt.figure(figsize=figsize)
         sns.histplot(data=aug, x='price', hue='Augmented')
 
-    def _summary_plot(self, model, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         res = kwargs.pop('res')
         ylim = kwargs.pop('ylim')
-        figsize = kwargs.pop('figsize')
         plt.figure(figsize=figsize)
         for title, (x, y) in kwargs.items():
             sns.scatterplot(x=x['price'], y=y, alpha=0.25, sizes=0.25, label=title.capitalize())

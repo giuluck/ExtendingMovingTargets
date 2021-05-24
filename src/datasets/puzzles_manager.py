@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, List
 from sklearn.metrics import r2_score
 
 from moving_targets.util.typing import Dataset
@@ -12,7 +12,7 @@ from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
-from src.util.typing import Methods, Augmented, Rng, SamplingFunctions
+from src.util.typing import Methods, Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
 class PuzzlesManager(DataManager):
@@ -44,8 +44,8 @@ class PuzzlesManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[-1, 1, 1], eps=eps)
 
-    def _load_splits(self, **kwargs) -> Dataset:
-        extrapolation = kwargs.pop('extrapolation')
+    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+        # preprocess data
         df = pd.read_csv(self.filepath)
         for col in df.columns:
             if col not in ['label', 'split']:
@@ -56,10 +56,14 @@ class PuzzlesManager(DataManager):
         x['num_reviews'] = df['star_rating'].map(lambda l: len(l))
         y = df['label']
         # split data
-        if extrapolation:
-            return split_dataset(x, y, val_size=0.2, extrapolation=0.2)
+        if n_folds == 1:
+            if extrapolation:
+                fold = split_dataset(x, y, val_size=0.2, extrapolation=0.2)
+            else:
+                fold = {s: (x[df['split'] == s], y[df['split'] == s]) for s in ['train', 'validation', 'test']}
+            return [fold]
         else:
-            return {s: (x[df['split'] == s], y[df['split'] == s]) for s in ['train', 'validation', 'test']}
+            raise NotImplementedError('K-fold cross-validation not implemented for Puzzles dataset')
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         if isinstance(num_augmented, int):
@@ -73,8 +77,7 @@ class PuzzlesManager(DataManager):
             'num_reviews': (num_augmented[0], lambda s: rng.uniform(b['num_reviews'][0], b['num_reviews'][1], size=s))
         }
 
-    def _data_plot(self, **kwargs):
-        figsize = kwargs.pop('figsize')
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         dfs, info = [], []
         for key, (x, y) in kwargs.items():
             df = pd.concat((x, y), axis=1)
@@ -83,10 +86,8 @@ class PuzzlesManager(DataManager):
         w, h = figsize
         sns.pairplot(data=pd.concat(dfs), hue='Key', plot_kws={'alpha': 0.7}, height=h / 4, aspect=w / h)
 
-    def _summary_plot(self, model, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         res = kwargs.pop('res')
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
         fig, axes = plt.subplots(1, 3, sharey='all', tight_layout=tight_layout, figsize=figsize)
         wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),

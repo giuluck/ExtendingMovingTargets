@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Tuple
+from typing import Tuple, List
 from sklearn.metrics import roc_auc_score, r2_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
@@ -151,17 +151,21 @@ class RestaurantsManager(DataManager):
             dollar_rating: (num_augmented // 3, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
-    def _load_splits(self, **kwargs) -> Dataset:
+    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+        assert extrapolation is False, "'extrapolation' is not supported for Restaurants dataset"
         rng = np.random.default_rng(seed=0)
-        return {
-            'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
-            'validation': self.process_data(self.sample_dataset(600, rng, testing_set=False)),
-            'test': self.process_data(self.sample_dataset(600, rng, testing_set=True))
-        }
+        # generate and split data
+        if n_folds == 1:
+            fold = {
+                'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
+                'validation': self.process_data(self.sample_dataset(600, rng, testing_set=False)),
+                'test': self.process_data(self.sample_dataset(600, rng, testing_set=True))
+            }
+            return [fold]
+        else:
+            raise NotImplementedError('K-fold cross-validation not implemented for Restaurants dataset')
 
-    def _data_plot(self, **kwargs):
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, ax = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
         ax = ax.reshape((-1, 3))
         for i, (title, (x, y)) in enumerate(kwargs.items()):
@@ -169,18 +173,14 @@ class RestaurantsManager(DataManager):
             sns.kdeplot(x=x['num_reviews'], hue=y, ax=ax[i, 1])
             sns.countplot(x=x[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1), hue=y, ax=ax[i, 2])
 
-    def _augmented_plot(self, aug: pd.DataFrame, **kwargs):
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
+    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, axes = plt.subplots(1, 3, sharex='col', sharey='row', figsize=figsize, tight_layout=tight_layout)
         aug['dollar_rating'] = aug[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1)
         for ax, feature in zip(axes, ['avg_rating', 'num_reviews', 'dollar_rating']):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
-    def _summary_plot(self, model, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         res = kwargs.pop('res')
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
         print(f'{self.compute_ground_r2(model):.4} (ground r2)')
         self.plot_conclusions(figsize=figsize, tight_layout=tight_layout, res=res, orient_columns=False, models={
             'Estimated CTR': model,

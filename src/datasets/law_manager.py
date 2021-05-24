@@ -1,9 +1,10 @@
 """Law Data Manager."""
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
+from typing import List, Optional as Opt
 from sklearn.metrics import accuracy_score
 
 from moving_targets.util.typing import Dataset
@@ -11,16 +12,16 @@ from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
-from src.util.typing import Methods, Augmented, SamplingFunctions, Rng
+from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize, TightLayout
 
 
 class LawManager(DataManager):
     """Data Manager for the Law Dataset."""
 
-    def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm', test_size: float = 0.8,
-                 res: int = 64):
+    def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',
+                 test_size: Opt[float] = 0.8, res: int = 64):
         self.filepath: str = filepath
-        self.test_size: float = test_size
+        self.test_size: Opt[float] = test_size
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         super(LawManager, self).__init__(
             x_columns=['lsat', 'ugpa'],
@@ -40,13 +41,19 @@ class LawManager(DataManager):
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         return compute_numeric_monotonicities(samples, references, directions=[1, 1], eps=eps)
 
-    def _load_splits(self, **kwargs) -> Dataset:
+    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
+        assert extrapolation is False, "'extrapolation' is not supported for Law dataset"
         # preprocess data
         df = pd.read_csv(self.filepath)[['lsat', 'ugpa', 'pass_bar']]
         df = df.dropna().reset_index(drop=True)
         df = df.rename(columns={'pass_bar': 'pass'}).astype({'pass': int})
+        x, y = df[['lsat', 'ugpa']], df['pass']
         # split data
-        return split_dataset(df[['lsat', 'ugpa']], df['pass'], test_size=self.test_size, val_size=0.5, random_state=0)
+        if n_folds == 1:
+            assert self.test_size is not None, "'self.test_size' required if 'n_folds' is one"
+            return [split_dataset(x, y, test_size=self.test_size, val_size=0.5, random_state=0)]
+        else:
+            raise NotImplementedError('K-fold cross-validation not implemented for Law dataset')
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {
@@ -54,9 +61,7 @@ class LawManager(DataManager):
             'ugpa': (num_augmented // 2, lambda s: rng.uniform(0, 4, size=s))
         }
 
-    def _data_plot(self, **kwargs):
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, ax = plt.subplots(2, len(kwargs), sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)
         for i, (title, (x, y)) in enumerate(kwargs.items()):
             for c, label in enumerate(['Passed', 'Not Passed']):
@@ -65,10 +70,8 @@ class LawManager(DataManager):
                 sns.scatterplot(x='ugpa', y='lsat', data=data, s=25, alpha=0.7, marker='+', color='black', ax=ax[c, i])
                 ax[c, i].set(title=title.capitalize(), ylabel=label if i == 0 else None, xlim=(1.4, 4.3), ylim=(0, 52))
 
-    def _summary_plot(self, model, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         res = kwargs.pop('res')
-        figsize = kwargs.pop('figsize')
-        tight_layout = kwargs.pop('tight_layout')
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         grid = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
         grid['pred'] = model.predict(grid)

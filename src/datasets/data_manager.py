@@ -1,13 +1,13 @@
 """Data Manager."""
 
-from typing import List, Callable, Tuple, Dict, Optional as Opt
+from typing import List, Callable, Tuple, Dict, Optional as Opt, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from moving_targets.util.typing import Monotonicities, Vector, Matrix, Data, Dataset
+from moving_targets.util.typing import Monotonicities, Vector, Matrix, Dataset
 from src.util.augmentation import get_monotonicities_list, augment_data
 from src.util.model import violations_summary, metrics_summary
 from src.util.preprocessing import Scaler, Scalers
@@ -31,24 +31,21 @@ class DataManager:
         post_process: post-processing routine for the evaluation metric.
     """
 
+    DataInfo = Tuple[Dataset, Scalers]
+
     @staticmethod
-    def get_kwargs(default: Dict, figsize: Tuple[int, int], tight_layout: bool, **kwargs) -> Dict:
+    def get_kwargs(default: Dict, **kwargs) -> Dict:
         """Updates the default parameter dictionary.
 
         Args:
-            default: default dictionary.
-            figsize: figsize.
-            tight_layout: tight_layout.
+            default: the default dictionary.
             **kwargs: additional arguments.
 
         Returns:
-            An updated dictionary.
+            An updated dictionary, with 'figsize' and 'tight_layout' parameters included and set to None.
         """
-        output = default.copy()
-        if figsize is not None:
-            output['figsize'] = figsize
-        if tight_layout is not None:
-            output[tight_layout] = tight_layout
+        output = dict(figsize=None, tight_layout=None)
+        output.update(default)
         output.update(kwargs)
         return output
 
@@ -83,22 +80,21 @@ class DataManager:
         self.augmented_kwargs: Opt = augmented_kwargs
         self.summary_kwargs: Opt = summary_kwargs
 
-    def _load_splits(self, **kwargs) -> Dataset:
+    def _load_splits(self, n_folds: int, extrapolation: bool) -> List[Dataset]:
         raise NotImplementedError("please implement method '_load_splits'")
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         raise NotImplementedError("please implement method '_get_sampling_functions'")
 
-    def _data_plot(self, **kwargs):
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         raise NotImplementedError("please implement method '_data_plot'")
 
-    def _augmented_plot(self, aug: pd.DataFrame, **kwargs):
-        figsize, tight_layout = kwargs.get('figsize'), kwargs.get('tight_layout')
+    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, axes = plt.subplots(1, len(self.x_columns), sharey='all', figsize=figsize, tight_layout=tight_layout)
         for ax, feature in zip(axes, self.x_columns):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
-    def _summary_plot(self, model, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         raise NotImplementedError("please implement method '_summary_plot'")
 
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
@@ -111,10 +107,19 @@ class DataManager:
         y_scaler = None if self.y_scaling is None else Scaler(self.y_scaling).fit(y)
         return x_scaler, y_scaler
 
-    def load_data(self, **kwargs) -> Tuple[Dataset, Scalers]:
-        """Loads the dataset."""
-        splits = self._load_splits(**kwargs)
-        return splits, self.get_scalers(splits['train'][0], splits['train'][1])
+    def load_data(self, n_folds: Opt[int] = None, extrapolation: bool = False) -> Union[DataInfo, List[DataInfo]]:
+        """Loads the dataset.
+
+        With n_folds = None directly returns the tuple with train/val/test splits and scalers.
+        With n_folds = 1 returns a list with a single tuple with train/val/test splits and scalers.
+        With n_folds > 1 returns a list of tuples with train/val splits and their respective scalers.
+        """
+        real_folds = 1 if n_folds is None else n_folds
+        assert real_folds > 0, "'n_folds' should be either None or a positive integer"
+        assert real_folds == 1 or not extrapolation, "if 'n_folds' is not one, then extrapolation must be False"
+        splits = self._load_splits(n_folds=real_folds, extrapolation=extrapolation)
+        splits = [(s, self.get_scalers(s['train'][0], s['train'][1])) for s in splits]
+        return splits[0] if n_folds is None else splits
 
     def get_augmented_data(self,
                            x: Matrix,
@@ -149,27 +154,27 @@ class DataManager:
         mask = ~np.isnan(y_aug[self.y_column])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
 
-    def plot_data(self, figsize: Figsize = None, tight_layout: TightLayout = None, **kwargs: Data):
+    def plot_data(self, figsize: Figsize = None, tight_layout: TightLayout = None, **kwargs):
         """Plots the given data."""
         # print general info about data
         info = [f'{len(x)} {title} samples' for title, (x, _) in kwargs.items()]
         print(', '.join(info))
         # plot data
-        kwargs = self.get_kwargs(default=self.data_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        kwargs = self.get_kwargs(default=self.data_kwargs, **kwargs)
         self._data_plot(**kwargs)
         plt.show()
 
-    def plot_augmented(self, x: Matrix, y: Vector, figsize: Figsize = None, tight_layout: TightLayout = None, **kwargs):
+    def plot_augmented(self, x: Matrix, y: Vector, **kwargs):
         """Plots the given augmented data."""
         # retrieve augmented data
         aug = x.copy()
         aug['Augmented'] = np.isnan(y[self.y_column])
         # plot augmented data
-        kwargs = self.get_kwargs(default=self.augmented_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        kwargs = self.get_kwargs(default=self.augmented_kwargs, **kwargs)
         self._augmented_plot(aug=aug, **kwargs)
         plt.show()
 
-    def evaluation_summary(self, model, figsize: Figsize = None, tight_layout: TightLayout = None, **kwargs):
+    def evaluation_summary(self, model, **kwargs):
         """Evaluates the model."""
         # compute metrics on kwargs
         print(violations_summary(
@@ -185,6 +190,6 @@ class DataManager:
             **kwargs
         ))
         # plot summary
-        kwargs = self.get_kwargs(default=self.summary_kwargs, figsize=figsize, tight_layout=tight_layout, **kwargs)
+        kwargs = self.get_kwargs(default=self.summary_kwargs, **kwargs)
         self._summary_plot(model=model, **kwargs)
         plt.show()
