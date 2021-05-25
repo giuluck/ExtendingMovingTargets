@@ -5,3 +5,4 @@ temp
 wandb
 __pycache__
 log.txt
+gurobi.log

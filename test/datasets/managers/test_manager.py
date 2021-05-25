@@ -174,7 +174,8 @@ class TestManager:
             # handle verbosity
             if verbose in [2, True]:
                 print(f'-- elapsed time: {time.time() - start_time}')
-        print(f'{num_folds}-FOLDS CROSS-VALIDATION ENDED')
+        if verbose is not False:
+            print(f'{num_folds}-FOLDS CROSS-VALIDATION ENDED')
 
     def test(self,
              iterations: int,
