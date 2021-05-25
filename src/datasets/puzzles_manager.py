@@ -11,7 +11,7 @@ from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
-from src.util.preprocessing import split_dataset
+from src.util.preprocessing import split_dataset, cross_validate
 from src.util.typing import Methods, Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
@@ -63,7 +63,7 @@ class PuzzlesManager(DataManager):
                 fold = {s: (x[df['split'] == s], y[df['split'] == s]) for s in ['train', 'validation', 'test']}
             return [fold]
         else:
-            raise NotImplementedError('K-fold cross-validation not implemented for Puzzles dataset')
+            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         if isinstance(num_augmented, int):

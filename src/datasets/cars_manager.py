@@ -10,7 +10,7 @@ from sklearn.metrics import r2_score
 from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
-from src.util.preprocessing import split_dataset
+from src.util.preprocessing import split_dataset, cross_validate
 from src.util.typing import Augmented, SamplingFunctions, Methods, Rng, Figsize, TightLayout
 
 
@@ -49,7 +49,7 @@ class CarsManager(DataManager):
             fold = split_dataset(x, y, extrapolation=extrapolation, test_size=0.2, val_size=0.2, random_state=0)
             return [fold]
         else:
-            raise NotImplementedError('K-fold cross-validation not implemented for Cars dataset')
+            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}

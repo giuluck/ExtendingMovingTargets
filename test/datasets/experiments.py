@@ -15,23 +15,13 @@ from test.datasets.tests import get_dataset
 if __name__ == '__main__':
     # create study list
     study = cartesian_product(
-        seed=[0, 1, 2],
-        alpha=[0.01, 0.1, 1.0],
-        learner_weights=['all', 'infeasible'],
-        learner_omega=[1],
-        master_omega=[1],
-        warm_start=[True, False],
-        dataset=['restaurants', 'default', 'law'],
-        kind=[('classes', True), ('probabilities', 'bce')]
+        mst_alpha=[0.01, 0.1, 1.0],
+        dataset=['cars', 'synthetic', 'puzzles'],
+        lrn_warm_start=[True, False],
+        mst_learner_omega=[1, 10, 100],
+        mst_master_omega=[1, 10, 100],
+        mst_learner_weights=['all', 'infeasible'],
     )
-    for s in study:
-        kind, param = s['kind']
-        if kind == 'probabilities':
-            s['loss_fn'] = param
-        elif kind == 'classes':
-            s['use_prob'] = param
-        else:
-            raise ValueError(f"unknown kind '{kind}'")
 
     # begin study
     for i, config in enumerate(study):
@@ -41,12 +31,8 @@ if __name__ == '__main__':
         del config['dataset']
         try:
             manager, _ = get_dataset(dataset=dataset)
-            manager(
-                seed=config['seed'],
-                kind=config['kind'],
-                warm_start=config['warm_start'],
-                master_args={k: v for k, v in config.items() if k not in ['seed', 'kind', 'warm_start']}
-            ).fit(
+            manager(seed=42, **config).validate(
+                num_folds=5,
                 iterations=20,
                 verbose=False,
                 callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=dataset, crashed=False, **config)]
@@ -56,6 +42,6 @@ if __name__ == '__main__':
             print('-- unsolvable')
             WandBLogger.instance.config['crashed'] = True
             WandBLogger.instance.finish()
-        except:
-            print('-- errors')
-shutil.rmtree('wandb')
+        # except:
+        #     print('-- errors')
+    shutil.rmtree('wandb')

@@ -11,7 +11,7 @@ from moving_targets.util.typing import Number, Vector, Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
-from src.util.preprocessing import split_dataset
+from src.util.preprocessing import split_dataset, cross_validate
 from src.util.typing import Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
@@ -69,13 +69,19 @@ class SyntheticManager(DataManager):
                 }
             return [fold]
         else:
-            raise NotImplementedError('K-fold cross-validation not implemented for Synthetic dataset')
+            x, y = self.sample_dataset(n=200, noise=self.noise, rng=rng, testing_set=False)
+            folds = cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
+            # replace validation data with samples having test-like distribution
+            for f in folds:
+                xv, _ = f['validation']
+                f['validation'] = self.sample_dataset(n=len(xv), noise=self.noise, rng=rng, testing_set=True)
+            return folds
 
     def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, ax = plt.subplots(len(kwargs), 3, sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
+        _, ax = plt.subplots(3, len(kwargs), sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
         # hue/size bounds
         ybn = np.concatenate([[y.min(), y.max()] for _, y in kwargs.values()])
         abn, bbn, ybn = (-1, 1), (-1, 1), (np.min(ybn), np.max(ybn))

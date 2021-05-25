@@ -1,5 +1,6 @@
 """Test Managers & Callbacks."""
 
+import time
 import random
 import numpy as np
 import pandas as pd
@@ -9,7 +10,7 @@ import matplotlib.pyplot as plt
 from typing import List, Any, Type, Dict, Union, Optional as Opt
 from tensorflow.python.keras.callbacks import EarlyStopping
 
-from moving_targets.callbacks import Callback
+from moving_targets.callbacks import Callback, WandBLogger
 from moving_targets.metrics import MonotonicViolation, MSE, R2, CrossEntropy, Accuracy, Metric
 from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import DataManager
@@ -144,8 +145,36 @@ class TestManager:
             ]
         )
 
-    def validate(self, iterations: int, num_folds: int = 10, verbose: Union[int, bool, str] = 'folds'):
-        pass
+    def validate(self,
+                 iterations: int,
+                 num_folds: int = 10,
+                 callbacks: Opt[List[Callback]] = None,
+                 verbose: Union[bool, int] = True,
+                 plot_args: Dict = None,
+                 summary_args: Dict = None):
+        callbacks = [] if callbacks is None else callbacks
+        if verbose is not False:
+            print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
+        for i, fold in enumerate(self.get_folds(num_folds=num_folds, extrapolation=False)):
+            # handle verbosity
+            start_time = time.time()
+            if verbose in [2, True]:
+                print(f'  > fold {i + 1:0{len(str(num_folds))}}/{num_folds}', end=' ')
+            # handle wandb callback
+            for c in callbacks:
+                if isinstance(c, WandBLogger):
+                    c.config['fold'] = i
+            # fit model
+            self._fit(fold=fold,
+                      iterations=iterations,
+                      callbacks=callbacks,
+                      verbose=False,
+                      plot_args=plot_args,
+                      summary_args=summary_args)
+            # handle verbosity
+            if verbose in [2, True]:
+                print(f'-- elapsed time: {time.time() - start_time}')
+        print(f'{num_folds}-FOLDS CROSS-VALIDATION ENDED')
 
     def test(self,
              iterations: int,
@@ -154,8 +183,24 @@ class TestManager:
              plot_args: Dict = None,
              summary_args: Dict = None,
              extrapolation: bool = False):
-        TestManager.setup(seed=self.seed)
+        # get single fold with train/val/test splits
         fold = self.get_folds(num_folds=1, extrapolation=extrapolation)[0]
+        # fit model
+        self._fit(fold=fold,
+                  iterations=iterations,
+                  callbacks=callbacks,
+                  verbose=verbose,
+                  plot_args=plot_args,
+                  summary_args=summary_args)
+
+    def _fit(self,
+             fold: Dict,
+             iterations: int,
+             callbacks: Opt[List[Callback]],
+             verbose: Union[int, bool, str],
+             plot_args: Dict = None,
+             summary_args: Dict = None):
+        TestManager.setup(seed=self.seed)
         model = self.get_model(fold)
         history = model.fit(
             x=fold['data'][0],

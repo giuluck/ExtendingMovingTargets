@@ -1,10 +1,10 @@
 """Processing utils."""
 
-from typing import Union, Dict, Tuple, Optional as Opt
+from typing import Union, Dict, Tuple, List, Optional as Opt
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 
 from moving_targets.util.typing import Matrix, Vector
 from src.util.typing import Methods, Extrapolation
@@ -172,3 +172,21 @@ def split_dataset(*arg: Union[Matrix, Vector],
         splits = train_test_split(*train_data, test_size=val_size, **kwargs)
         train_data, val_data = splits if len(arg) == 1 else (splits[::2], splits[1::2])
         return {'train': train_data, 'validation': val_data, 'test': test_data}
+
+
+def cross_validate(*arg: Union[pd.DataFrame, pd.Series], num_folds: int = 10, **kwargs) -> List[Dict]:
+    """Splits the input data in folds.
+
+    Args:
+        *arg: the input data vectors.
+        num_folds: the number of folds.
+        **kwargs: 'sklearn.model_selection.train_test_split' arguments.
+
+    Returns:
+        A list of dictionaries of datasets.
+    """
+    folds = []
+    kf = KFold(n_splits=num_folds, **kwargs)
+    for tr, vl in kf.split(arg[0]):
+        folds.append({'train': tuple([v.iloc[tr] for v in arg]), 'validation': tuple([v.iloc[vl] for v in arg])})
+    return folds
