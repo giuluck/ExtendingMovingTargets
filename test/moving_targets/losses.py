@@ -6,7 +6,7 @@ import numpy as np
 from docplex.mp.model import Model as CplexModel
 from gurobipy import Model as GurobiModel, Env, GRB
 from sklearn.metrics import mean_squared_error, mean_absolute_error, log_loss, precision_score
-from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical as one_hot
 
 from moving_targets.masters import CplexMaster, GurobiMaster
 
@@ -19,13 +19,13 @@ class TestLosses:
     @staticmethod
     def _custom_loss(name):
         if name == 'sae':
-            return lambda yt, yp, sample_weight: NUM_KEYS * mean_absolute_error(yt, yp, sample_weight=sample_weight)
+            return lambda y, p, sample_weight: NUM_KEYS * mean_absolute_error(y, p, sample_weight=sample_weight)
         elif name == 'sse':
-            return lambda yt, yp, sample_weight: NUM_KEYS * mean_squared_error(yt, yp, sample_weight=sample_weight)
-        elif name == 'swapped bce':
-            return lambda yt, yp, sample_weight: log_loss(yp, yt, sample_weight=sample_weight)
-        elif name == 'categorical precision':
-            return lambda yt, yp, sample_weight: precision_score(yt, yp, sample_weight=sample_weight, average='micro')
+            return lambda y, p, sample_weight: NUM_KEYS * mean_squared_error(y, p, sample_weight=sample_weight)
+        elif name == 'reversed crossentropy':
+            return lambda y, p, sample_weight: log_loss(p, y, sample_weight=sample_weight)
+        elif name in ['binary hamming', 'categorical hamming']:
+            return lambda y, p, sample_weight: 1 - precision_score(y, p, sample_weight=sample_weight, average='micro')
         else:
             raise ValueError(f'{name} is not a valid loss')
 
@@ -102,7 +102,7 @@ class TestLosses:
     def test_bh(self):
         self._test(
             model_loss=self._losses().binary_hamming,
-            scikit_loss=precision_score,
+            scikit_loss=TestLosses._custom_loss('binary hamming'),
             classes=(2, 'indicator'),
             weights=False
         )
@@ -110,7 +110,7 @@ class TestLosses:
     def test_bh_weights(self):
         self._test(
             model_loss=self._losses().binary_hamming,
-            scikit_loss=precision_score,
+            scikit_loss=TestLosses._custom_loss('binary hamming'),
             classes=(2, 'indicator'),
             weights=True)
 
@@ -130,26 +130,26 @@ class TestLosses:
             weights=True
         )
 
-    def test_swapped_bce(self):
+    def test_reversed_bce(self):
         self._test(
-            model_loss=self._losses().swapped_binary_crossentropy,
-            scikit_loss=TestLosses._custom_loss('swapped bce'),
-            classes=(2, 'swapped'),
+            model_loss=self._losses().reversed_binary_crossentropy,
+            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            classes=(2, 'reversed'),
             weights=False
         )
 
-    def test_swapped_bce_weights(self):
+    def test_reversed_bce_weights(self):
         self._test(
-            model_loss=self._losses().swapped_binary_crossentropy,
-            scikit_loss=TestLosses._custom_loss('swapped bce'),
-            classes=(2, 'swapped'),
+            model_loss=self._losses().reversed_binary_crossentropy,
+            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            classes=(2, 'reversed'),
             weights=True
         )
 
     def test_ch(self):
         self._test(
             model_loss=self._losses().categorical_hamming,
-            scikit_loss=TestLosses._custom_loss('categorical precision'),
+            scikit_loss=TestLosses._custom_loss('categorical hamming'),
             classes=(5, 'indicator'),
             weights=False
         )
@@ -157,7 +157,7 @@ class TestLosses:
     def test_ch_weights(self):
         self._test(
             model_loss=self._losses().categorical_hamming,
-            scikit_loss=TestLosses._custom_loss('categorical precision'),
+            scikit_loss=TestLosses._custom_loss('categorical hamming'),
             classes=(5, 'indicator'),
             weights=True
         )
@@ -175,6 +175,22 @@ class TestLosses:
             model_loss=self._losses().categorical_crossentropy,
             scikit_loss=log_loss,
             classes=(5, 'probability'),
+            weights=True
+        )
+
+    def test_reversed_cce(self):
+        self._test(
+            model_loss=self._losses().reversed_categorical_crossentropy,
+            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            classes=(5, 'reversed'),
+            weights=False
+        )
+
+    def test_reversed_cce_weights(self):
+        self._test(
+            model_loss=self._losses().reversed_categorical_crossentropy,
+            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            classes=(5, 'reversed'),
             weights=True
         )
 
@@ -204,6 +220,7 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
                     numeric_variables = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
                     constraints = [v == p for v, p in zip(model_variables, model_assignments)]
                     if kind == 'indicator':
+                        # handle integer predictions in case of hamming distance
                         numeric_variables = np.round(numeric_variables).astype(int)
                     elif kind != 'probability':
                         raise ValueError(f"unsupported kind '{kind}'")
@@ -211,18 +228,18 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
                     model_variables = model.binary_var_matrix(keys1=NUM_KEYS, keys2=num_classes, name='y')
                     model_variables = np.array(list(model_variables.values())).reshape(NUM_KEYS, num_classes)
                     model_assignments = np.random.choice(range(num_classes), size=NUM_KEYS)
-                    model_assignments = to_categorical(model_assignments, num_classes=num_classes).astype(int)
+                    model_assignments = one_hot(model_assignments, num_classes=num_classes).astype(int)
                     numeric_variables = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
                     numeric_variables = (numeric_variables.transpose() / numeric_variables.sum(axis=1)).transpose()
                     constraints = [v == p for v, p in zip(model_variables.flatten(), model_assignments.flatten())]
                     if kind == 'indicator':
-                        model_assignments = numeric_variables.argmax(axis=1)
+                        # handle integer predictions in case of hamming distance
+                        model_assignments = model_assignments.argmax(axis=1)
                         numeric_variables = numeric_variables.argmax(axis=1)
                     elif kind != 'probability':
                         raise ValueError(f"unsupported kind '{kind}'")
                 else:
                     raise ValueError('num_classes should be either None or a tuple')
-            # handle integer predictions in case of precision metric
             model.add_constraints(constraints)
             model.minimize(model_loss(
                 model=model,
@@ -232,12 +249,18 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
             ))
             cplex_objective = model.solve().objective_value
             scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
-            self.assertAlmostEqual(cplex_objective, scikit_objective, delta=3)
+            self.assertAlmostEqual(cplex_objective, scikit_objective)
 
-    def test_swapped_bce(self):
+    def test_reversed_bce(self):
         pass
 
-    def test_swapped_bce_weights(self):
+    def test_reversed_bce_weights(self):
+        pass
+
+    def test_reversed_cce(self):
+        pass
+
+    def test_reversed_cce_weights(self):
         pass
 
 
@@ -264,40 +287,52 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
                         constraints = (v == p for v, p in zip(model_variables, model_assignments))
                     else:
                         num_classes, kind = classes
-                        if num_classes == 2 and kind != 'swapped':
-                            model_variables = model.addVars(NUM_KEYS, vtype=GRB.BINARY, name='y')
-                            model_variables = np.array(model_variables.values())
-                            model_assignments = np.random.choice([0, 1], size=NUM_KEYS)
-                            numeric_variables = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
-                            constraints = (v == p for v, p in zip(model_variables, model_assignments))
-                            if kind == 'indicator':
-                                numeric_variables = np.round(numeric_variables).astype(int)
-                            elif kind != 'probability':
-                                raise ValueError(f"unsupported kind '{kind}'")
-                        elif num_classes == 2 and kind == 'swapped':
-                            model_variables = model.addVars(NUM_KEYS, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='y')
-                            model_variables = np.array(model_variables.values())
-                            model_assignments = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
-                            numeric_variables = np.random.choice([0, 1], size=NUM_KEYS)
-                            constraints = (v == p for v, p in zip(model_variables, model_assignments))
+                        if num_classes == 2:
+                            if kind == 'reversed':
+                                model_variables = model.addVars(NUM_KEYS, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='y')
+                                model_variables = np.array(model_variables.values())
+                                model_assignments = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
+                                numeric_variables = np.random.choice([0, 1], size=NUM_KEYS)
+                                constraints = (v == p for v, p in zip(model_variables, model_assignments))
+                            else:
+                                model_variables = model.addVars(NUM_KEYS, vtype=GRB.BINARY, name='y')
+                                model_variables = np.array(model_variables.values())
+                                model_assignments = np.random.choice([0, 1], size=NUM_KEYS)
+                                numeric_variables = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
+                                constraints = (v == p for v, p in zip(model_variables, model_assignments))
+                                if kind == 'indicator':
+                                    # handle integer predictions in case of hamming distance
+                                    numeric_variables = np.round(numeric_variables).astype(int)
+                                elif kind != 'probability':
+                                    raise ValueError(f"unsupported kind '{kind}'")
                         elif isinstance(num_classes, int) and num_classes > 2:
-                            model_variables = model.addVars(NUM_KEYS, num_classes, vtype=GRB.BINARY, name='y')
-                            model_variables = np.array(model_variables.values())
-                            model_assignments = np.random.choice(range(num_classes), size=NUM_KEYS)
-                            model_assignments = to_categorical(model_assignments, num_classes=num_classes).astype(int)
-                            numeric_variables = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
-                            numeric_variables = numeric_variables.transpose() / numeric_variables.sum(axis=1)
-                            numeric_variables = numeric_variables.transpose()
-                            constraints = (v == p for v, p in zip(model_variables, model_assignments.flatten()))
+                            if kind == 'reversed':
+                                model_variables = np.array(model.addVars(NUM_KEYS, num_classes, vtype=GRB.CONTINUOUS,
+                                                                         lb=0, ub=1, name='y').values())
+                                model_assignments = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
+                                model_assignments = model_assignments.transpose() / model_assignments.sum(axis=1)
+                                model_assignments = model_assignments.transpose()
+                                numeric_variables = np.random.choice(range(num_classes), size=NUM_KEYS)
+                                numeric_variables = one_hot(numeric_variables, num_classes=num_classes).astype(int)
+                                constraints = (v == p for v, p in zip(model_variables, model_assignments.flatten()))
+                            else:
+                                model_variables = model.addVars(NUM_KEYS, num_classes, vtype=GRB.BINARY, name='y')
+                                model_variables = np.array(model_variables.values())
+                                model_assignments = np.random.choice(range(num_classes), size=NUM_KEYS)
+                                model_assignments = one_hot(model_assignments, num_classes=num_classes).astype(int)
+                                numeric_variables = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
+                                numeric_variables = numeric_variables.transpose() / numeric_variables.sum(axis=1)
+                                numeric_variables = numeric_variables.transpose()
+                                constraints = (v == p for v, p in zip(model_variables, model_assignments.flatten()))
+                                if kind == 'indicator':
+                                    # handle integer predictions in case of hamming distance
+                                    model_assignments = model_assignments.argmax(axis=1)
+                                    numeric_variables = numeric_variables.argmax(axis=1)
+                                elif kind != 'probability':
+                                    raise ValueError(f"unsupported kind '{kind}'")
                             model_variables = model_variables.reshape(NUM_KEYS, num_classes)
-                            if kind == 'indicator':
-                                model_assignments = numeric_variables.argmax(axis=1)
-                                numeric_variables = numeric_variables.argmax(axis=1)
-                            elif kind != 'probability':
-                                raise ValueError(f"unsupported kind '{kind}'")
                         else:
                             raise ValueError('num_classes should be either None or a tuple')
-                    # handle integer predictions in case of precision metric
                     model.update()
                     model.addConstrs(constraints, name='c')
                     model.setObjective(model_loss(
@@ -309,4 +344,4 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
                     model.optimize()
                     gurobi_objective = model.objVal
                     scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
-                    self.assertAlmostEqual(gurobi_objective, scikit_objective, delta=3)
+                    self.assertAlmostEqual(gurobi_objective, scikit_objective)

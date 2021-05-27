@@ -22,6 +22,7 @@ if __name__ == '__main__':
         mst_master_omega=[1, 10, 100],
         mst_learner_weights=['all', 'infeasible'],
     )
+    study = study[244:]
 
     # begin study
     for i, config in enumerate(study):
