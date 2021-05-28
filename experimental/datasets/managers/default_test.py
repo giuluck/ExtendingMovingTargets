@@ -8,7 +8,7 @@ from typing import Optional as Opt
 from moving_targets.metrics import Accuracy
 from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import DefaultManager
-from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
+from experimental.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

@@ -10,7 +10,7 @@ from moving_targets.metrics import Accuracy
 from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import LawManager
 from src.util.plot import ColorFader
-from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
+from experimental.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

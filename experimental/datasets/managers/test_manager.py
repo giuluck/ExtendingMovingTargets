@@ -1,5 +1,5 @@
 """Test Managers & Callbacks."""
-
+import re
 import time
 import random
 import numpy as np
@@ -7,17 +7,29 @@ import pandas as pd
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from pandas import DataFrame
 from typing import List, Any, Type, Dict, Union, Optional as Opt
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback, WandBLogger
 from moving_targets.metrics import MonotonicViolation, MSE, R2, CrossEntropy, Accuracy, Metric
-from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration, Monotonicities
 from src.datasets import DataManager
 from src.models import MTLearner, MT, MTRegressionMaster, MTClassificationMaster, MTMaster
 from src.util.augmentation import get_monotonicities_list
 from src.util.dictionaries import merge_dictionaries
+from src.util.preprocessing import Scalers
 from src.util.typing import Augmented
+
+
+# noinspection PyMissingOrEmptyDocstring
+class Fold:
+    def __init__(self, x: Matrix, y: DataFrame, scalers: Scalers, monotonicities: Monotonicities, validation: Dataset):
+        self.x: Matrix = x
+        self.y: DataFrame = y
+        self.scalers: Scalers = scalers
+        self.monotonicities: Monotonicities = monotonicities
+        self.validation: Dataset = validation
 
 
 # noinspection PyMissingOrEmptyDocstring
@@ -109,9 +121,13 @@ class TestManager:
             num_columns=plt_num_columns
         )
         self.summary_args: Dict = dict()
+        # class name, split by capital letters
+        # first empty string (classes begin with capitals) and final 'Test' string are removed
+        # the result is joined with spaces and lower-cased
+        self.name: str = ' '.join(re.split('(?=[A-Z])', self.__class__.__name__)[1:-1]).lower()
 
-    def get_folds(self, num_folds: int, extrapolation: bool):
-        folds: List[Dict] = []
+    def get_folds(self, num_folds: int, extrapolation: bool) -> List[Fold]:
+        folds: List[Fold] = []
         for data, _ in self.dataset.load_data(num_folds=num_folds, extrapolation=extrapolation):
             (x_aug, y_aug), scalers = self.dataset.get_augmented_data(
                 x=data['train'][0],
@@ -124,24 +140,26 @@ class TestManager:
                 compute_monotonicities=self.dataset.compute_monotonicities,
                 **self.monotonicities_args
             )
-            folds.append({
-                'data': (x_aug, y_aug[self.dataset.y_column]),
-                'scalers': scalers,
-                'monotonicities': monotonicities,
-                'validation': data
-            })
+            folds.append(Fold(
+                x=x_aug,
+                y=y_aug,
+                scalers=scalers,
+                monotonicities=monotonicities,
+                validation=data
+            ))
         return folds
 
-    def get_model(self, fold_info: Dict):
-        (_, y), scalers, monotonicities, val_data = fold_info.values()
+    def get_model(self, fold: Fold):
         return MT(
-            learner=MTLearner(scalers=scalers, **self.learner_args),
-            master=self.master_class(monotonicities=monotonicities, augmented_mask=np.isnan(y), **self.master_args),
+            learner=MTLearner(scalers=fold.scalers, **self.learner_args),
+            master=self.master_class(monotonicities=fold.monotonicities,
+                                     augmented_mask=np.isnan(fold.y[self.dataset.y_column]),
+                                     **self.master_args),
             init_step=self.mt_init_step,
             metrics=self.mt_metrics + [
-                MonotonicViolation(monotonicities=monotonicities, aggregation='average', name='avg. violation'),
-                MonotonicViolation(monotonicities=monotonicities, aggregation='percentage', name='pct. violation'),
-                MonotonicViolation(monotonicities=monotonicities, aggregation='feasible', name='is feasible')
+                MonotonicViolation(monotonicities=fold.monotonicities, aggregation='average', name='avg. violation'),
+                MonotonicViolation(monotonicities=fold.monotonicities, aggregation='percentage', name='pct. violation'),
+                MonotonicViolation(monotonicities=fold.monotonicities, aggregation='feasible', name='is feasible')
             ]
         )
 
@@ -165,12 +183,12 @@ class TestManager:
                 if isinstance(c, WandBLogger):
                     c.config['fold'] = i
             # fit model
-            self._fit(fold=fold,
-                      iterations=iterations,
-                      callbacks=callbacks,
-                      verbose=False,
-                      plot_args=plot_args,
-                      summary_args=summary_args)
+            self._run_instance(fold=fold,
+                               iterations=iterations,
+                               callbacks=callbacks,
+                               verbose=False,
+                               plot_args=plot_args,
+                               summary_args=summary_args)
             # handle verbosity
             if verbose in [2, True]:
                 print(f'-- elapsed time: {time.time() - start_time}')
@@ -187,27 +205,27 @@ class TestManager:
         # get single fold with train/val/test splits
         fold = self.get_folds(num_folds=1, extrapolation=extrapolation)[0]
         # fit model
-        self._fit(fold=fold,
-                  iterations=iterations,
-                  callbacks=callbacks,
-                  verbose=verbose,
-                  plot_args=plot_args,
-                  summary_args=summary_args)
+        self._run_instance(fold=fold,
+                           iterations=iterations,
+                           callbacks=callbacks,
+                           verbose=verbose,
+                           plot_args=plot_args,
+                           summary_args=summary_args)
 
-    def _fit(self,
-             fold: Dict,
-             iterations: int,
-             callbacks: Opt[List[Callback]],
-             verbose: Union[int, bool, str],
-             plot_args: Dict = None,
-             summary_args: Dict = None):
+    def _run_instance(self,
+                      fold: Fold,
+                      iterations: int,
+                      callbacks: Opt[List[Callback]],
+                      verbose: Union[int, bool],
+                      plot_args: Dict = None,
+                      summary_args: Dict = None):
         TestManager.setup(seed=self.seed)
         model = self.get_model(fold)
         history = model.fit(
-            x=fold['data'][0],
-            y=fold['data'][1],
+            x=fold.x,
+            y=fold.y[self.dataset.y_column],
             iterations=iterations,
-            val_data=fold['validation'],
+            val_data=fold.validation,
             callbacks=callbacks,
             verbose=verbose
         )
@@ -216,7 +234,7 @@ class TestManager:
             history.plot(**plot_args)
         if summary_args is not None:
             summary_args = merge_dictionaries(self.summary_args, summary_args)
-            self.dataset.evaluation_summary(model, **fold['validation'], **summary_args)
+            self.dataset.evaluation_summary(model, **fold.validation, **summary_args)
 
 
 # noinspection PyMissingOrEmptyDocstring

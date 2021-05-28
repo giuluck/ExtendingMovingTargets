@@ -9,7 +9,7 @@ from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import PuzzlesManager
 from src.util.plot import ColorFader
 from src.util.typing import Augmented
-from test.datasets.managers.test_manager import RegressionTest, AnalysisCallback
+from experimental.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

@@ -9,7 +9,7 @@ from typing import Optional as Opt
 from moving_targets.metrics import AUC
 from moving_targets.util.typing import Iteration, Vector, Matrix, Dataset
 from src.datasets import RestaurantsManager
-from test.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
+from experimental.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

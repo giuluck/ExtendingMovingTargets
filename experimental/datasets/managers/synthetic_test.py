@@ -9,7 +9,7 @@ from typing import Optional as Opt
 from moving_targets.util.typing import Matrix, Vector, Iteration, Dataset
 from src.datasets import SyntheticManager
 from src.util.plot import ColorFader
-from test.datasets.managers.test_manager import RegressionTest, AnalysisCallback
+from experimental.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

@@ -7,7 +7,7 @@ from typing import Optional as Opt
 
 from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import CarsManager
-from test.datasets.managers.test_manager import AnalysisCallback, RegressionTest
+from experimental.datasets.managers.test_manager import AnalysisCallback, RegressionTest
 
 
 # noinspection PyMissingOrEmptyDocstring

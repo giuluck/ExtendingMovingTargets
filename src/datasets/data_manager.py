@@ -16,7 +16,7 @@ from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, Tigh
 
 class DataManager:
     """Abstract dataset handler.
-    
+
     Args:
         x_columns: name of the x features.
         x_scaling: x scaling methods.
@@ -174,21 +174,48 @@ class DataManager:
         self._augmented_plot(aug=aug, **kwargs)
         plt.show()
 
-    def evaluation_summary(self, model, **kwargs):
-        """Evaluates the model."""
-        # compute metrics on kwargs
-        print(violations_summary(
-            model=model,
-            grid=self.grid,
-            monotonicities=self.monotonicities
-        ))
-        print(metrics_summary(
+    def metrics_summary(self, model, return_type: str = 'str', **kwargs) -> Union[str, Dict[str, float]]:
+        """Computes the metrics over a custom set of validation data, then builds a summary.
+
+        Args:
+            model: a model object having the 'predict(x)' method.
+            return_type: either 'str' to return the string, or 'dict' to return the dictionary.
+            **kwargs: a dictionary of named `Data` arguments.
+
+        Returns:
+            Either a dictionary for the metric values or a string representing the evaluation summary.
+        """
+        return metrics_summary(
             model=model,
             metric=self.metric,
             metric_name=self.metric_name,
             post_process=self.post_process,
+            return_type=return_type,
             **kwargs
-        ))
+        )
+
+    def violations_summary(self, model, return_type: str = 'str') -> Union[str, Dict[str, float]]:
+        """Computes the violations over a custom set of validation data, then builds a summary.
+
+        Args:
+            model: a model object having the 'predict(x)' method.
+            return_type: either 'str' to return the string, or 'dict' to return the dictionary.
+
+        Returns:
+            Either a dictionary for the metric values or a string representing the evaluation summary.
+        """
+        return violations_summary(
+            model=model,
+            grid=self.grid,
+            monotonicities=self.monotonicities,
+            return_type=return_type
+        )
+
+    def evaluation_summary(self, model, **kwargs):
+        """Evaluates the model."""
+        # compute metrics on kwargs
+        print(self.violations_summary(model=model, return_type='str'))
+        print(self.metrics_summary(model=model, return_type='str', **kwargs))
         # plot summary
         kwargs = self.get_kwargs(default=self.summary_kwargs, **kwargs)
         self._summary_plot(model=model, **kwargs)

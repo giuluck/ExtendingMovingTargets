@@ -3,6 +3,7 @@
 from typing import Optional, Callable
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import tensorflow.keras.backend as k
 from tensorflow.keras.metrics import Mean
@@ -37,15 +38,17 @@ class SBRBatchGenerator(Sequence):
         batch_size: the batch size.
     """
 
-    def __init__(self, x: Matrix, y: Vector, ground_indices: Vector, monotonicities: Vector, batch_size: int):
+    def __init__(self, x: Matrix, y: Vector, ground_indices: pd.Series, monotonicities: pd.Series, batch_size: int):
         super(SBRBatchGenerator, self).__init__()
         # compute number of samples in each group
-        self.num_samples = np.sum(ground_indices == 0)
+        counts = np.array(ground_indices.value_counts())
+        assert np.allclose(counts, counts[0]), "All the ground samples must have the same number of augmented ones."
+        self.num_samples = counts[0]
         # get a copy of the whole data
         data = x.copy()
-        data['label'] = y
-        data['index'] = ground_indices
-        data['monotonicity'] = monotonicities
+        data['label'] = y.copy()
+        data['index'] = ground_indices.copy()
+        data['monotonicity'] = monotonicities.copy()
         # place labelled values at the beginning, then shuffle the indices and create batches based on the index value
         data = data.sort_values(['index', 'label'], ascending=[True, False], ignore_index=True).astype('float32')
         shuffle = np.random.permutation(np.unique(ground_indices))

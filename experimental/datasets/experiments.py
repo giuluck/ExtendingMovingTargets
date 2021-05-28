@@ -10,7 +10,7 @@ import shutil
 
 from moving_targets.callbacks import WandBLogger
 from src.util.dictionaries import cartesian_product
-from test.datasets.tests import get_dataset
+from experimental.datasets.tests import get_dataset
 
 if __name__ == '__main__':
     # create study list
@@ -22,7 +22,6 @@ if __name__ == '__main__':
         mst_master_omega=[1, 10, 100],
         mst_learner_weights=['all', 'infeasible'],
     )
-    study = study[244:]
 
     # begin study
     for i, config in enumerate(study):

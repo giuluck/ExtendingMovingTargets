@@ -47,7 +47,7 @@ def augment_data(x: Matrix,
                 new_info.append(pd.DataFrame(data=[], columns=['ground_index', 'monotonicity'], dtype='int'))
     x_aug = pd.concat([x] + new_samples).reset_index(drop=True)
     y_aug = pd.concat([pd.DataFrame(y)] + new_info).reset_index(drop=True).rename({0: y.name}, axis=1)
-    y_aug = y_aug.fillna({'ground_index': pd.Series(y_aug.index), 'monotonicity': 0}).astype({'ground_index': 'int'})
+    y_aug = y_aug.fillna({'ground_index': pd.Series(y.index), 'monotonicity': 0}).astype({'ground_index': 'int'})
     return x_aug, y_aug
 
 
