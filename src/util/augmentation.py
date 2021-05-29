@@ -123,5 +123,5 @@ def get_monotonicities_list(data: pd.DataFrame,
         values = data.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1).values
         higher_indices, lower_indices = np.where(compute_monotonicities(values, values) == 1)
     else:
-        raise ValueError("kind should be in ['ground', 'group', 'all']")
+        raise ValueError(f"'{kind}' is not a valid monotonicities kind")
     return [(hi, li) for hi, li in zip(higher_indices, lower_indices)]

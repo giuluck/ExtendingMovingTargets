@@ -35,7 +35,7 @@ class PuzzlesResponse(AnalysisCallback):
 
     def __init__(self, feature: str, res: int = 5, **kwargs):
         super(PuzzlesResponse, self).__init__(**kwargs)
-        assert feature in self.features, f"feature should be in {self.features}"
+        assert feature in self.features, f"'{feature}' is not a valid feature"
         grid = np.meshgrid(np.linspace(0, 230, res), np.linspace(0, 5, res), np.linspace(0, 70, res))
         self.grid: pd.DataFrame = pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(self.features, grid)})
         self.feature: str = feature

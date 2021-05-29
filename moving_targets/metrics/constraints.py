@@ -55,7 +55,7 @@ class MonotonicViolation(Metric):
         elif aggregation == 'feasible':
             self.aggregate = lambda violations: int(np.all(violations <= 0))
         else:
-            raise ValueError(f"{aggregation} should be in ['average', 'percentage', 'feasible']")
+            raise ValueError(f"'{aggregation}' is not a valid aggregation kind")
         self.eps = eps
 
     def __call__(self, x: Matrix, y: Vector, p: Vector) -> float:

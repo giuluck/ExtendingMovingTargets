@@ -86,7 +86,7 @@ class TestManager:
         elif master_kind in ['reg', 'regression']:
             self.master_class: Type[MTMaster] = MTRegressionMaster
         else:
-            raise ValueError("'master_kind' should be either 'classification' or 'regression'")
+            raise ValueError(f"'{master_kind}' is not a valid master kind")
         self.augmented_args: Dict = dict(
             num_augmented=aug_num_augmented,
             num_random=aug_num_random,
@@ -264,16 +264,18 @@ class ClassificationTest(TestManager):
                  mst_evaluation_metric: Metric = Accuracy(),
                  **kwargs):
         if master_kind == 'classification':
-            loss_metric = CrossEntropy(name='loss')
-            loss_fn = 'binary_crossentropy'
+            mt_loss_metric = CrossEntropy(name='loss')
+            lrn_loss = 'binary_crossentropy'
+        elif master_kind == 'regression':
+            mt_loss_metric = MSE(name='loss')
+            lrn_loss = 'mse'
         else:
-            loss_metric = MSE(name='loss')
-            loss_fn = 'mse'
+            raise ValueError(f"'{master_kind}' is not a valid master kind")
         super(ClassificationTest, self).__init__(
             dataset=dataset,
             master_kind=master_kind,
-            mt_metrics=[loss_metric, mst_evaluation_metric],
-            lrn_loss=loss_fn,
+            mt_metrics=[mt_loss_metric, mst_evaluation_metric],
+            lrn_loss=lrn_loss,
             lrn_output_act='sigmoid',
             **kwargs
         )

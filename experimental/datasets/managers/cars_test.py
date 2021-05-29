@@ -40,7 +40,7 @@ class CarsAdjustments(AnalysisCallback):
 
     def __init__(self, plot_kind: str = 'scatter', **kwargs):
         super(CarsAdjustments, self).__init__(**kwargs)
-        assert plot_kind in ['line', 'scatter'], "plot_kind should be either 'line' or 'scatter'"
+        assert plot_kind in ['line', 'scatter'], f"'{plot_kind}' is not a valid plot kind"
         self.plot_kind: str = plot_kind
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Opt[Dataset], iteration: Iteration, **kwargs):

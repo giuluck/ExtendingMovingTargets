@@ -114,7 +114,7 @@ class MTMaster(CplexMaster, GurobiMaster):
         elif learner_weights == 'infeasible':
             self.infeasible_mask = np.zeros_like(augmented_mask)  # vector of 'False'
         else:
-            raise ValueError("learner_weights should be either 'all' or 'infeasible'")
+            raise ValueError(f"{learner_weights} is not a valid learner weights kind")
         self.learner_omega = learner_omega
         if master_omega is None:
             self.master_omega_y, self.master_omega_p = learner_omega, learner_omega
@@ -219,7 +219,7 @@ class MTRegressionMaster(MTMaster):
                  augmented_mask: Vector,
                  loss_fn: str = 'mse',
                  **kwargs):
-        assert loss_fn in self.losses.keys(), f'loss_fn should be in {list(self.losses.keys())}'
+        assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
         super(MTRegressionMaster, self).__init__(
             monotonicities=monotonicities,
             augmented_mask=augmented_mask,
@@ -280,7 +280,7 @@ class MTClassificationMaster(MTMaster):
                  loss_fn: str = 'hd',
                  clip_value: Union[float, Tuple[float, float]] = 1e-15,
                  **kwargs):
-        assert loss_fn in self.losses.keys(), f'loss_fn should be in {list(self.losses.keys())}'
+        assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
         self.loss_fn = self.losses[loss_fn]
         super(MTClassificationMaster, self).__init__(
             monotonicities=monotonicities,
@@ -291,7 +291,7 @@ class MTClassificationMaster(MTMaster):
         # change clip values of binary crossentropy functions
         if self.loss_fn == 'binary_crossentropy':
             y_clip, p_clip = clip_value if isinstance(clip_value, tuple) else (clip_value, clip_value)
-            assert y_clip > 0 and p_clip > 0, "clip_value should be either a single or a pair of positive number(s)"
+            assert y_clip > 0 and p_clip > 0, f"{clip_value} is not a valid clip value instance"
             self.y_loss_fn.clip_value = y_clip
             self.p_loss_fn.clip_value = p_clip
         elif self.loss_fn == 'reversed_binary_crossentropy' and self.backend == 'cplex':

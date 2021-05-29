@@ -68,7 +68,7 @@ class LawAdjustments(AnalysisCallback):
 class LawResponse(AnalysisCallback):
     def __init__(self, feature: str, res: int = 100, **kwargs):
         super(LawResponse, self).__init__(**kwargs)
-        assert feature in ['lsat', 'ugpa'], "feature should be either 'lsat' or 'ugpa'"
+        assert feature in ['lsat', 'ugpa'], f"'{feature}' is not a valid feature"
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         self.grid: pd.DataFrame = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
         self.fader: ColorFader = ColorFader('red', 'blue', bounds=[0, 4] if feature == 'lsat' else [0, 50])

@@ -30,7 +30,7 @@ class RestaurantsAdjustment(AnalysisCallback):
 
     def __init__(self, rating: str, res: int = 100, data_points: bool = True, **kwargs):
         super(RestaurantsAdjustment, self).__init__(**kwargs)
-        assert rating in self.dollar_ratings, f"rating should be in {self.dollar_ratings}"
+        assert rating in self.dollar_ratings, f"'{rating}' is not a valid dollar rating"
         ar, nr = np.meshgrid(np.linspace(1, 5, res), np.linspace(0, 200, res))
         self.grid: pd.DataFrame = RestaurantsManager.process_data(pd.DataFrame.from_dict({
             'avg_rating': ar.flatten(),

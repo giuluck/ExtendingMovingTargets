@@ -26,7 +26,7 @@ class ColorFader:
 
     def __init__(self, *args, bounds: Optional[Vector] = None, error: str = 'raise'):
         assert np.log2(len(args)) % 1 == 0, "Please provide a number of colors which is a power of two"
-        assert error in ['raise', 'input', 'output'], "'error' parameter should be in ['raise', 'input', 'output']"
+        assert error in ['raise', 'input', 'output'], f"'{error}' is not a valid error kind"
         self.dim = int(np.log2(len(args)))
         self.colors = np.array([to_rgb(c) for c in args])
         self.translation = np.zeros_like(self.dim)

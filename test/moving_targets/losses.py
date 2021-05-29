@@ -3,6 +3,8 @@
 import unittest
 
 import numpy as np
+import tensorflow as tf
+import tensorflow.keras.backend as k
 from docplex.mp.model import Model as CplexModel
 from gurobipy import Model as GurobiModel, Env, GRB
 from sklearn.metrics import mean_squared_error, mean_absolute_error, log_loss, precision_score
@@ -13,19 +15,31 @@ from moving_targets.masters import CplexMaster, GurobiMaster
 SEED = 0
 NUM_KEYS = 50
 NUM_TESTS = 100
+PLACES = 3
+k.set_epsilon(1e-15)
 
 
 class TestLosses:
     @staticmethod
     def _custom_loss(name):
+        def _ce_handler(y, p, sw, loss_fn):
+            y = tf.cast(y, tf.float32)
+            p = tf.cast(p, tf.float32)
+            sw = tf.cast(tf.constant(1.0) if sw is None else len(sw) * tf.constant(sw) / k.sum(sw), tf.float32)
+            return k.mean(sw * loss_fn(y, p)).numpy()
+
         if name == 'sae':
             return lambda y, p, sample_weight: NUM_KEYS * mean_absolute_error(y, p, sample_weight=sample_weight)
         elif name == 'sse':
             return lambda y, p, sample_weight: NUM_KEYS * mean_squared_error(y, p, sample_weight=sample_weight)
-        elif name == 'reversed crossentropy':
-            return lambda y, p, sample_weight: log_loss(p, y, sample_weight=sample_weight)
         elif name in ['binary hamming', 'categorical hamming']:
             return lambda y, p, sample_weight: 1 - precision_score(y, p, sample_weight=sample_weight, average='micro')
+        elif name in ['reversed binary crossentropy', 'reversed categorical crossentropy']:
+            fn = k.binary_crossentropy if 'binary' in name else k.categorical_crossentropy
+            return lambda y, p, sample_weight: _ce_handler(y, p, sample_weight, lambda yy, pp: fn(pp, yy))
+        elif name in ['symmetric binary crossentropy', 'symmetric categorical crossentropy']:
+            fn = k.binary_crossentropy if 'binary' in name else k.categorical_crossentropy
+            return lambda y, p, sample_weight: _ce_handler(y, p, sample_weight, lambda yy, pp: fn(yy, pp) + fn(pp, yy))
         else:
             raise ValueError(f'{name} is not a valid loss')
 
@@ -133,7 +147,7 @@ class TestLosses:
     def test_reversed_bce(self):
         self._test(
             model_loss=self._losses().reversed_binary_crossentropy,
-            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            scikit_loss=TestLosses._custom_loss('reversed binary crossentropy'),
             classes=(2, 'reversed'),
             weights=False
         )
@@ -141,8 +155,24 @@ class TestLosses:
     def test_reversed_bce_weights(self):
         self._test(
             model_loss=self._losses().reversed_binary_crossentropy,
-            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            scikit_loss=TestLosses._custom_loss('reversed binary crossentropy'),
             classes=(2, 'reversed'),
+            weights=True
+        )
+
+    def test_symmetric_bce(self):
+        self._test(
+            model_loss=self._losses().symmetric_binary_crossentropy,
+            scikit_loss=TestLosses._custom_loss('symmetric binary crossentropy'),
+            classes=(2, 'symmetric'),
+            weights=False
+        )
+
+    def test_symmetric_bce_weights(self):
+        self._test(
+            model_loss=self._losses().symmetric_binary_crossentropy,
+            scikit_loss=TestLosses._custom_loss('symmetric binary crossentropy'),
+            classes=(2, 'symmetric'),
             weights=True
         )
 
@@ -181,7 +211,7 @@ class TestLosses:
     def test_reversed_cce(self):
         self._test(
             model_loss=self._losses().reversed_categorical_crossentropy,
-            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            scikit_loss=TestLosses._custom_loss('reversed categorical crossentropy'),
             classes=(5, 'reversed'),
             weights=False
         )
@@ -189,8 +219,24 @@ class TestLosses:
     def test_reversed_cce_weights(self):
         self._test(
             model_loss=self._losses().reversed_categorical_crossentropy,
-            scikit_loss=TestLosses._custom_loss('reversed crossentropy'),
+            scikit_loss=TestLosses._custom_loss('reversed categorical crossentropy'),
             classes=(5, 'reversed'),
+            weights=True
+        )
+
+    def test_symmetric_cce(self):
+        self._test(
+            model_loss=self._losses().symmetric_categorical_crossentropy,
+            scikit_loss=TestLosses._custom_loss('symmetric categorical crossentropy'),
+            classes=(5, 'symmetric'),
+            weights=False
+        )
+
+    def test_symmetric_cce_weights(self):
+        self._test(
+            model_loss=self._losses().symmetric_categorical_crossentropy,
+            scikit_loss=TestLosses._custom_loss('symmetric categorical crossentropy'),
+            classes=(5, 'symmetric'),
             weights=True
         )
 
@@ -239,7 +285,7 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
                     elif kind != 'probability':
                         raise ValueError(f"unsupported kind '{kind}'")
                 else:
-                    raise ValueError('num_classes should be either None or a tuple')
+                    raise ValueError(f"'num_classes' should be either None or a tuple, but it is {num_classes}")
             model.add_constraints(constraints)
             model.minimize(model_loss(
                 model=model,
@@ -249,7 +295,7 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
             ))
             cplex_objective = model.solve().objective_value
             scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
-            self.assertAlmostEqual(cplex_objective, scikit_objective)
+            self.assertAlmostEqual(cplex_objective, scikit_objective, places=PLACES)
 
     def test_reversed_bce(self):
         pass
@@ -257,10 +303,22 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
     def test_reversed_bce_weights(self):
         pass
 
+    def test_symmetric_bce(self):
+        pass
+
+    def test_symmetric_bce_weights(self):
+        pass
+
     def test_reversed_cce(self):
         pass
 
     def test_reversed_cce_weights(self):
+        pass
+
+    def test_symmetric_cce(self):
+        pass
+
+    def test_symmetric_cce_weights(self):
         pass
 
 
@@ -288,17 +346,16 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
                     else:
                         num_classes, kind = classes
                         if num_classes == 2:
-                            if kind == 'reversed':
+                            numeric_variables = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
+                            if kind in ['reversed', 'symmetric']:
                                 model_variables = model.addVars(NUM_KEYS, vtype=GRB.CONTINUOUS, lb=0, ub=1, name='y')
                                 model_variables = np.array(model_variables.values())
                                 model_assignments = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
-                                numeric_variables = np.random.choice([0, 1], size=NUM_KEYS)
                                 constraints = (v == p for v, p in zip(model_variables, model_assignments))
                             else:
                                 model_variables = model.addVars(NUM_KEYS, vtype=GRB.BINARY, name='y')
                                 model_variables = np.array(model_variables.values())
                                 model_assignments = np.random.choice([0, 1], size=NUM_KEYS)
-                                numeric_variables = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
                                 constraints = (v == p for v, p in zip(model_variables, model_assignments))
                                 if kind == 'indicator':
                                     # handle integer predictions in case of hamming distance
@@ -306,33 +363,31 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
                                 elif kind != 'probability':
                                     raise ValueError(f"unsupported kind '{kind}'")
                         elif isinstance(num_classes, int) and num_classes > 2:
-                            if kind == 'reversed':
+                            numeric_variables = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
+                            numeric_variables = numeric_variables.transpose() / numeric_variables.sum(axis=1)
+                            numeric_variables = numeric_variables.transpose()
+                            if kind in ['reversed', 'symmetric']:
                                 model_variables = np.array(model.addVars(NUM_KEYS, num_classes, vtype=GRB.CONTINUOUS,
                                                                          lb=0, ub=1, name='y').values())
                                 model_assignments = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
                                 model_assignments = model_assignments.transpose() / model_assignments.sum(axis=1)
                                 model_assignments = model_assignments.transpose()
-                                numeric_variables = np.random.choice(range(num_classes), size=NUM_KEYS)
-                                numeric_variables = one_hot(numeric_variables, num_classes=num_classes).astype(int)
                                 constraints = (v == p for v, p in zip(model_variables, model_assignments.flatten()))
                             else:
                                 model_variables = model.addVars(NUM_KEYS, num_classes, vtype=GRB.BINARY, name='y')
                                 model_variables = np.array(model_variables.values())
                                 model_assignments = np.random.choice(range(num_classes), size=NUM_KEYS)
                                 model_assignments = one_hot(model_assignments, num_classes=num_classes).astype(int)
-                                numeric_variables = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
-                                numeric_variables = numeric_variables.transpose() / numeric_variables.sum(axis=1)
-                                numeric_variables = numeric_variables.transpose()
                                 constraints = (v == p for v, p in zip(model_variables, model_assignments.flatten()))
                                 if kind == 'indicator':
                                     # handle integer predictions in case of hamming distance
                                     model_assignments = model_assignments.argmax(axis=1)
                                     numeric_variables = numeric_variables.argmax(axis=1)
                                 elif kind != 'probability':
-                                    raise ValueError(f"unsupported kind '{kind}'")
+                                    raise ValueError(f"'{kind}' is not a valid kind")
                             model_variables = model_variables.reshape(NUM_KEYS, num_classes)
                         else:
-                            raise ValueError('num_classes should be either None or a tuple')
+                            raise ValueError(f"'num_classes' should be either None or a tuple, but it is {num_classes}")
                     model.update()
                     model.addConstrs(constraints, name='c')
                     model.setObjective(model_loss(
@@ -344,4 +399,4 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
                     model.optimize()
                     gurobi_objective = model.objVal
                     scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
-                    self.assertAlmostEqual(gurobi_objective, scikit_objective)
+                    self.assertAlmostEqual(gurobi_objective, scikit_objective, places=PLACES)

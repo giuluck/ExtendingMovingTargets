@@ -16,8 +16,8 @@ class Master:
 
     def __init__(self, alpha: float = 1., beta: float = 1.):
         super(Master, self).__init__()
-        assert alpha >= 0, "alpha should be a non-negative number"
-        assert beta >= 0, "beta should be a non-negative number"
+        assert alpha >= 0, f"'alpha' should be a non-negative number, but it is {alpha}"
+        assert beta >= 0, f"'beta' should be a non-negative number, but it is {beta}"
         self.alpha: float = alpha
         self.beta: float = beta
 

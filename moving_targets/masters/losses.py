@@ -115,10 +115,14 @@ class LossesHandler:
         self.binary_hamming = MeanLoss(loss_fn=self._binary_hamming, sum_fn=self.sum_fn)
         self.binary_crossentropy = ClippedMeanLoss(loss_fn=self._binary_crossentropy, sum_fn=self.sum_fn)
         self.reversed_binary_crossentropy = MeanLoss(loss_fn=self._reversed_binary_crossentropy, sum_fn=self.sum_fn)
+        self.symmetric_binary_crossentropy = ClippedMeanLoss(loss_fn=self._symmetric_binary_crossentropy,
+                                                             sum_fn=self.sum_fn)
         self.categorical_hamming = MeanLoss(loss_fn=self._categorical_hamming, sum_fn=self.sum_fn)
         self.categorical_crossentropy = ClippedMeanLoss(loss_fn=self._categorical_crossentropy, sum_fn=self.sum_fn)
         self.reversed_categorical_crossentropy = MeanLoss(loss_fn=self._reversed_categorical_crossentropy,
                                                           sum_fn=self.sum_fn)
+        self.symmetric_categorical_crossentropy = ClippedMeanLoss(loss_fn=self._symmetric_categorical_crossentropy,
+                                                                  sum_fn=self.sum_fn)
 
     def _absolute_errors(self, model, numeric_variable: float, model_variable: Any):
         lb = numeric_variable - model_variable.ub
@@ -148,6 +152,11 @@ class LossesHandler:
         l1 = nv * self.log_fn(model, mv, lb=mv.lb, ub=mv.ub)  # loss w.r.t. term 1
         return -(l0 + l1)
 
+    def _symmetric_binary_crossentropy(self, model, numeric_variable: float, model_variable: Any):
+        bce = self._binary_crossentropy(model, numeric_variable, model_variable)
+        rbce = self._reversed_binary_crossentropy(model, numeric_variable, model_variable)
+        return bce + rbce
+
     def _categorical_hamming(self, model, numeric_variable: int, model_variable: Vector):
         return 1 - model_variable[numeric_variable]
 
@@ -157,3 +166,8 @@ class LossesHandler:
     def _reversed_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Vector):
         _log = lambda x: self.log_fn(model, x, lb=x.lb, ub=x.ub)
         return self.sum_fn(model, [-nv * _log(mv) for nv, mv in zip(numeric_variable, model_variable)])
+
+    def _symmetric_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Any):
+        cce = self._categorical_crossentropy(model, numeric_variable, model_variable)
+        rcce = self._reversed_categorical_crossentropy(model, numeric_variable, model_variable)
+        return cce + rcce

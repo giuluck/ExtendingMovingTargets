@@ -110,13 +110,13 @@ class DataManager:
     def load_data(self, num_folds: Opt[int] = None, extrapolation: bool = False) -> Union[DataInfo, List[DataInfo]]:
         """Loads the dataset.
 
-        With n_folds = None directly returns the tuple with train/val/test splits and scalers.
-        With n_folds = 1 returns a list with a single tuple with train/val/test splits and scalers.
-        With n_folds > 1 returns a list of tuples with train/val splits and their respective scalers.
+        With num_folds = None directly returns the tuple with train/val/test splits and scalers.
+        With num_folds = 1 returns a list with a single tuple with train/val/test splits and scalers.
+        With num_folds > 1 returns a list of tuples with train/val splits and their respective scalers.
         """
         real_folds = 1 if num_folds is None else num_folds
-        assert real_folds > 0, "'n_folds' should be either None or a positive integer"
-        assert real_folds == 1 or not extrapolation, "if 'n_folds' is not one, then extrapolation must be False"
+        assert real_folds > 0, f"'num_folds' should be either None or a positive integer, but it is {real_folds}"
+        assert real_folds == 1 or not extrapolation, f"if 'num_folds' == {real_folds}, then extrapolation must be False"
         splits = self._load_splits(num_folds=real_folds, extrapolation=extrapolation)
         splits = [(s, self.get_scalers(s['train'][0], s['train'][1])) for s in splits]
         return splits[0] if num_folds is None else splits

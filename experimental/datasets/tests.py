@@ -174,7 +174,7 @@ if __name__ == '__main__':
         callback_functions=['adjustments', 'response']
     )
     manager: TestManager = manager_type(
-        # master_kind='classification',
+        master_kind='classification',
         mst_backend='gurobi',
         mst_loss_fn='rbce',
         mst_alpha=1.0,
@@ -184,4 +184,5 @@ if __name__ == '__main__':
         lrn_warm_start=False,
         aug_num_ground=None
     )
-    manager.test(iterations=iterations, callbacks=None, plot_args=get_plot_args(manager), summary_args={})
+    plot_args = get_plot_args(manager)
+    manager.test(iterations=iterations, callbacks=callbacks, plot_args=None, summary_args={})

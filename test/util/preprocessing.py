@@ -25,7 +25,7 @@ class TestCustomScalers(unittest.TestCase):
             self.assertAlmostEqual(np.max(df_custom.values), 1.0, msg=f'norm max is {np.max(df_custom.values)}')
             scikit_scaler = MinMaxScaler()
         else:
-            raise ValueError("method should be either 'std' or 'norm'")
+            raise ValueError(f"'{method}' is not a valid method")
         df_scikit = scikit_scaler.fit_transform(df)
         msg = f'\n> AVG DIFF:\n{abs(df_custom - df_scikit).mean()}'
         msg += f'\n> MAX DIFF:\n{abs(df_custom - df_scikit).max()}'

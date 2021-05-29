@@ -26,7 +26,7 @@ class MACS(Logger):
                  init_step: str = 'pretraining',
                  metrics: Opt[List[Metric]] = None):
         super(MACS, self).__init__()
-        assert init_step in ['pretraining', 'projection'], "initial step should be 'pretraining' or 'projection'"
+        assert init_step in ['pretraining', 'projection'], f"'{initial_step}' is not a valid initial step"
         self.learner: Learner = learner
         self.master: Master = master
         self.init_step: str = init_step
@@ -55,8 +55,8 @@ class MACS(Logger):
             `AssertionError` if the number of iteration is negative, or if zero and the initial step is 'pretraining'.
         """
         # check user input
-        assert iterations >= 0, 'the number of iterations should be non-negative'
-        assert iterations > 0 or self.init_step == 'pretraining', 'if projection, iterations should be a positive value'
+        assert iterations >= 0, f'the number of iterations should be non-negative, but it is {iterations}'
+        assert self.init_step == 'pretraining' or iterations > 0, 'if projection, iterations cannot be zero'
         assert isinstance(verbose, bool) or (isinstance(verbose, int) and verbose in [0, 1, 2]), 'unknown verbosity'
         val_data = {} if val_data is None else (val_data if isinstance(val_data, dict) else {'val': val_data})
 
