@@ -78,7 +78,7 @@ class ClippedMeanLoss(MeanLoss):
 
     def __call__(self, model, numeric_variables: Vector, model_variables: Vector,
                  sample_weight: Optional[Vector] = None) -> float:
-        numeric_variables = np.clip(numeric_variables, a_min=self.clip_value, a_max=1 - self.clip_value)
+        numeric_variables = np.clip(numeric_variables.astype(float), a_min=self.clip_value, a_max=1 - self.clip_value)
         return super(ClippedMeanLoss, self).__call__(
             model=model,
             numeric_variables=numeric_variables,
@@ -98,10 +98,12 @@ class LossesHandler:
     """
 
     def __init__(self,
-                 sum_fn: Optional[Callable] = lambda model, x: model.sum(x),
-                 abs_fn: Optional[Callable] = lambda model, x: model.abs(x),
-                 log_fn: Optional[Callable] = lambda model, x: model.log(x)):
+                 aux_fn: Callable = lambda model, x, lb, ub, name: x,
+                 sum_fn: Callable = lambda model, x: model.sum(x),
+                 abs_fn: Callable = lambda model, x: model.abs(x),
+                 log_fn: Callable = lambda model, x: model.log(x)):
         # metadata
+        self.aux_fn = aux_fn
         self.sum_fn = sum_fn
         self.abs_fn = abs_fn
         self.log_fn = log_fn
@@ -119,7 +121,9 @@ class LossesHandler:
                                                           sum_fn=self.sum_fn)
 
     def _absolute_errors(self, model, numeric_variable: float, model_variable: Any):
-        return self.abs_fn(model, numeric_variable - model_variable)
+        lb = numeric_variable - model_variable.ub
+        ub = numeric_variable - model_variable.lb
+        return self.abs_fn(model, numeric_variable - model_variable, lb=lb, ub=ub)
 
     def _squared_errors(self, model, numeric_variable: float, model_variable: Any):
         return (numeric_variable - model_variable) ** 2
@@ -138,11 +142,11 @@ class LossesHandler:
         return self._categorical_crossentropy(model, numeric_variable, model_variable)
 
     def _reversed_binary_crossentropy(self, model, numeric_variable: float, model_variable: Any):
-        # for both variables, if the value is p, then the probability of 0 is 1 - p and the probability of 1 is p,
-        # thus the array becomes [1 - p, p]
-        model_variable = np.array([1 - model_variable, model_variable])
-        numeric_variable = np.array([1 - numeric_variable, numeric_variable])
-        return self._reversed_categorical_crossentropy(model, numeric_variable, model_variable)
+        # do not leverage _reversed_categorical_crossentropy to avoid Gurobi error "LinExpr has no attribute 'lb'"
+        nv, mv = numeric_variable, model_variable
+        l0 = (1 - nv) * self.log_fn(model, 1 - mv, lb=1 - mv.ub, ub=1 - mv.lb)  # loss w.r.t. term 0
+        l1 = nv * self.log_fn(model, mv, lb=mv.lb, ub=mv.ub)  # loss w.r.t. term 1
+        return -(l0 + l1)
 
     def _categorical_hamming(self, model, numeric_variable: int, model_variable: Vector):
         return 1 - model_variable[numeric_variable]
@@ -151,5 +155,5 @@ class LossesHandler:
         return self.sum_fn(model, -model_variable * np.log(numeric_variable))
 
     def _reversed_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Vector):
-        _log = lambda x: self.log_fn(model, x)
+        _log = lambda x: self.log_fn(model, x, lb=x.lb, ub=x.ub)
         return self.sum_fn(model, [-nv * _log(mv) for nv, mv in zip(numeric_variable, model_variable)])

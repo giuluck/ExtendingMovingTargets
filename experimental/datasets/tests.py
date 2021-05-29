@@ -3,7 +3,7 @@
 import numpy as np
 from typing import List, Optional, Type, Tuple, Dict
 
-from moving_targets.callbacks import FileLogger, Callback, WandBLogger
+from moving_targets.callbacks import FileLogger, Callback
 from src.datasets import DataManager
 from src.models import MTRegressionMaster
 from experimental.datasets.managers import DistanceAnalysis, SyntheticAdjustments2D, SyntheticAdjustments3D, \
@@ -169,17 +169,19 @@ def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
 if __name__ == '__main__':
     iterations: int = 1
     manager_type, callbacks = get_dataset(
-        dataset='cars',
+        dataset='restaurants',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['adjustments', 'response']
     )
     manager: TestManager = manager_type(
         # master_kind='classification',
-        lrn_warm_start=False,
+        mst_backend='gurobi',
+        mst_loss_fn='rbce',
         mst_alpha=1.0,
         mst_master_omega=1.0,
         mst_learner_omega=1.0,
-        mst_learner_weights='all'
+        mst_learner_weights='all',
+        lrn_warm_start=False,
+        aug_num_ground=None
     )
-    wb = WandBLogger(project='sc', entity='giuluck', run_name='test')
-    manager.validate(num_folds=5, iterations=iterations, callbacks=[], plot_args=None, summary_args=None)
+    manager.test(iterations=iterations, callbacks=None, plot_args=get_plot_args(manager), summary_args={})

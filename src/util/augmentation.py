@@ -45,9 +45,10 @@ def augment_data(x: Matrix,
             else:
                 new_samples.append(x.head(0))
                 new_info.append(pd.DataFrame(data=[], columns=['ground_index', 'monotonicity'], dtype='int'))
-    x_aug = pd.concat([x] + new_samples).reset_index(drop=True)
+    x_aug = pd.concat([x] + new_samples).reset_index(drop=True).astype(x.dtypes)
     y_aug = pd.concat([pd.DataFrame(y)] + new_info).reset_index(drop=True).rename({0: y.name}, axis=1)
-    y_aug = y_aug.fillna({'ground_index': pd.Series(y.index), 'monotonicity': 0}).astype({'ground_index': 'int'})
+    # there is no way to return integer labels due to the presence of nan values (pd.Int64 type have problems with tf)
+    y_aug = y_aug.fillna({'ground_index': pd.Series(y.index), 'monotonicity': 0}).astype({'ground_index': int})
     return x_aug, y_aug
 
 

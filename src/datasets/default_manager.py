@@ -48,7 +48,8 @@ class DefaultManager(DataManager):
         df = df.dropna().reset_index(drop=True)
         df = df[np.in1d(df['MARRIAGE'], [1, 2])]
         df['MARRIAGE'] = df['MARRIAGE'] - 1
-        df = df.rename(columns={'MARRIAGE': 'married', 'PAY_0': 'payment'}).astype(float)
+        df = df.rename(columns={'MARRIAGE': 'married', 'PAY_0': 'payment'})
+        df = df.astype({'married': float, 'payment': float, 'default': int})
         x, y = df[['married', 'payment']], df['default']
         # split data
         if num_folds == 1:

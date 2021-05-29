@@ -56,7 +56,7 @@ class RestaurantsManager(DataManager):
             'num_reviews': np.repeat(num_reviews, num_views),
             'dollar_rating': np.repeat(dollar_ratings, num_views),
             'clicked': rng.binomial(n=1, p=np.repeat(ctr_labels, num_views))
-        })
+        }).astype({'clicked': int})
 
     @staticmethod
     def plot_conclusions(models, figsize: Figsize = (10, 10), tight_layout: TightLayout = True,

@@ -66,6 +66,8 @@ class TestManager:
                  lrn_epochs: int = 200,
                  lrn_verbose: bool = False,
                  lrn_early_stopping: EarlyStopping = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4),
+                 mst_backend: str = 'cplex',
+                 mst_loss_fn: Opt[str] = None,
                  mst_alpha: float = 1.0,
                  mst_learner_weights: str = 'all',
                  mst_learner_omega: float = 1.0,
@@ -105,12 +107,14 @@ class TestManager:
             callbacks=[lrn_early_stopping]
         )
         self.master_args = dict(
+            backend=mst_backend,
             alpha=mst_alpha,
             learner_weights=mst_learner_weights,
             learner_omega=mst_learner_omega,
             master_omega=mst_master_omega,
             eps=mst_eps,
             time_limit=mst_time_limit,
+            **({} if mst_loss_fn is None else {'loss_fn': mst_loss_fn}),
             **({} if mst_custom_args is None else mst_custom_args)
         )
         self.mt_init_step: str = mt_init_step
