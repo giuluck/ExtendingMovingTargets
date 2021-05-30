@@ -54,7 +54,7 @@ class TestManager:
                  dataset: DataManager,
                  master_kind: str,
                  lrn_loss: str,
-                 aug_num_augmented: Augmented = 15,
+                 aug_num_augmented: Opt[Augmented] = None,
                  aug_num_random: int = 0,
                  aug_num_ground: Opt[int] = None,
                  mono_kind: str = 'group',
@@ -88,9 +88,9 @@ class TestManager:
         else:
             raise ValueError(f"'{master_kind}' is not a valid master kind")
         self.augmented_args: Dict = dict(
-            num_augmented=aug_num_augmented,
             num_random=aug_num_random,
-            num_ground=aug_num_ground
+            num_ground=aug_num_ground,
+            num_augmented=aug_num_augmented
         )
         self.monotonicities_args: Dict = dict(
             kind=mono_kind,

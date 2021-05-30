@@ -182,8 +182,9 @@ if __name__ == '__main__':
         mst_learner_omega=1.0,
         mst_learner_weights='all',
         lrn_warm_start=False,
+        aug_num_augmented=None,
         aug_num_ground=None,
-        mst_time_limit=60,
+        mst_time_limit=None,
         mst_custom_args={'verbose': True}
     )
     plot_args = get_plot_args(manager)

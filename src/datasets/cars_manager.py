@@ -51,7 +51,7 @@ class CarsManager(DataManager):
         else:
             return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):

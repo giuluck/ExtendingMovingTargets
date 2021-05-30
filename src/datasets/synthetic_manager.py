@@ -77,7 +77,7 @@ class SyntheticManager(DataManager):
                 f['validation'] = self.sample_dataset(n=len(xv), noise=self.noise, rng=rng, testing_set=True)
             return folds
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):

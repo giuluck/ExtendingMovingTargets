@@ -83,7 +83,7 @@ class DataManager:
     def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         raise NotImplementedError("please implement method '_load_splits'")
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented) -> SamplingFunctions:
         raise NotImplementedError("please implement method '_get_sampling_functions'")
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
@@ -124,7 +124,7 @@ class DataManager:
     def get_augmented_data(self,
                            x: Matrix,
                            y: Vector,
-                           num_augmented: Augmented = 15,
+                           num_augmented: Opt[Augmented] = None,
                            num_random: int = 0,
                            num_ground: Opt[int] = None,
                            seed: int = 0) -> Tuple[AugmentedData, Scalers]:
@@ -137,7 +137,7 @@ class DataManager:
         # add random unsupervised samples to fill the data space
         if num_random > 0:
             random_values = {}
-            sampling_functions = self._get_sampling_functions(num_augmented=num_random, rng=rng)
+            sampling_functions = self._get_sampling_functions(rng=rng, num_augmented=num_random)
             for col in x.columns:
                 # if there is an explicit sampling strategy use it, otherwise sample original data
                 n, f = sampling_functions.get(col, (0, lambda s: rng.choice(x[col], size=s)))
@@ -145,16 +145,17 @@ class DataManager:
             x = pd.concat((x, pd.DataFrame.from_dict(random_values)), ignore_index=True)
             y = pd.concat((y, pd.Series([np.nan] * num_random, name=y.name)), ignore_index=True)
         # augment data
+        sampling_args = {} if num_augmented is None else {'num_augmented': num_augmented}  # if None, uses default
         x_aug, y_aug = augment_data(
             x=x,
             y=y,
             compute_monotonicities=self.compute_monotonicities,
-            sampling_functions=self._get_sampling_functions(num_augmented=num_augmented, rng=rng)
+            sampling_functions=self._get_sampling_functions(rng=rng, **sampling_args)
         )
         mask = ~np.isnan(y_aug[self.y_column])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
 
-    def plot_data(self, figsize: Figsize = None, tight_layout: TightLayout = None, **kwargs):
+    def plot_data(self, **kwargs):
         """Plots the given data."""
         # print general info about data
         info = [f'{len(x)} {title} samples' for title, (x, _) in kwargs.items()]

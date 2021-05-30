@@ -19,9 +19,11 @@ class DefaultManager(DataManager):
 
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
-    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm', test_size: Opt[float] = 0.8):
+    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm',
+                 test_size: Opt[float] = 0.8, val_size: Opt[float] = None):
         self.filepath: str = filepath
         self.test_size: Opt[float] = test_size
+        self.val_size: Opt[float] = val_size
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
         super(DefaultManager, self).__init__(
             x_columns=['married', 'payment'],
@@ -54,11 +56,11 @@ class DefaultManager(DataManager):
         # split data
         if num_folds == 1:
             assert self.test_size is not None, "'self.test_size' required if 'n_folds' is one"
-            return [split_dataset(x, y, test_size=self.test_size, val_size=0.5, random_state=0)]
+            return [split_dataset(x, y, test_size=self.test_size, val_size=self.val_size, random_state=0)]
         else:
             raise NotImplementedError('K-fold cross-validation not implemented for Default dataset')
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 3) -> SamplingFunctions:
         return {'payment': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s))}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):

@@ -143,12 +143,12 @@ class RestaurantsManager(DataManager):
         monotonicities = monotonicities.astype('int') * (num_differences == 1)
         return monotonicities
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 5) -> SamplingFunctions:
         dollar_rating = ('D', 'DD', 'DDD', 'DDDD')
         return {
-            'avg_rating': (num_augmented // 3, lambda s: rng.uniform(1.0, 5.0, size=s)),
-            'num_reviews': (num_augmented // 3, lambda s: np.round(np.exp(rng.uniform(0.0, np.log(200), size=s)))),
-            dollar_rating: (num_augmented // 3, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
+            'avg_rating': (num_augmented, lambda s: rng.uniform(1.0, 5.0, size=s)),
+            'num_reviews': (num_augmented, lambda s: np.round(np.exp(rng.uniform(0.0, np.log(200), size=s)))),
+            dollar_rating: (num_augmented, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
     def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:

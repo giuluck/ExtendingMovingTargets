@@ -65,11 +65,13 @@ class PuzzlesManager(DataManager):
         else:
             return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = (3, 4, 8)) -> SamplingFunctions:
         if isinstance(num_augmented, int):
             num_augmented = [num_augmented] * 3
         elif isinstance(num_augmented, dict):
             num_augmented = [num_augmented[k] for k in ['word_count', 'star_rating', 'num_reviews']]
+        elif isinstance(num_augmented, tuple):
+            num_augmented = list(num_augmented)
         b = self.bound
         return {
             'word_count': (num_augmented[0], lambda s: rng.uniform(b['word_count'][0], b['word_count'][1], size=s)),

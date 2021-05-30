@@ -15,11 +15,11 @@ from experimental.datasets.managers.test_manager import ClassificationTest, Anal
 class DefaultTest(ClassificationTest):
     def __init__(self,
                  filepath: str = '../../res/default.csv',
-                 test_size: float = 0.8,
+                 dataset_args: Opt[dict] = None,
                  lrn_h_units: tuple = (128, 128),
                  **kwargs):
         super(DefaultTest, self).__init__(
-            dataset=DefaultManager(filepath=filepath, test_size=test_size),
+            dataset=DefaultManager(filepath=filepath, **{} if dataset_args is None else dataset_args),
             lrn_h_units=lrn_h_units,
             mst_evaluation_metric=Accuracy(name='metric'),
             **kwargs

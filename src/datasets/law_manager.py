@@ -19,9 +19,10 @@ class LawManager(DataManager):
     """Data Manager for the Law Dataset."""
 
     def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',
-                 test_size: Opt[float] = 0.8, res: int = 64):
+                 test_size: Opt[float] = 0.8, val_size: Opt[float] = None, res: int = 64):
         self.filepath: str = filepath
         self.test_size: Opt[float] = test_size
+        self.val_size: Opt[float] = val_size
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         super(LawManager, self).__init__(
             x_columns=['lsat', 'ugpa'],
@@ -51,14 +52,14 @@ class LawManager(DataManager):
         # split data
         if num_folds == 1:
             assert self.test_size is not None, "'self.test_size' required if 'n_folds' is one"
-            return [split_dataset(x, y, test_size=self.test_size, val_size=0.5, random_state=0)]
+            return [split_dataset(x, y, test_size=self.test_size, val_size=self.val_size, random_state=0)]
         else:
             raise NotImplementedError('K-fold cross-validation not implemented for Law dataset')
 
-    def _get_sampling_functions(self, num_augmented: Augmented, rng: Rng) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 2) -> SamplingFunctions:
         return {
-            'lsat': (num_augmented // 2, lambda s: rng.uniform(0, 50, size=s)),
-            'ugpa': (num_augmented // 2, lambda s: rng.uniform(0, 4, size=s))
+            'lsat': (num_augmented, lambda s: rng.uniform(0, 50, size=s)),
+            'ugpa': (num_augmented, lambda s: rng.uniform(0, 4, size=s))
         }
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):

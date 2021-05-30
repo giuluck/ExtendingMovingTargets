@@ -17,11 +17,11 @@ from experimental.datasets.managers.test_manager import ClassificationTest, Anal
 class LawTest(ClassificationTest):
     def __init__(self,
                  filepath: str = '../../res/law.csv',
-                 test_size: float = 0.8,
+                 dataset_args: Opt[dict] = None,
                  lrn_h_units: tuple = (128, 128),
                  **kwargs):
         super(LawTest, self).__init__(
-            dataset=LawManager(filepath=filepath, test_size=test_size),
+            dataset=LawManager(filepath=filepath, **{} if dataset_args is None else dataset_args),
             lrn_h_units=lrn_h_units,
             mst_evaluation_metric=Accuracy(name='metric'),
             **kwargs
