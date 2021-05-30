@@ -40,18 +40,21 @@ class GurobiMaster(Master, ABC):
 
     losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x), abs_fn=_abs, log_fn=_log)
 
-    def __init__(self, time_limit: float = 30., **kwargs):
+    def __init__(self, time_limit: Optional[float] = None, verbose: bool = False, **kwargs):
         super(GurobiMaster, self).__init__(**kwargs)
-        self.time_limit: float = time_limit
+        self.time_limit: Optional[float] = time_limit
+        self.verbose: bool = verbose
 
     # noinspection PyMissingOrEmptyDocstring
     def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
         # build model and get losses
         with Env(empty=True) as env:
-            env.setParam('OutputFlag', 0)
+            if not self.verbose:
+                env.setParam('OutputFlag', 0)
             env.start()
             with Model(env=env, name='model') as model:
-                model.setParam('TimeLimit', self.time_limit)
+                if self.time_limit is not None:
+                    model.setParam('TimeLimit', self.time_limit)
                 model_info = self.build_model(macs, model, x, y, iteration)
                 # algorithm core: check for feasibility and behave depending on that
                 y_loss = self.y_loss(macs, model, model_info, x, y, iteration)
@@ -64,6 +67,6 @@ class GurobiMaster(Master, ABC):
 
                 # solve the problem and get the adjusted labels
                 model.optimize()
-                if model.Status == GRB.INFEASIBLE:
-                    raise RuntimeError('The given model has no admissible solution, please check its constraints.')
+                if model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
+                    raise RuntimeError(f'The model has returned status {model.Status}, please check its constraints.')
                 return self.return_solutions(macs, model, model_info, x, y, iteration)

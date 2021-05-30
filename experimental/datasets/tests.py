@@ -169,7 +169,7 @@ def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
 if __name__ == '__main__':
     iterations: int = 1
     manager_type, callbacks = get_dataset(
-        dataset='restaurants',
+        dataset='law',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['adjustments', 'response']
     )
@@ -182,7 +182,9 @@ if __name__ == '__main__':
         mst_learner_omega=1.0,
         mst_learner_weights='all',
         lrn_warm_start=False,
-        aug_num_ground=None
+        aug_num_ground=None,
+        mst_time_limit=60,
+        mst_custom_args={'verbose': True}
     )
     plot_args = get_plot_args(manager)
     manager.test(iterations=iterations, callbacks=callbacks, plot_args=None, summary_args={})

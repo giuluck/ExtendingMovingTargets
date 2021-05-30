@@ -27,15 +27,16 @@ class CplexMaster(Master, ABC):
                            abs_fn=lambda model, x, lb=None, ub=None: model.abs(x),
                            log_fn=_log)
 
-    def __init__(self, time_limit: float = 30., **kwargs):
+    def __init__(self, time_limit: Optional[float] = None, **kwargs):
         super(CplexMaster, self).__init__(**kwargs)
-        self.time_limit: float = time_limit
+        self.time_limit: Optional[float] = time_limit
 
     # noinspection PyMissingOrEmptyDocstring
     def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
         # build model and get losses
         model = Model(name='model')
-        model.set_time_limit(self.time_limit)
+        if self.time_limit is not None:
+            model.set_time_limit(self.time_limit)
         model_info = self.build_model(macs, model, x, y, iteration)
 
         # algorithm core: check for feasibility and behave depending on that

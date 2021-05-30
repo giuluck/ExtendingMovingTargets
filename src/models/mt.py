@@ -82,6 +82,7 @@ class MTMaster(CplexMaster, GurobiMaster):
         master_omega: real number that decides the weight of augmented samples during the master step.
         eps: the slack value under which a violation is considered to be acceptable.
         time_limit: the maximal time for which the master can run during each iteration.
+        **kwargs: any other specific argument to be passed to the super class.
     """
 
     def __init__(self,
@@ -94,13 +95,15 @@ class MTMaster(CplexMaster, GurobiMaster):
                  learner_omega: float = 1.0,
                  master_omega: Optional[float] = None,
                  eps: float = 1e-3,
-                 time_limit: float = 30):
-        super(MTMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit)
+                 time_limit: Optional[float] = None,
+                 **kwargs):
         self.backend: str = backend
         if self.backend == 'cplex':
+            super(MTMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit, **kwargs)
             self.y_loss_fn = getattr(CplexMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(CplexMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         elif self.backend == 'gurobi':
+            super(CplexMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit, **kwargs)
             self.y_loss_fn = getattr(GurobiMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         else:
@@ -271,7 +274,11 @@ class MTClassificationMaster(MTMaster):
         'rce': 'reversed_binary_crossentropy',
         'reversed crossentropy': 'reversed_binary_crossentropy',
         'rbce': 'reversed_binary_crossentropy',
-        'reversed binary crossentropy': 'reversed_binary_crossentropy'
+        'reversed binary crossentropy': 'reversed_binary_crossentropy',
+        'sce': 'symmetric_binary_crossentropy',
+        'symmetric crossentropy': 'symmetric_binary_crossentropy',
+        'sbce': 'symmetric_binary_crossentropy',
+        'symmetric binary crossentropy': 'symmetric_binary_crossentropy'
     }
 
     def __init__(self,
@@ -280,6 +287,7 @@ class MTClassificationMaster(MTMaster):
                  loss_fn: str = 'hd',
                  clip_value: Union[float, Tuple[float, float]] = 1e-15,
                  **kwargs):
+        # handle loss and build model from super class
         assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
         self.loss_fn = self.losses[loss_fn]
         super(MTClassificationMaster, self).__init__(
@@ -288,14 +296,14 @@ class MTClassificationMaster(MTMaster):
             loss_fn=self.losses[loss_fn],
             **kwargs
         )
-        # change clip values of binary crossentropy functions
-        if self.loss_fn == 'binary_crossentropy':
-            y_clip, p_clip = clip_value if isinstance(clip_value, tuple) else (clip_value, clip_value)
-            assert y_clip > 0 and p_clip > 0, f"{clip_value} is not a valid clip value instance"
-            self.y_loss_fn.clip_value = y_clip
-            self.p_loss_fn.clip_value = p_clip
-        elif self.loss_fn == 'reversed_binary_crossentropy' and self.backend == 'cplex':
-            raise ValueError('Cplex Master cannot handle reversed binary crossentropy')
+        # change clip values for crossentropy functions
+        self.y_clip, self.p_clip = clip_value if isinstance(clip_value, tuple) else (clip_value, clip_value)
+        assert self.y_clip > 0 and self.p_clip > 0, f"{clip_value} is not a valid clip value instance"
+        self.y_loss_fn.clip_value = self.y_clip
+        self.p_loss_fn.clip_value = self.p_clip
+        # raise error if losses involving logarithms are called with cplex
+        if self.backend == 'cplex' and ('reversed' in self.loss_fn or 'symmetric' in self.loss_fn):
+            raise ValueError(f"Cplex Master cannot handle {self.loss_fn.replace('_', ' ')}")
 
     # noinspection PyMissingOrEmptyDocstring
     def build_variables(self, model, y) -> Vector:
@@ -303,10 +311,11 @@ class MTClassificationMaster(MTMaster):
         if self.backend == 'cplex':
             var = model.binary_var_list(keys=len(y), lb=0.0, ub=1.0, name='y')
         elif self.backend == 'gurobi':
-            if self.loss_fn == 'reversed_binary_crossentropy':
-                var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name='y').values()
-            else:
+            if self.loss_fn in ['binary_hamming', 'binary_crossentropy']:
                 var = model.addVars(len(y), vtype=GRB.BINARY, lb=0.0, ub=1.0, name='y').values()
+            else:
+                clip_value = min(self.y_clip, self.p_clip)
+                var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=clip_value, ub=1 - clip_value, name='y').values()
             model.update()
         return var
 
