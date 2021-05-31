@@ -39,7 +39,9 @@ class History(Logger):
         # handle columns and number of rows
         assert isinstance(self.history, pd.DataFrame), 'Process did not end correctly, therefore no dataframe was built'
         columns = self.history.columns if columns is None else columns
-        columns = [c for c in columns if c is None or np.issubdtype(self.history[c].dtype, np.number)]
+        for i, c in enumerate(columns):
+            if c is None or c not in self.history.columns or not np.issubdtype(self.history[c].dtype, np.number):
+                columns[i] = None
         n_rows = int(np.ceil(len(columns) / num_columns))
         # handle matplotlib arguments
         plt_args = dict(tight_layout=True)

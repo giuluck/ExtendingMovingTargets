@@ -70,12 +70,10 @@ class SyntheticManager(DataManager):
             return [fold]
         else:
             x, y = self.sample_dataset(n=200, noise=self.noise, rng=rng, testing_set=False)
+            val = self.sample_dataset(n=50, noise=self.noise, rng=rng, testing_set=True)
             folds = cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
-            # replace validation data with samples having test-like distribution
-            for f in folds:
-                xv, _ = f['validation']
-                f['validation'] = self.sample_dataset(n=len(xv), noise=self.noise, rng=rng, testing_set=True)
-            return folds
+            # replace k-fold validation data with fixed validation samples as they must have a test-like distribution
+            return [dict(train=f['train'], validation=val) for f in folds]
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}

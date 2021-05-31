@@ -16,12 +16,16 @@ if __name__ == '__main__':
     # create study list
     study = cartesian_product(
         mst_alpha=[0.01, 0.1, 1.0],
-        dataset=['cars', 'synthetic', 'puzzles'],
-        lrn_warm_start=[True, False],
-        mst_learner_omega=[1, 10, 100],
-        mst_master_omega=[1, 10, 100],
-        mst_learner_weights=['all', 'infeasible'],
+        mst_loss_fn=['hd', 'bce', 'rbce', 'sbce'],
+        master_kind=['classification'],
+        mst_backend=['gurobi'],
+        mst_learner_weights=['all'],
+        mst_learner_omega=[1],
+        mst_master_omega=[1],
+        lrn_warm_start=[False],
+        dataset=['restaurants'],
     )
+    study = study[9:]
 
     # begin study
     for i, config in enumerate(study):
@@ -31,17 +35,13 @@ if __name__ == '__main__':
         del config['dataset']
         try:
             manager, _ = get_dataset(dataset=dataset)
-            manager(seed=42, **config).validate(
+            manager(**config).validate(
                 num_folds=5,
-                iterations=20,
-                verbose=False,
+                iterations=10,
+                verbose=True,
                 callbacks=[WandBLogger(project='sc', entity='giuluck', run_name=dataset, crashed=False, **config)]
             )
             print(f'-- elapsed time: {time.time() - start_time}')
-        except RuntimeError:
-            print('-- unsolvable')
-            WandBLogger.instance.config['crashed'] = True
-            WandBLogger.instance.finish()
-        # except:
-        #     print('-- errors')
+        except:
+            print('-- errors')
     shutil.rmtree('wandb')

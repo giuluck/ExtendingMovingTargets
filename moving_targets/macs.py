@@ -87,7 +87,9 @@ class MACS(Logger):
             self._update_callbacks(callbacks, lambda c: c.on_adjustment_start(self, **kwargs))
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------
             yj, kw = self.master.adjust_targets(self, x=kwargs['x'], y=kwargs['y'], iteration=iteration), {}
-            if isinstance(yj, tuple):
+            if yj is None:
+                break  # in case of infeasible model, the training loop is stopped
+            elif isinstance(yj, tuple):
                 yj, kw = yj
                 kwargs.update(kw)
             # ---------------------------------------------- MASTER  STEP ----------------------------------------------

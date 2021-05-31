@@ -1,11 +1,10 @@
 """Testing Script."""
 
 import numpy as np
-from typing import List, Optional, Type, Tuple, Dict
+from typing import List, Optional, Type, Tuple
 
 from moving_targets.callbacks import FileLogger, Callback
 from src.datasets import DataManager
-from src.models import MTRegressionMaster
 from experimental.datasets.managers import DistanceAnalysis, SyntheticAdjustments2D, SyntheticAdjustments3D, \
     SyntheticResponse, CarsAdjustments, PuzzlesResponse, CarsTest, CarsUnivariateTest, SyntheticTest, PuzzlesTest, \
     RestaurantsTest, RestaurantsAdjustment, LawTest, LawAdjustments, LawResponse, DefaultTest, DefaultAdjustments, \
@@ -22,7 +21,7 @@ def get_dataset(dataset: str,
     ds: Optional[Type[:DataManager]] = None
     cb: List[Callback] = []
     if 'logger' in callback_functions:
-        cb.append(FileLogger('../temp/log.txt', routines=['on_iteration_end']))
+        cb.append(FileLogger('../temp/log.txt', routines=['on_pretraining_end', 'on_iteration_end']))
     if dataset == 'cars univariate':
         ds = CarsUnivariateTest
         if 'distance' in callback_functions:
@@ -147,10 +146,28 @@ def get_dataset(dataset: str,
     return ds, cb
 
 
-def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
-    """Gets the dictionary with the list of columns to plot."""
-
-    return dict(columns=[
+if __name__ == '__main__':
+    iterations: int = 1
+    manager_type, callbacks = get_dataset(
+        dataset='restaurants',
+        num_col=int(np.ceil(np.sqrt(iterations + 1))),
+        callback_functions=['logger', 'adjustments', 'response']
+    )
+    manager: TestManager = manager_type(
+        master_kind='classification',
+        mst_backend='gurobi',
+        mst_loss_fn='rbce',
+        mst_alpha=0.01,
+        mst_master_omega=1.0,
+        mst_learner_omega=1.0,
+        mst_learner_weights='all',
+        lrn_warm_start=False,
+        aug_num_augmented=None,
+        aug_num_ground=None,
+        mst_time_limit=None,
+        mst_custom_args={'verbose': False}
+    )
+    plot_args = dict(columns=[
         'learner/loss',
         'metrics/train loss',
         'metrics/train metric',
@@ -159,33 +176,9 @@ def get_plot_args(mng: TestManager) -> Dict[str, List[str]]:
         'metrics/validation loss',
         'metrics/validation metric',
         'metrics/pct. violation',
-        f'master/{"adj. mse" if issubclass(mng.master_class, MTRegressionMaster) else "avg. flips"}',
+        'master/adj. mse',
         'metrics/test loss',
         'metrics/test metric',
         'metrics/avg. violation'
     ])
-
-
-if __name__ == '__main__':
-    iterations: int = 1
-    manager_type, callbacks = get_dataset(
-        dataset='law',
-        num_col=int(np.ceil(np.sqrt(iterations + 1))),
-        callback_functions=['adjustments', 'response']
-    )
-    manager: TestManager = manager_type(
-        master_kind='classification',
-        mst_backend='gurobi',
-        mst_loss_fn='rbce',
-        mst_alpha=1.0,
-        mst_master_omega=1.0,
-        mst_learner_omega=1.0,
-        mst_learner_weights='all',
-        lrn_warm_start=False,
-        aug_num_augmented=None,
-        aug_num_ground=None,
-        mst_time_limit=None,
-        mst_custom_args={'verbose': True}
-    )
-    plot_args = get_plot_args(manager)
-    manager.test(iterations=iterations, callbacks=callbacks, plot_args=None, summary_args={})
+    manager.validate(num_folds=5, iterations=iterations, callbacks=callbacks, plot_args=plot_args, summary_args={})

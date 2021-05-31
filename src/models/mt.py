@@ -184,7 +184,12 @@ class MTMaster(CplexMaster, GurobiMaster):
         sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
         sample_weight[~self.augmented_mask] = 1.0
         # logs and outputs
-        macs.log(**{'time/master': time.time() - self.start_time})
+        diffs = adj[~np.isnan(y)] - y[~np.isnan(y)]
+        macs.log(**{
+            'time/master': time.time() - self.start_time,
+            'master/adj. mae': np.mean(np.abs(diffs)),
+            'master/adj. mse': np.mean(diffs ** 2)
+        })
         self.start_time = None
         return adj.astype(y.dtype), {'sample_weight': sample_weight}
 
@@ -240,17 +245,6 @@ class MTRegressionMaster(MTMaster):
             model.update()
         return var
 
-    # noinspection PyMissingOrEmptyDocstring
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
-        adj, kwargs = super(MTRegressionMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
-        mask = ~np.isnan(y)
-        diffs = adj[mask] - y[mask]
-        macs.log(**{
-            'master/adj. mae': np.mean(np.abs(diffs)),
-            'master/adj. mse': np.mean(diffs ** 2)
-        })
-        return adj, kwargs
-
 
 class MTClassificationMaster(MTMaster):
     """Custom Moving Target Master for Classification Problems.
@@ -259,7 +253,8 @@ class MTClassificationMaster(MTMaster):
         monotonicities: list of monotonicities.
         augmented_mask: boolean mask to distinguish between original and augmented samples.
         loss_fn: the master loss.
-        clip_value: the clipping value to be used to avoid numerical errors with the log in case of crossentropy loss.
+        clip_value: the clipping value to be used to avoid numerical errors with the log in case of crossentropy.
+        cont_eps: handles the lower/upper bounds for continuous variables in case of reversed/symmetric crossentropy.
         **kwargs: super-class arguments.
     """
 
@@ -285,10 +280,12 @@ class MTClassificationMaster(MTMaster):
                  monotonicities: Monotonicities,
                  augmented_mask: Vector,
                  loss_fn: str = 'hd',
-                 clip_value: Union[float, Tuple[float, float]] = 1e-15,
+                 clip_value: Union[float, Tuple[float, float]] = 1e-3,
+                 cont_eps: float = 1e-3,
                  **kwargs):
         # handle loss and build model from super class
         assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
+        self.cont_eps = cont_eps
         self.loss_fn = self.losses[loss_fn]
         super(MTClassificationMaster, self).__init__(
             monotonicities=monotonicities,
@@ -297,10 +294,10 @@ class MTClassificationMaster(MTMaster):
             **kwargs
         )
         # change clip values for crossentropy functions
-        self.y_clip, self.p_clip = clip_value if isinstance(clip_value, tuple) else (clip_value, clip_value)
-        assert self.y_clip > 0 and self.p_clip > 0, f"{clip_value} is not a valid clip value instance"
-        self.y_loss_fn.clip_value = self.y_clip
-        self.p_loss_fn.clip_value = self.p_clip
+        y_clip, p_clip = clip_value if isinstance(clip_value, tuple) else (clip_value, clip_value)
+        assert y_clip > 0 and p_clip > 0, f"{clip_value} is not a valid clip value instance"
+        self.y_loss_fn.clip_value = y_clip
+        self.p_loss_fn.clip_value = p_clip
         # raise error if losses involving logarithms are called with cplex
         if self.backend == 'cplex' and ('reversed' in self.loss_fn or 'symmetric' in self.loss_fn):
             raise ValueError(f"Cplex Master cannot handle {self.loss_fn.replace('_', ' ')}")
@@ -314,8 +311,8 @@ class MTClassificationMaster(MTMaster):
             if self.loss_fn in ['binary_hamming', 'binary_crossentropy']:
                 var = model.addVars(len(y), vtype=GRB.BINARY, lb=0.0, ub=1.0, name='y').values()
             else:
-                clip_value = min(self.y_clip, self.p_clip)
-                var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=clip_value, ub=1 - clip_value, name='y').values()
+                lb, ub = self.cont_eps, 1 - self.cont_eps
+                var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=lb, ub=ub, name='y').values()
             model.update()
         return var
 
@@ -332,16 +329,6 @@ class MTClassificationMaster(MTMaster):
         v, p = model_info
         # masks both y variables and model variables (v) to transform the vector to type int in order to deal with loss
         return super(MTClassificationMaster, self).y_loss(macs, model, (v[m], p), x, y[m].astype(int), iteration)
-
-    # noinspection PyMissingOrEmptyDocstring
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
-        adj, kwargs = super(MTClassificationMaster, self).return_solutions(macs, solution, model_info, x, y, iteration)
-        mask = ~np.isnan(y)
-        macs.log(**{
-            'master/avg. flips': np.abs(adj[mask] - y[mask]).mean(),
-            'master/tot. flips': np.abs(adj[mask] - y[mask]).sum(),
-        })
-        return adj, kwargs
 
 
 class MT(MACS):

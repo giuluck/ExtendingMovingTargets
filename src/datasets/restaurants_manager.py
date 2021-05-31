@@ -10,6 +10,7 @@ from tensorflow.python.keras.utils.np_utils import to_categorical
 
 from moving_targets.util.typing import Vector, Dataset
 from src.datasets.data_manager import DataManager
+from src.util.preprocessing import cross_validate
 from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
 
 
@@ -163,7 +164,11 @@ class RestaurantsManager(DataManager):
             }
             return [fold]
         else:
-            raise NotImplementedError('K-fold cross-validation not implemented for Restaurants dataset')
+            x, y = self.process_data(self.sample_dataset(1600, rng, testing_set=False))
+            val = self.process_data(self.sample_dataset(100, rng, testing_set=True))
+            folds = cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
+            # replace k-fold validation data with fixed validation samples as they must have a test-like distribution
+            return [dict(train=f['train'], validation=val) for f in folds]
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, ax = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)

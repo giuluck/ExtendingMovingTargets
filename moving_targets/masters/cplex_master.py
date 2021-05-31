@@ -1,5 +1,5 @@
 """Cplex Master interface."""
-
+import logging
 from abc import ABC
 from typing import Optional
 from docplex.mp.dvar import Var
@@ -51,5 +51,6 @@ class CplexMaster(Master, ABC):
         # solve the problem and get the adjusted labels
         solution = model.solve()
         if solution is None:
-            raise RuntimeError('The given model has no admissible solution, please check its constraints.')
+            logging.warning(f'Model is infeasible at iteration {iteration}, stop training.')
+            return None
         return self.return_solutions(macs, solution, model_info, x, y, iteration)
