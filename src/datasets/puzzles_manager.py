@@ -11,7 +11,7 @@ from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
-from src.util.preprocessing import split_dataset, cross_validate
+from src.util.preprocessing import split_dataset
 from src.util.typing import Methods, Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
@@ -55,15 +55,12 @@ class PuzzlesManager(DataManager):
         x['star_rating'] = df['star_rating'].map(lambda l: np.mean(l))
         x['num_reviews'] = df['star_rating'].map(lambda l: len(l))
         y = df['label']
-        # split data
-        if num_folds == 1:
-            if extrapolation:
-                fold = split_dataset(x, y, val_size=0.2, extrapolation=0.2)
-            else:
-                fold = {s: (x[df['split'] == s], y[df['split'] == s]) for s in ['train', 'validation', 'test']}
-            return [fold]
+        # split train/test
+        if extrapolation:
+            splits = split_dataset(x, y, val_size=0.2, extrapolation=0.2)
         else:
-            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
+            splits = {s: (x[df['split'] == s], y[df['split'] == s]) for s in ['train', 'validation', 'test']}
+        return self.cross_validate(splits, num_folds=num_folds, stratify=False)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = (3, 4, 8)) -> SamplingFunctions:
         if isinstance(num_augmented, int):

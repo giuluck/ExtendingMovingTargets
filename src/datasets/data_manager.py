@@ -10,7 +10,7 @@ import seaborn as sns
 from moving_targets.util.typing import Monotonicities, Vector, Matrix, Dataset
 from src.util.augmentation import get_monotonicities_list, augment_data
 from src.util.model import violations_summary, metrics_summary
-from src.util.preprocessing import Scaler, Scalers
+from src.util.preprocessing import Scaler, Scalers, cross_validate
 from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, TightLayout, AugmentedData, Rng
 
 
@@ -79,6 +79,27 @@ class DataManager:
         self.data_kwargs: Opt = data_kwargs
         self.augmented_kwargs: Opt = augmented_kwargs
         self.summary_kwargs: Opt = summary_kwargs
+
+    @staticmethod
+    def cross_validate(splits: Dataset, num_folds: int, stratify: bool = False, **kwargs) -> List[Dataset]:
+        """Given a train/test split, returns the cross-validation folds.
+
+        Args:
+            splits: the train/test splits.
+            num_folds: the number of folds.
+            stratify: either to use stratification or not in the cross-validation.
+            **kwargs: cross_validate custom arguments.
+
+        Returns:
+            The list of folds.
+        """
+        # cross-validate or return train/test
+        if num_folds == 1:
+            return [splits]
+        else:
+            x, y = splits.pop('train')
+            folds = cross_validate(x, y, num_folds=num_folds, stratify=y if stratify else None, **kwargs)
+            return [{**f, **splits} for f in folds]
 
     def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         raise NotImplementedError("please implement method '_load_splits'")

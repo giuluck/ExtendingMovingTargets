@@ -11,7 +11,7 @@ from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
-from src.util.preprocessing import split_dataset, cross_validate
+from src.util.preprocessing import split_dataset
 from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize, TightLayout
 
 
@@ -19,9 +19,9 @@ class LawManager(DataManager):
     """Data Manager for the Law Dataset."""
 
     def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',
-                 fraction: float = 0.03, res: int = 64):
+                 train_fraction: float = 0.03, res: int = 64):
         self.filepath: str = filepath
-        self.fraction: float = fraction
+        self.train_fraction: float = train_fraction
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         super(LawManager, self).__init__(
             x_columns=['lsat', 'ugpa'],
@@ -46,14 +46,11 @@ class LawManager(DataManager):
         # preprocess data
         df = pd.read_csv(self.filepath)[['lsat', 'ugpa', 'pass_bar']]
         df = df.dropna().reset_index(drop=True)
-        df = df.sample(frac=self.fraction, random_state=0)
         df = df.rename(columns={'pass_bar': 'pass'}).astype({'pass': int})
         x, y = df[['lsat', 'ugpa']], df['pass']
-        # split data
-        if num_folds == 1:
-            return [split_dataset(x, y, test_size=0.2, val_size=0.2, random_state=0)]
-        else:
-            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
+        # split train/test
+        splits = split_dataset(x, y, test_size=1 - self.train_fraction, val_size=0.0, stratify=y)
+        return self.cross_validate(splits=splits, num_folds=num_folds, stratify=True)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 5) -> SamplingFunctions:
         return {

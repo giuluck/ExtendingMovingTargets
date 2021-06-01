@@ -19,9 +19,9 @@ class DefaultManager(DataManager):
 
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
-    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm', fraction: float = 0.025):
+    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm', train_fraction: float = 0.025):
         self.filepath: str = filepath
-        self.fraction: float = fraction
+        self.train_fraction: float = train_fraction
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
         super(DefaultManager, self).__init__(
             x_columns=['married', 'payment'],
@@ -48,15 +48,12 @@ class DefaultManager(DataManager):
         df = df.dropna().reset_index(drop=True)
         df = df[np.in1d(df['MARRIAGE'], [1, 2])]
         df['MARRIAGE'] = df['MARRIAGE'] - 1
-        df = df.sample(frac=self.fraction, random_state=0)
         df = df.rename(columns={'MARRIAGE': 'married', 'PAY_0': 'payment'})
         df = df.astype({'married': float, 'payment': float, 'default': int})
         x, y = df[['married', 'payment']], df['default']
-        # split data
-        if num_folds == 1:
-            return [split_dataset(x, y, test_size=0.2, val_size=0.2, random_state=0)]
-        else:
-            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
+        # split train/test
+        splits = split_dataset(x, y, test_size=1 - self.train_fraction, val_size=0.0, stratify=y)
+        return self.cross_validate(splits=splits, num_folds=num_folds, stratify=True)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 7) -> SamplingFunctions:
         return {'payment': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s))}

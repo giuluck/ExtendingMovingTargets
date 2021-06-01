@@ -11,7 +11,7 @@ from moving_targets.util.typing import Number, Vector, Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
-from src.util.preprocessing import split_dataset, cross_validate
+from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
@@ -56,24 +56,16 @@ class SyntheticManager(DataManager):
 
     def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
         rng = np.random.default_rng(seed=0)
-        # generate and split data
-        if num_folds == 1:
-            if extrapolation:
-                x, y = self.sample_dataset(n=700, noise=self.noise, rng=rng, testing_set=True)
-                fold = split_dataset(x, y, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
-            else:
-                fold = {
-                    'train': SyntheticManager.sample_dataset(n=150, noise=self.noise, rng=rng, testing_set=False),
-                    'validation': SyntheticManager.sample_dataset(n=50, noise=self.noise, rng=rng, testing_set=False),
-                    'test': SyntheticManager.sample_dataset(n=500, noise=self.noise, rng=rng, testing_set=True)
-                }
-            return [fold]
+        # generate and split train/test
+        if extrapolation:
+            x, y = self.sample_dataset(n=700, noise=self.noise, rng=rng, testing_set=True)
+            splits = split_dataset(x, y, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
         else:
-            x, y = self.sample_dataset(n=200, noise=self.noise, rng=rng, testing_set=False)
-            val = self.sample_dataset(n=50, noise=self.noise, rng=rng, testing_set=True)
-            folds = cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
-            # replace k-fold validation data with fixed validation samples as they must have a test-like distribution
-            return [dict(train=f['train'], validation=val) for f in folds]
+            splits = {
+                'train': SyntheticManager.sample_dataset(n=200, noise=self.noise, rng=rng, testing_set=False),
+                'test': SyntheticManager.sample_dataset(n=500, noise=self.noise, rng=rng, testing_set=True)
+            }
+        return self.cross_validate(splits=splits, num_folds=num_folds, stratify=False)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}

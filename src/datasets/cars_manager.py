@@ -10,7 +10,7 @@ from sklearn.metrics import r2_score
 from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
-from src.util.preprocessing import split_dataset, cross_validate
+from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, SamplingFunctions, Methods, Rng, Figsize, TightLayout
 
 
@@ -42,14 +42,10 @@ class CarsManager(DataManager):
         # preprocess data
         df = pd.read_csv(self.filepath).rename(columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
         df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
-        x, y = df[['price']], df['sales']
-        # split data
-        if num_folds == 1:
-            extrapolation = 0.2 if extrapolation else None
-            fold = split_dataset(x, y, extrapolation=extrapolation, test_size=0.2, val_size=0.2, random_state=0)
-            return [fold]
-        else:
-            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
+        # split train/test
+        extrapolation = 0.2 if extrapolation else None
+        splits = split_dataset(df[['price']], df['sales'], extrapolation=extrapolation, test_size=0.2, val_size=0.0)
+        return self.cross_validate(splits, num_folds=num_folds, stratify=False)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}

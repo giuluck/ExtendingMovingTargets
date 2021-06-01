@@ -4,7 +4,7 @@ from typing import Union, Dict, Tuple, List, Optional as Opt
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 
 from moving_targets.util.typing import Matrix, Vector
 from src.util.typing import Methods, Extrapolation
@@ -122,9 +122,11 @@ class Scaler:
 
 
 Scalers = Union[None, Scaler, Tuple[Scaler, Scaler]]
+SplitArgs = Union[Matrix, Vector]
+ValidationArgs = Union[pd.DataFrame, pd.Series]
 
 
-def split_dataset(*arg: Union[Matrix, Vector],
+def split_dataset(*args: SplitArgs,
                   test_size: float = 0.2,
                   val_size: Opt[float] = None,
                   extrapolation: Extrapolation = None,
@@ -132,7 +134,7 @@ def split_dataset(*arg: Union[Matrix, Vector],
     """Splits the input data.
 
     Args:
-        *arg: the input data vectors.
+        *args: the input data vectors.
         test_size: the percentage of data left for testing.
         val_size: the percentage of data left for validation. If zero, no validation set is returned.
         extrapolation: whether to split the data randomly or to test on a given percentage of extrapolated data.
@@ -142,14 +144,16 @@ def split_dataset(*arg: Union[Matrix, Vector],
         A dictionary of datasets.
     """
     # handle default values
+    split_args = dict(shuffle=True, random_state=0)
+    split_args.update(kwargs)
     val_size = test_size if val_size is None else val_size
-    val_size = val_size if isinstance(val_size, float) else val_size / len(arg[0])
-    test_size = test_size if isinstance(test_size, float) else test_size / len(arg[0])
+    val_size = val_size if isinstance(val_size, float) else val_size / len(args[0])
+    test_size = test_size if isinstance(test_size, float) else test_size / len(args[0])
     # split train/test
     if extrapolation is None:
-        splits = train_test_split(*arg, test_size=test_size, **kwargs)
+        splits = train_test_split(*args, test_size=test_size, **split_args)
     else:
-        x = arg[0]
+        x = args[0]
         if not isinstance(extrapolation, dict):
             extrapolation = {col: extrapolation for col in x.columns}
         train_mask, test_mask = np.ones(len(x)).astype(bool), np.ones(len(x)).astype(bool)
@@ -161,32 +165,36 @@ def split_dataset(*arg: Union[Matrix, Vector],
             test_mask = np.logical_and(test_mask, np.logical_or(feat <= feat.quantile(lq), feat >= feat.quantile(uq)))
         splits = []
         # create the splits from the initial data by appending the train and the test partition for each vector
-        for a in arg:
+        for a in args:
             splits.append(a[train_mask])
             splits.append(a[test_mask])
-    train_data, test_data = splits[::2], (splits[1] if len(arg) == 1 else splits[1::2])
+    train_data, test_data = splits[::2], (splits[1] if len(args) == 1 else splits[1::2])
     # split val/test only if necessary
     if val_size == 0.0:
         return {'train': train_data, 'test': test_data}
     else:
-        splits = train_test_split(*train_data, test_size=val_size, **kwargs)
-        train_data, val_data = splits if len(arg) == 1 else (splits[::2], splits[1::2])
+        splits = train_test_split(*train_data, test_size=val_size, **split_args)
+        train_data, val_data = splits if len(args) == 1 else (splits[::2], splits[1::2])
         return {'train': train_data, 'validation': val_data, 'test': test_data}
 
 
-def cross_validate(*arg: Union[pd.DataFrame, pd.Series], num_folds: int = 10, **kwargs) -> List[Dict]:
+def cross_validate(*args: ValidationArgs, num_folds: int = 10, stratify: Opt[Vector] = None, **kwargs) -> List[Dict]:
     """Splits the input data in folds.
 
     Args:
-        *arg: the input data vectors.
+        *args: the input data vectors.
         num_folds: the number of folds.
-        **kwargs: 'sklearn.model_selection.train_test_split' arguments.
+        stratify: either None (no stratification) or the vector of labels.
+        **kwargs: 'sklearn.model_selection.KFold' or 'sklearn.model_selection.StratifiedKFold' arguments.
 
     Returns:
         A list of dictionaries of datasets.
     """
+    split_args = dict(shuffle=True, random_state=0)
+    split_args.update(kwargs)
+    kf = KFold if stratify is None else StratifiedKFold
+    kf = kf(n_splits=num_folds, **split_args)
     folds = []
-    kf = KFold(n_splits=num_folds, **kwargs)
-    for tr, vl in kf.split(arg[0]):
-        folds.append({'train': tuple([v.iloc[tr] for v in arg]), 'validation': tuple([v.iloc[vl] for v in arg])})
+    for tr, vl in kf.split(X=args[0], y=stratify):
+        folds.append({'train': tuple([v.iloc[tr] for v in args]), 'validation': tuple([v.iloc[vl] for v in args])})
     return folds
