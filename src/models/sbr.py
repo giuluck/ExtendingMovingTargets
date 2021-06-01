@@ -44,14 +44,15 @@ class SBRBatchGenerator(Sequence):
         counts = np.array(ground_indices.value_counts())
         assert np.allclose(counts, counts[0]), "All the ground samples must have the same number of augmented ones."
         self.num_samples = counts[0]
-        # get a copy of the whole data
+        # get a copy of the whole data (and map indices from random range into range [0, num_grounds]
         data = x.copy()
         data['label'] = y.copy()
         data['index'] = ground_indices.copy()
+        data['index'] = data['index'].map({old: new for new, old in enumerate(ground_indices.unique())})
         data['monotonicity'] = monotonicities.copy()
         # place labelled values at the beginning, then shuffle the indices and create batches based on the index value
         data = data.sort_values(['index', 'label'], ascending=[True, False], ignore_index=True).astype('float32')
-        shuffle = np.random.permutation(np.unique(ground_indices))
+        shuffle = np.random.permutation(data['index'].unique())
         shuffle = {i: m for i, m in enumerate(shuffle)}
         data['batch'] = data['index'].map(shuffle) // batch_size
         # store list of batches by grouping dataframe by batches

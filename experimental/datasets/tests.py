@@ -149,7 +149,7 @@ def get_dataset(dataset: str,
 if __name__ == '__main__':
     iterations: int = 1
     manager_type, callbacks = get_dataset(
-        dataset='restaurants',
+        dataset='law',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['logger', 'adjustments', 'response']
     )
@@ -162,10 +162,8 @@ if __name__ == '__main__':
         mst_learner_omega=1.0,
         mst_learner_weights='all',
         lrn_warm_start=False,
-        aug_num_augmented=None,
-        aug_num_ground=None,
         mst_time_limit=None,
-        mst_custom_args={'verbose': False}
+        mst_custom_args={'verbose': True}
     )
     plot_args = dict(columns=[
         'learner/loss',
@@ -181,4 +179,5 @@ if __name__ == '__main__':
         'metrics/test metric',
         'metrics/avg. violation'
     ])
-    manager.validate(num_folds=5, iterations=iterations, callbacks=callbacks, plot_args=plot_args, summary_args={})
+    manager.validate(num_folds=10, iterations=iterations, callbacks=[FileLogger()], summary_args={}, verbose=False)
+    # manager.test(iterations=iterations, callbacks=None, plot_args=plot_args, summary_args={}, verbose=True)

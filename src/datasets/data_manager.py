@@ -118,6 +118,10 @@ class DataManager:
         assert real_folds > 0, f"'num_folds' should be either None or a positive integer, but it is {real_folds}"
         assert real_folds == 1 or not extrapolation, f"if 'num_folds' == {real_folds}, then extrapolation must be False"
         splits = self._load_splits(num_folds=real_folds, extrapolation=extrapolation)
+
+        # TODO: remove
+        print(len(splits[0]['train'][0]))
+
         splits = [(s, self.get_scalers(s['train'][0], s['train'][1])) for s in splits]
         return splits[0] if num_folds is None else splits
 
@@ -127,6 +131,7 @@ class DataManager:
                            num_augmented: Opt[Augmented] = None,
                            num_random: int = 0,
                            num_ground: Opt[int] = None,
+                           monotonicities: bool = True,
                            seed: int = 0) -> Tuple[AugmentedData, Scalers]:
         """Builds the augmented dataset."""
         rng = np.random.default_rng(seed=seed)
@@ -146,12 +151,10 @@ class DataManager:
             y = pd.concat((y, pd.Series([np.nan] * num_random, name=y.name)), ignore_index=True)
         # augment data
         sampling_args = {} if num_augmented is None else {'num_augmented': num_augmented}  # if None, uses default
-        x_aug, y_aug = augment_data(
-            x=x,
-            y=y,
-            compute_monotonicities=self.compute_monotonicities,
-            sampling_functions=self._get_sampling_functions(rng=rng, **sampling_args)
-        )
+        x_aug, y_aug = augment_data(x=x,
+                                    y=y,
+                                    sampling_functions=self._get_sampling_functions(rng=rng, **sampling_args),
+                                    compute_monotonicities=self.compute_monotonicities if monotonicities else None)
         mask = ~np.isnan(y_aug[self.y_column])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
 

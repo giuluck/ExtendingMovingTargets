@@ -13,18 +13,20 @@ class MLPManager(ModelManager):
     def __init__(self,
                  test_manager: TestManager,
                  epochs: int = 1000,
+                 batch_size: int = 32,
                  validation_split: float = 0.2,
                  early_stop: EarlyStopping = EarlyStopping(monitor='val_loss', patience=50, restore_best_weights=True),
                  verbose: bool = False,
                  **kwargs):
         super(MLPManager, self).__init__(test_manager=test_manager,
                                          epochs=epochs,
+                                         batch_size=batch_size,
                                          validation_split=validation_split,
                                          callbacks=[early_stop],
                                          verbose=verbose,
                                          **kwargs)
 
-    def get_folds(self, num_folds: int, extrapolation: bool) -> List[Fold]:
+    def get_folds(self, num_folds: int, extrapolation: bool, compute_monotonicities: bool = False) -> List[Fold]:
         folds: List[Fold] = []
         for data, scalers in self.test_manager.dataset.load_data(num_folds=num_folds, extrapolation=extrapolation):
             folds.append(Fold(

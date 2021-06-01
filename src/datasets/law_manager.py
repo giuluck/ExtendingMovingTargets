@@ -4,14 +4,14 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import List, Optional as Opt
+from typing import List
 from sklearn.metrics import accuracy_score
 
 from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
-from src.util.preprocessing import split_dataset
+from src.util.preprocessing import split_dataset, cross_validate
 from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize, TightLayout
 
 
@@ -19,10 +19,9 @@ class LawManager(DataManager):
     """Data Manager for the Law Dataset."""
 
     def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',
-                 test_size: Opt[float] = 0.8, val_size: Opt[float] = None, res: int = 64):
+                 fraction: float = 0.03, res: int = 64):
         self.filepath: str = filepath
-        self.test_size: Opt[float] = test_size
-        self.val_size: Opt[float] = val_size
+        self.fraction: float = fraction
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         super(LawManager, self).__init__(
             x_columns=['lsat', 'ugpa'],
@@ -47,16 +46,16 @@ class LawManager(DataManager):
         # preprocess data
         df = pd.read_csv(self.filepath)[['lsat', 'ugpa', 'pass_bar']]
         df = df.dropna().reset_index(drop=True)
+        df = df.sample(frac=self.fraction, random_state=0)
         df = df.rename(columns={'pass_bar': 'pass'}).astype({'pass': int})
         x, y = df[['lsat', 'ugpa']], df['pass']
         # split data
         if num_folds == 1:
-            assert self.test_size is not None, "'self.test_size' required if 'n_folds' is one"
-            return [split_dataset(x, y, test_size=self.test_size, val_size=self.val_size, random_state=0)]
+            return [split_dataset(x, y, test_size=0.2, val_size=0.2, random_state=0)]
         else:
-            raise NotImplementedError('K-fold cross-validation not implemented for Law dataset')
+            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
 
-    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 2) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 5) -> SamplingFunctions:
         return {
             'lsat': (num_augmented, lambda s: rng.uniform(0, 50, size=s)),
             'ugpa': (num_augmented, lambda s: rng.uniform(0, 4, size=s))

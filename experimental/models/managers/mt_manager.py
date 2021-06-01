@@ -1,7 +1,7 @@
 """Moving Targets Manager."""
 
 import numpy as np
-from typing import Any, Union
+from typing import Any, Union, List
 
 from experimental.datasets.managers import TestManager, Fold
 from experimental.models.managers.model_manager import ModelManager
@@ -10,10 +10,15 @@ from src.models import MT, MTLearner
 
 # noinspection PyMissingOrEmptyDocstring
 class MTManager(ModelManager):
-    def __init__(self, test_manager: TestManager, iterations: int = 20, verbose: Union[int, str] = False, **kwargs):
+    def __init__(self, test_manager: TestManager, iterations: int = 10, verbose: Union[int, str] = False, **kwargs):
         super(MTManager, self).__init__(test_manager=test_manager, **kwargs)
         self.iterations = iterations
         self.verbose = verbose
+
+    def get_folds(self, num_folds: int, extrapolation: bool, compute_monotonicities: bool = False) -> List[Fold]:
+        return super(MTManager, self).get_folds(num_folds=num_folds,
+                                                extrapolation=extrapolation,
+                                                compute_monotonicities=compute_monotonicities)
 
     def fit(self, fold: Fold) -> Any:
         label = self.test_manager.dataset.y_column

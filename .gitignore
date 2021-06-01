@@ -1,8 +1,7 @@
 .idea
 .ipynb_checkpoints
-venv
+*.log
 temp
+venv
 wandb
 __pycache__
-log.txt
-gurobi.log

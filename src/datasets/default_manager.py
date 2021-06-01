@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import List, Optional as Opt
+from typing import List
 from sklearn.metrics import accuracy_score
 
 from moving_targets.util.typing import Dataset
 from src.datasets.data_manager import DataManager
 from src.util.augmentation import compute_numeric_monotonicities
-from src.util.preprocessing import split_dataset
+from src.util.preprocessing import split_dataset, cross_validate
 from src.util.typing import Augmented, SamplingFunctions, Rng, Figsize, TightLayout
 
 
@@ -19,11 +19,9 @@ class DefaultManager(DataManager):
 
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
-    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm',
-                 test_size: Opt[float] = 0.8, val_size: Opt[float] = None):
+    def __init__(self, filepath: str, x_scaling: str = 'std', y_scaling: str = 'norm', fraction: float = 0.025):
         self.filepath: str = filepath
-        self.test_size: Opt[float] = test_size
-        self.val_size: Opt[float] = val_size
+        self.fraction: float = fraction
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
         super(DefaultManager, self).__init__(
             x_columns=['married', 'payment'],
@@ -50,17 +48,17 @@ class DefaultManager(DataManager):
         df = df.dropna().reset_index(drop=True)
         df = df[np.in1d(df['MARRIAGE'], [1, 2])]
         df['MARRIAGE'] = df['MARRIAGE'] - 1
+        df = df.sample(frac=self.fraction, random_state=0)
         df = df.rename(columns={'MARRIAGE': 'married', 'PAY_0': 'payment'})
         df = df.astype({'married': float, 'payment': float, 'default': int})
         x, y = df[['married', 'payment']], df['default']
         # split data
         if num_folds == 1:
-            assert self.test_size is not None, "'self.test_size' required if 'n_folds' is one"
-            return [split_dataset(x, y, test_size=self.test_size, val_size=self.val_size, random_state=0)]
+            return [split_dataset(x, y, test_size=0.2, val_size=0.2, random_state=0)]
         else:
-            raise NotImplementedError('K-fold cross-validation not implemented for Default dataset')
+            return cross_validate(x, y, num_folds=num_folds, shuffle=True, random_state=0)
 
-    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 3) -> SamplingFunctions:
+    def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 7) -> SamplingFunctions:
         return {'payment': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s))}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):

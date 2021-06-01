@@ -17,6 +17,7 @@ class SBRManager(ModelManager):
                  alpha: Optional[float] = None,
                  regularizer_act: Optional[Callable] = None,
                  epochs: int = 1000,
+                 batch_size: int = 32,
                  validation_split: float = 0.2,
                  early_stop: EarlyStopping = EarlyStopping(monitor='val_loss', patience=50, restore_best_weights=True),
                  verbose: bool = False,
@@ -26,6 +27,7 @@ class SBRManager(ModelManager):
                                          callbacks=[early_stop],
                                          verbose=verbose,
                                          **kwargs)
+        self.batch_size = batch_size
         self.validation_split = validation_split
         self.alpha = alpha
         self.regularizer_act = regularizer_act
@@ -38,7 +40,7 @@ class SBRManager(ModelManager):
         train_mask = ~np.isin(y['ground_index'], y['ground_index'].iloc[validation_indices])
         x, y = x[train_mask], y[train_mask]
         # handle batches and training
-        sbr_batches = SBRBatchGenerator(x, y[label], y['ground_index'], y['monotonicity'], 4)
+        sbr_batches = SBRBatchGenerator(x, y[label], y['ground_index'], y['monotonicity'], self.batch_size)
         model = SBR(output_act=self.output_act, h_units=self.h_units, alpha=self.alpha,
                     regularizer_act=self.regularizer_act, scalers=fold.scalers)
         model.compile(loss=self.loss, optimizer=self.optimizer)
@@ -54,12 +56,14 @@ class UnivariateSBRManager(MLPManager):
                  regularizer_act: Optional[Callable] = None,
                  direction: int = 1,
                  epochs: int = 1000,
+                 batch_size: int = 32,
                  validation_split: float = 0.2,
                  early_stop: EarlyStopping = EarlyStopping(monitor='val_loss', patience=50, restore_best_weights=True),
                  verbose: bool = False,
                  **kwargs):
         super(UnivariateSBRManager, self).__init__(test_manager=test_manager,
                                                    epochs=epochs,
+                                                   batch_size=batch_size,
                                                    validation_split=validation_split,
                                                    early_stop=early_stop,
                                                    verbose=verbose,

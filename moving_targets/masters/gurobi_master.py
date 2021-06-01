@@ -46,9 +46,10 @@ class GurobiMaster(Master, ABC):
 
     losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x), abs_fn=_abs, log_fn=_log)
 
-    def __init__(self, time_limit: Optional[float] = None, verbose: bool = False, **kwargs):
+    def __init__(self, time_limit: Optional[float] = None, pre_passes: int = -1, verbose: bool = False, **kwargs):
         super(GurobiMaster, self).__init__(**kwargs)
         self.time_limit: Optional[float] = time_limit
+        self.pre_passes: int = pre_passes
         self.verbose: bool = verbose
 
     # noinspection PyMissingOrEmptyDocstring
@@ -61,6 +62,7 @@ class GurobiMaster(Master, ABC):
             with Model(env=env, name='model') as model:
                 if self.time_limit is not None:
                     model.setParam('TimeLimit', self.time_limit)
+                model.setParam('PrePasses', self.pre_passes)
                 model_info = self.build_model(macs, model, x, y, iteration)
                 # algorithm core: check for feasibility and behave depending on that
                 y_loss = self.y_loss(macs, model, model_info, x, y, iteration)
@@ -73,7 +75,7 @@ class GurobiMaster(Master, ABC):
                     model.setObjective(y_loss + (1.0 / self.alpha) * p_loss, GRB.MINIMIZE)
                 # solve the problem and get the adjusted labels
                 model.optimize()
-                if model.Status not in [GRB.OPTIMAL, GRB.SUBOPTIMAL]:
+                if model.SolCount == 0:
                     logging.warning(f'Status {model.Status} returned at iteration {iteration}, stop training.')
                     return None
                 return self.return_solutions(macs, model, model_info, x, y, iteration)

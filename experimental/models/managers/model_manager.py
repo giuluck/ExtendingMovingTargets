@@ -33,8 +33,10 @@ class ModelManager:
     def fit(self, fold: Fold) -> Any:
         raise NotImplementedError("Please implement method 'fit'")
 
-    def get_folds(self, num_folds: int, extrapolation: bool) -> List[Fold]:
-        return self.test_manager.get_folds(num_folds=num_folds, extrapolation=extrapolation)
+    def get_folds(self, num_folds: int, extrapolation: bool, compute_monotonicities: bool = True) -> List[Fold]:
+        return self.test_manager.get_folds(num_folds=num_folds,
+                                           extrapolation=extrapolation,
+                                           compute_monotonicities=compute_monotonicities)
 
     def validate(self, num_folds: int = 10, summary_args: Dict = None):
         for i, fold in enumerate(self.get_folds(num_folds=num_folds, extrapolation=False)):

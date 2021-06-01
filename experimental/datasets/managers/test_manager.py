@@ -64,6 +64,7 @@ class TestManager:
                  lrn_h_units: Opt[List[int]] = None,
                  lrn_warm_start: bool = False,
                  lrn_epochs: int = 200,
+                 lrn_batch_size: int = 32,
                  lrn_verbose: bool = False,
                  lrn_early_stopping: EarlyStopping = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4),
                  mst_backend: str = 'cplex',
@@ -103,6 +104,7 @@ class TestManager:
             h_units=lrn_h_units,
             warm_start=lrn_warm_start,
             epochs=lrn_epochs,
+            batch_size=lrn_batch_size,
             verbose=lrn_verbose,
             callbacks=[lrn_early_stopping]
         )
@@ -130,12 +132,13 @@ class TestManager:
         # the result is joined with spaces and lower-cased
         self.name: str = ' '.join(re.split('(?=[A-Z])', self.__class__.__name__)[1:-1]).lower()
 
-    def get_folds(self, num_folds: int, extrapolation: bool) -> List[Fold]:
+    def get_folds(self, num_folds: int, extrapolation: bool, compute_monotonicities: bool = True) -> List[Fold]:
         folds: List[Fold] = []
         for data, _ in self.dataset.load_data(num_folds=num_folds, extrapolation=extrapolation):
             (x_aug, y_aug), scalers = self.dataset.get_augmented_data(
                 x=data['train'][0],
                 y=data['train'][1],
+                monotonicities=compute_monotonicities,
                 **self.augmented_args
             )
             monotonicities = get_monotonicities_list(

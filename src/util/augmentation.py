@@ -11,15 +11,15 @@ from src.util.typing import SamplingFunctions, AugmentedData, Directions
 
 def augment_data(x: Matrix,
                  y: Vector,
-                 compute_monotonicities: Callable,
-                 sampling_functions: SamplingFunctions) -> AugmentedData:
+                 sampling_functions: SamplingFunctions,
+                 compute_monotonicities: Optional[Callable] = None) -> AugmentedData:
     """Augments the dataset using the given sampling functions, then computes its monotonicities wrt the ground samples.
 
     Args:
         x: the matrix/dataframe of samples.
         y: the vector of labels.
-        compute_monotonicities: routine that computes the monotonicities of some data points wrt a reference point.
         sampling_functions: sampling routine associated to each x feature, with respective number of augmented samples.
+        compute_monotonicities: routine that computes the monotonicities of some data points wrt a reference point.
 
     Returns:
         A tuple of augmented inputs/labels. The labels are no more in form of a vector, but rather a `DataFrame` with
@@ -35,7 +35,10 @@ def augment_data(x: Matrix,
                 if isinstance(attribute, tuple):
                     attribute = list(attribute)
                 samples[attribute] = function(num_augmented)
-                monotonicities = compute_monotonicities(samples.values, sample.values.reshape(1, -1)).reshape(-1, )
+                if compute_monotonicities is None:
+                    monotonicities = [np.nan] * num_augmented
+                else:
+                    monotonicities = compute_monotonicities(samples.values, sample.values.reshape(1, -1)).reshape(-1, )
                 new_samples.append(samples.astype(x.dtypes))
                 new_info.append(pd.DataFrame(
                     data=zip([ground_index] * num_augmented, monotonicities),
@@ -48,7 +51,10 @@ def augment_data(x: Matrix,
     x_aug = pd.concat([x] + new_samples).reset_index(drop=True).astype(x.dtypes)
     y_aug = pd.concat([pd.DataFrame(y)] + new_info).reset_index(drop=True).rename({0: y.name}, axis=1)
     # there is no way to return integer labels due to the presence of nan values (pd.Int64 type have problems with tf)
-    y_aug = y_aug.fillna({'ground_index': pd.Series(y.index), 'monotonicity': 0}).astype({'ground_index': int})
+    y_aug = y_aug.fillna({
+        'ground_index': pd.Series(y.index),
+        'monotonicity': pd.Series(np.zeros(len(y)))
+    }).astype({'ground_index': int})
     return x_aug, y_aug
 
 
