@@ -2,6 +2,7 @@
 import logging
 from abc import ABC
 from typing import Optional
+
 from docplex.mp.dvar import Var
 from docplex.mp.model import Model
 

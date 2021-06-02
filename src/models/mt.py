@@ -1,9 +1,10 @@
 """Moving Target Models."""
 
 import time
+from typing import Optional, List, Tuple, Union
+
 import numpy as np
 from gurobipy import GRB
-from typing import Optional, List, Tuple, Union
 
 from moving_targets import MACS
 from moving_targets.learners import Learner

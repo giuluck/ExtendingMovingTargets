@@ -1,14 +1,15 @@
 """Test Managers & Callbacks."""
+import random
 import re
 import time
-import random
+from typing import List, Any, Type, Dict, Union, Optional as Opt
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
-import matplotlib.pyplot as plt
 from pandas import DataFrame
-from typing import List, Any, Type, Dict, Union, Optional as Opt
 from tensorflow.python.keras.callbacks import EarlyStopping
 
 from moving_targets.callbacks import Callback, WandBLogger
@@ -21,12 +22,14 @@ from src.util.dictionaries import merge_dictionaries
 from src.util.preprocessing import Scalers
 from src.util.typing import Augmented
 
+YInfo = Union[Vector, DataFrame]
+
 
 # noinspection PyMissingOrEmptyDocstring
 class Fold:
-    def __init__(self, x: Matrix, y: DataFrame, scalers: Scalers, monotonicities: Monotonicities, validation: Dataset):
+    def __init__(self, x: Matrix, y: YInfo, scalers: Scalers, monotonicities: Monotonicities, validation: Dataset):
         self.x: Matrix = x
-        self.y: DataFrame = y
+        self.y: YInfo = y
         self.scalers: Scalers = scalers
         self.monotonicities: Monotonicities = monotonicities
         self.validation: Dataset = validation

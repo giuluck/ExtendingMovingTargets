@@ -1,15 +1,16 @@
 """Synthetic Test Manager & Callbacks."""
 
+from typing import Optional as Opt
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from typing import Optional as Opt
 
+from experimental.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 from moving_targets.util.typing import Matrix, Vector, Iteration, Dataset
 from src.datasets import SyntheticManager
 from src.util.plot import ColorFader
-from experimental.datasets.managers.test_manager import RegressionTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

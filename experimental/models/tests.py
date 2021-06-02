@@ -1,8 +1,8 @@
 """Testing Script."""
 
-from experimental.models.managers import SBRManager, MLPManager
-from experimental.datasets.managers import CarsTest, DefaultTest
+from experimental.datasets.managers import PuzzlesTest
+from experimental.models.managers import TFLManager
 
 if __name__ == '__main__':
-    manager = SBRManager(test_manager=DefaultTest(), verbose=False, wandb_name=None)
-    manager.validate(num_folds=10, summary_args={})
+    manager = TFLManager(test_manager=PuzzlesTest(), epochs=1000, wandb_name=None)
+    manager.test(summary_args={})

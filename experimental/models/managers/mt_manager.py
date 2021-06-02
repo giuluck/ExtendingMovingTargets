@@ -1,7 +1,8 @@
 """Moving Targets Manager."""
 
-import numpy as np
 from typing import Any, Union, List
+
+import numpy as np
 
 from experimental.datasets.managers import TestManager, Fold
 from experimental.models.managers.model_manager import ModelManager

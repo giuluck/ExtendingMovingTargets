@@ -1,15 +1,15 @@
 """Cars Data Manager."""
 
+from typing import Tuple, Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Tuple, List
 from sklearn.metrics import r2_score
 
-from moving_targets.util.typing import Dataset
+from moving_targets.util.typing import Splits
 from src.datasets.data_manager import DataManager
-from src.util.augmentation import compute_numeric_monotonicities
 from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, SamplingFunctions, Methods, Rng, Figsize, TightLayout
 
@@ -26,6 +26,7 @@ class CarsManager(DataManager):
             x_scaling=x_scaling,
             y_column='sales',
             y_scaling=y_scaling,
+            directions=[-1],
             metric=r2_score,
             metric_name='r2',
             grid=pd.DataFrame.from_dict({'price': np.linspace(self.bound[0], self.bound[1], res)}),
@@ -34,11 +35,7 @@ class CarsManager(DataManager):
             summary_kwargs=dict(figsize=(10, 4), res=100, ylim=(-5, 125))
         )
 
-    # noinspection PyMissingOrEmptyDocstring
-    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
-        return compute_numeric_monotonicities(samples, references, directions=[-1], eps=eps)
-
-    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
         # preprocess data
         df = pd.read_csv(self.filepath).rename(columns={'Price in thousands': 'price', 'Sales in thousands': 'sales'})
         df = df[['price', 'sales']].replace({'.': np.nan}).dropna().astype('float')
@@ -65,8 +62,8 @@ class CarsManager(DataManager):
         plt.figure(figsize=figsize)
         for title, (x, y) in kwargs.items():
             sns.scatterplot(x=x['price'], y=y, alpha=0.25, sizes=0.25, label=title.capitalize())
-        x = np.linspace(self.bound[0], self.bound[1], res)
-        y = model.predict(x.reshape(-1, 1)).flatten()
-        sns.lineplot(x=x, y=y, color='black').set(xlabel='price', ylabel='sales', title='Estimated Function')
+        x = pd.DataFrame(np.linspace(self.bound[0], self.bound[1], res), columns=['price'])
+        y = model.predict(x).flatten()
+        sns.lineplot(x=x['price'], y=y, color='black').set(ylabel='sales', title='Estimated Function')
         plt.xlim(self.bound)
         plt.ylim(ylim)

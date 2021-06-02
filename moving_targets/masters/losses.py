@@ -1,7 +1,8 @@
 """Losses utilities."""
 
-import numpy as np
 from typing import Callable, Optional, Any
+
+import numpy as np
 
 from moving_targets.util.typing import Vector
 

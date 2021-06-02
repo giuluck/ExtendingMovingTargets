@@ -1,11 +1,11 @@
 """Model Manager."""
 import time
-
-import wandb
 from typing import Dict, Any, Union, List, Optional
 
-from src.util.dictionaries import merge_dictionaries
+import wandb
+
 from experimental.datasets.managers import TestManager, Fold
+from src.util.dictionaries import merge_dictionaries
 
 
 # noinspection PyMissingOrEmptyDocstring

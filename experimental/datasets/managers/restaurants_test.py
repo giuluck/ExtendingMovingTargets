@@ -1,15 +1,16 @@
 """Restaurants Test Manager & Callbacks."""
 
+from typing import Optional as Opt
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from typing import Optional as Opt
 
+from experimental.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 from moving_targets.metrics import AUC
 from moving_targets.util.typing import Iteration, Vector, Matrix, Dataset
 from src.datasets import RestaurantsManager
-from experimental.datasets.managers.test_manager import ClassificationTest, AnalysisCallback
 
 
 # noinspection PyMissingOrEmptyDocstring

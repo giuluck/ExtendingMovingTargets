@@ -1,13 +1,14 @@
 """Cars Test Manager & Callback."""
 
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 from typing import Optional as Opt
 
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+from experimental.datasets.managers.test_manager import AnalysisCallback, RegressionTest
 from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
 from src.datasets import CarsManager
-from experimental.datasets.managers.test_manager import AnalysisCallback, RegressionTest
 
 
 # noinspection PyMissingOrEmptyDocstring

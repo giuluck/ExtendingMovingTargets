@@ -1,11 +1,12 @@
 """Multi-Layer Perceptron Manager."""
 
 from typing import List, Any
+
 from tensorflow.python.keras.callbacks import EarlyStopping
 
-from src.models import MLP
 from experimental.datasets.managers import TestManager, Fold
 from experimental.models.managers.model_manager import ModelManager
+from src.models import MLP
 
 
 # noinspection PyMissingOrEmptyDocstring

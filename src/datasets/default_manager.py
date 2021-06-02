@@ -1,16 +1,16 @@
 """Default Data Manager."""
 
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import List
 from sklearn.metrics import accuracy_score
 
-from moving_targets.util.typing import Dataset
+from moving_targets.util.typing import Splits
 from src.datasets.data_manager import DataManager
-from src.util.augmentation import compute_numeric_monotonicities
-from src.util.preprocessing import split_dataset, cross_validate
+from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, SamplingFunctions, Rng, Figsize, TightLayout
 
 
@@ -28,6 +28,7 @@ class DefaultManager(DataManager):
             x_scaling={'payment': x_scaling},
             y_column='default',
             y_scaling=y_scaling,
+            directions=[0, 1],
             metric=accuracy_score,
             metric_name='acc',
             post_process=lambda x: x.round().astype(int),
@@ -37,11 +38,7 @@ class DefaultManager(DataManager):
             summary_kwargs=dict(figsize=(10, 4))
         )
 
-    # noinspection PyMissingOrEmptyDocstring
-    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
-        return compute_numeric_monotonicities(samples, references, directions=[0, 1], eps=eps)
-
-    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
         assert extrapolation is False, "'extrapolation' is not supported for Default dataset"
         # preprocess data
         df = pd.read_csv(self.filepath)[['MARRIAGE', 'PAY_0', 'default']]

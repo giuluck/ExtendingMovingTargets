@@ -1,14 +1,15 @@
 """Testing Script."""
 
-import numpy as np
 from typing import List, Optional, Type, Tuple
 
-from moving_targets.callbacks import FileLogger, Callback
-from src.datasets import DataManager
+import numpy as np
+
 from experimental.datasets.managers import DistanceAnalysis, SyntheticAdjustments2D, SyntheticAdjustments3D, \
     SyntheticResponse, CarsAdjustments, PuzzlesResponse, CarsTest, CarsUnivariateTest, SyntheticTest, PuzzlesTest, \
     RestaurantsTest, RestaurantsAdjustment, LawTest, LawAdjustments, LawResponse, DefaultTest, DefaultAdjustments, \
     TestManager
+from moving_targets.callbacks import FileLogger, Callback
+from src.datasets import DataManager
 
 
 def get_dataset(dataset: str,
@@ -149,7 +150,7 @@ def get_dataset(dataset: str,
 if __name__ == '__main__':
     iterations: int = 1
     manager_type, callbacks = get_dataset(
-        dataset='law',
+        dataset='restaurants',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callback_functions=['logger', 'adjustments', 'response']
     )
@@ -163,7 +164,7 @@ if __name__ == '__main__':
         mst_learner_weights='all',
         lrn_warm_start=False,
         mst_time_limit=None,
-        mst_custom_args={'verbose': True}
+        mst_custom_args={'verbose': False}
     )
     plot_args = dict(columns=[
         'learner/loss',
@@ -179,5 +180,5 @@ if __name__ == '__main__':
         'metrics/test metric',
         'metrics/avg. violation'
     ])
-    manager.validate(num_folds=10, iterations=iterations, callbacks=[FileLogger()], summary_args={}, verbose=False)
-    # manager.test(iterations=iterations, callbacks=None, plot_args=plot_args, summary_args={}, verbose=True)
+    # manager.validate(iterations=iterations, callbacks=None, summary_args={}, verbose=False)
+    manager.test(iterations=iterations, callbacks=None, plot_args=plot_args, summary_args={}, verbose=True)

@@ -1,7 +1,8 @@
 """Type aliases."""
 
-import numpy as np
 from typing import Union, List, Dict, Callable, Tuple, Optional, Any
+
+import numpy as np
 
 from moving_targets.util.typing import Matrix, Number
 

@@ -1,9 +1,9 @@
 """Gurobi Master interface."""
 import logging
-
-import numpy as np
 from abc import ABC
 from typing import Optional
+
+import numpy as np
 from gurobipy import Model, Env, GRB, Var
 
 from moving_targets.masters.losses import LossesHandler

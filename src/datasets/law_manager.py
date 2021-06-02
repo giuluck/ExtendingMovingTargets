@@ -1,15 +1,15 @@
 """Law Data Manager."""
 
+from typing import Optional
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
-from typing import List
 from sklearn.metrics import accuracy_score
 
-from moving_targets.util.typing import Dataset
+from moving_targets.util.typing import Splits
 from src.datasets.data_manager import DataManager
-from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
 from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize, TightLayout
@@ -28,6 +28,7 @@ class LawManager(DataManager):
             x_scaling=x_scaling,
             y_column='pass',
             y_scaling=y_scaling,
+            directions=[1, 1],
             metric=accuracy_score,
             metric_name='acc',
             post_process=lambda x: x.round().astype(int),
@@ -37,11 +38,7 @@ class LawManager(DataManager):
             summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=50)
         )
 
-    # noinspection PyMissingOrEmptyDocstring
-    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
-        return compute_numeric_monotonicities(samples, references, directions=[1, 1], eps=eps)
-
-    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
         assert extrapolation is False, "'extrapolation' is not supported for Law dataset"
         # preprocess data
         df = pd.read_csv(self.filepath)[['lsat', 'ugpa', 'pass_bar']]

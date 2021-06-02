@@ -1,14 +1,15 @@
 """Restaurants Data Manager."""
 
+from typing import Tuple, Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Tuple, List
 from sklearn.metrics import roc_auc_score, r2_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
-from moving_targets.util.typing import Vector, Dataset
+from moving_targets.util.typing import Vector, Splits
 from src.datasets.data_manager import DataManager
 from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
 
@@ -104,6 +105,7 @@ class RestaurantsManager(DataManager):
             x_scaling=dict(avg_rating=x_scaling, num_reviews=x_scaling),
             y_column='clicked',
             y_scaling=None,
+            directions=[1, 1, 'categorical', 'categorical', 'categorical' 'categorical'],
             metric=roc_auc_score,
             metric_name='auc',
             grid=grid,
@@ -151,7 +153,7 @@ class RestaurantsManager(DataManager):
             dollar_rating: (num_augmented, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
-    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
         assert extrapolation is False, "'extrapolation' is not supported for Restaurants dataset"
         rng = np.random.default_rng(seed=0)
         # generate and split train/test

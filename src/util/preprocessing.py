@@ -1,6 +1,6 @@
 """Processing utils."""
 
-from typing import Union, Dict, Tuple, List, Optional as Opt
+from typing import Union, Dict, Tuple, List, Optional as Opt, Any
 
 import numpy as np
 import pandas as pd
@@ -109,7 +109,7 @@ class Scaler:
         return (data * self.scaling) + self.translation
 
     @staticmethod
-    def get_default(num_features: int) -> object:
+    def get_default(num_features: int) -> Any:
         """Builds a blank scaler which works on data with the given number of features.
 
         Args:
@@ -121,7 +121,7 @@ class Scaler:
         return Scaler(methods=None).fit(data=[[0.] * num_features])
 
 
-Scalers = Union[None, Scaler, Tuple[Scaler, Scaler]]
+Scalers = Union[Opt[Scaler], Tuple[Opt[Scaler], Opt[Scaler]]]
 SplitArgs = Union[Matrix, Vector]
 ValidationArgs = Union[pd.DataFrame, pd.Series]
 

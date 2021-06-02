@@ -1,13 +1,14 @@
 """Semantic-Based Regularizer Manager."""
 
-import numpy as np
 from typing import Any, Callable, Optional
+
+import numpy as np
 from tensorflow.python.keras.callbacks import EarlyStopping
 
-from experimental.models.managers import MLPManager
-from src.models import SBR, SBRBatchGenerator, UnivariateSBR
 from experimental.datasets.managers import TestManager, Fold
+from experimental.models.managers import MLPManager
 from experimental.models.managers.model_manager import ModelManager
+from src.models import SBR, SBRBatchGenerator, UnivariateSBR
 
 
 # noinspection PyMissingOrEmptyDocstring

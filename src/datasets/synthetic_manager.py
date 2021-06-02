@@ -1,15 +1,15 @@
 """Synthetic Data Manager."""
 
+from typing import Union, Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from typing import Union, List
 from sklearn.metrics import r2_score
 
-from moving_targets.util.typing import Number, Vector, Dataset
+from moving_targets.util.typing import Number, Vector, Splits
 from src.datasets.data_manager import DataManager
-from src.util.augmentation import compute_numeric_monotonicities
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, Rng, SamplingFunctions, Figsize, TightLayout
@@ -42,6 +42,7 @@ class SyntheticManager(DataManager):
             x_scaling=x_scaling,
             y_column='label',
             y_scaling=y_scaling,
+            directions=[1, 0],
             metric=r2_score,
             metric_name='r2',
             grid=pd.DataFrame({'a': a.flatten(), 'b': b.flatten()}),
@@ -50,11 +51,7 @@ class SyntheticManager(DataManager):
             summary_kwargs=dict(figsize=(10, 4), tight_layout=True, res=50)
         )
 
-    # noinspection PyMissingOrEmptyDocstring
-    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
-        return compute_numeric_monotonicities(samples, references, directions=[1, 0], eps=eps)
-
-    def _load_splits(self, num_folds: int, extrapolation: bool) -> List[Dataset]:
+    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
         rng = np.random.default_rng(seed=0)
         # generate and split train/test
         if extrapolation:
