@@ -8,30 +8,30 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import shutil
 import time
 
-from experimental.datasets.managers import CarsTest, SyntheticTest, PuzzlesTest
-from experimental.models.managers import MLPManager, SBRManager, MTManager
+from experimental.datasets.managers import CarsTest, SyntheticTest, PuzzlesTest, RestaurantsTest, DefaultTest, LawTest
+from experimental.models.managers import MLPManager, SBRManager, MTManager, TFLManager
 
 if __name__ == '__main__':
-    study = [
-        # CARS
-        MLPManager(test_manager=CarsTest(), wandb_name='MLP'),
-        SBRManager(test_manager=CarsTest(), regularizer_act=None, wandb_name='SBR'),
-        MTManager(test_manager=CarsTest(mst_alpha=0.01), iterations=20, wandb_name='MT 0.01'),
-        MTManager(test_manager=CarsTest(mst_alpha=0.1), iterations=20, wandb_name='MT 0.1'),
-        MTManager(test_manager=CarsTest(mst_alpha=1.0), iterations=20, wandb_name='MT 1.0'),
-        # SYNTHETIC
-        MLPManager(test_manager=SyntheticTest(), wandb_name='MLP'),
-        SBRManager(test_manager=SyntheticTest(), regularizer_act=None, wandb_name='SBR'),
-        MTManager(test_manager=SyntheticTest(mst_alpha=0.01), iterations=20, wandb_name='MT 0.01'),
-        MTManager(test_manager=SyntheticTest(mst_alpha=0.1), iterations=20, wandb_name='MT 0.1'),
-        MTManager(test_manager=SyntheticTest(mst_alpha=1.0), iterations=20, wandb_name='MT 1.0'),
-        # PUZZLES
-        MLPManager(test_manager=PuzzlesTest(), wandb_name='MLP'),
-        SBRManager(test_manager=PuzzlesTest(), regularizer_act=None, wandb_name='SBR'),
-        MTManager(test_manager=PuzzlesTest(mst_alpha=0.01), iterations=20, wandb_name='MT 0.01'),
-        MTManager(test_manager=PuzzlesTest(mst_alpha=0.1), iterations=20, wandb_name='MT 0.1'),
-        MTManager(test_manager=PuzzlesTest(mst_alpha=1.0), iterations=20, wandb_name='MT 1.0')
-    ]
+    alphas = [0.01, 0.1, 1.0]
+    for manager in [CarsTest, SyntheticTest, PuzzlesTest, RestaurantsTest, DefaultTest, LawTest]:
+        benchmarks = [
+            MLPManager(test_manager=manager(), wandb_name='MLP'),
+            SBRManager(test_manager=manager(), wandb_name='SBR'),
+            TFLManager(test_manager=manager(), wandb_name='TFL')
+        ]
+        if manager in [CarsTest, SyntheticTest, PuzzlesTest]:
+            mts = [MTManager(test_manager=manager(mst_alpha=a), iterations=20, wandb_name=f'MT {a}') for a in alphas]
+        else:
+            mtc = [MTManager(test_manager=manager(mst_alpha=a, master_kind='classification', mst_loss_fn='rbce'),
+                             iterations=10, wandb_name=f'MT BCE {a}') for a in alphas]
+            mtr = [MTManager(test_manager=manager(mst_alpha=a, master_kind='regression', mst_loss_fn='mse'),
+                             iterations=20, wandb_name=f'MT MSE {a}') for a in alphas]
+            mts = mtc + mtr
+    # noinspection PyTypeChecker
+    study = benchmarks + mts
+    for i, s in enumerate(study):
+        print(i, '-->', s)
+    exit()
 
     # begin study
     for i, manager in enumerate(study):
