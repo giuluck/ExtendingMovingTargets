@@ -127,8 +127,8 @@ ValidationArgs = Union[pd.DataFrame, pd.Series]
 
 
 def split_dataset(*args: SplitArgs,
-                  test_size: float = 0.2,
-                  val_size: Opt[float] = None,
+                  test_size: Union[int, float] = 0.2,
+                  val_size: Union[None, int, float] = None,
                   extrapolation: Extrapolation = None,
                   **kwargs) -> Dict:
     """Splits the input data.

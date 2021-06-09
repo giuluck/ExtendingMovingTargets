@@ -26,7 +26,7 @@ class MACS(Logger):
                  init_step: str = 'pretraining',
                  metrics: Opt[List[Metric]] = None):
         super(MACS, self).__init__()
-        assert init_step in ['pretraining', 'projection'], f"'{initial_step}' is not a valid initial step"
+        assert init_step in ['pretraining', 'projection'], f"'{init_step}' is not a valid initial step"
         self.learner: Learner = learner
         self.master: Master = master
         self.init_step: str = init_step
@@ -60,13 +60,13 @@ class MACS(Logger):
         assert isinstance(verbose, bool) or (isinstance(verbose, int) and verbose in [0, 1, 2]), 'unknown verbosity'
         val_data = {} if val_data is None else (val_data if isinstance(val_data, dict) else {'val': val_data})
 
-        # handle callbacks and verbosity
+        # handle callbacks and verbosity (test for bool before testing for int, as True/False are instances of int)
         callbacks = [] if callbacks is None else callbacks
         print_callback = []
-        if isinstance(verbose, int):
-            print_callback = [FileLogger()] if verbose == 2 else ([ConsoleLogger()] if verbose == 1 else [])
-        elif isinstance(verbose, bool):
+        if isinstance(verbose, bool):
             print_callback = [FileLogger()] if verbose else []
+        elif isinstance(verbose, int):
+            print_callback = [FileLogger()] if verbose == 2 else ([ConsoleLogger()] if verbose == 1 else [])
         callbacks = print_callback + callbacks
         self._update_callbacks(callbacks, lambda c: c.on_process_start(self, x=x, y=y, val_data=val_data))
 

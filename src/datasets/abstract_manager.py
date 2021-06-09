@@ -14,7 +14,7 @@ from src.util.preprocessing import Scaler, Scalers, split_dataset, cross_validat
 from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, TightLayout, AugmentedData, Rng
 
 
-class DataManager:
+class AbstractManager:
     """Abstract dataset handler.
 
     Args:
@@ -104,7 +104,7 @@ class DataManager:
             stratify = y if stratify else None
             if num_folds == 1:
                 folds = split_dataset(x, y, test_size=0.2, val_size=0.0, stratify=stratify, **kwargs)
-                folds['validation'] = folds['test']
+                folds['validation'] = folds.pop('test')
                 folds['test'] = splits['test']
                 return [folds]
             else:
@@ -130,7 +130,8 @@ class DataManager:
 
     def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
         """Routine to compute the monotonicities."""
-        return compute_numeric_monotonicities(samples, references, directions=list(self.directions.values()), eps=eps)
+        directions = list(self.directions.values())
+        return compute_numeric_monotonicities(samples, references, directions=np.array(directions), eps=eps)
 
     def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Scaler, Scaler]:
         """Returns the dataset scalers."""
@@ -153,8 +154,8 @@ class DataManager:
             return splits, self.get_scalers(splits['train'][0], splits['train'][1])
 
     def get_augmented_data(self,
-                           x: Matrix,
-                           y: Vector,
+                           x: pd.DataFrame,
+                           y: pd.Series,
                            num_augmented: Opt[Augmented] = None,
                            num_random: int = 0,
                            num_ground: Opt[int] = None,
@@ -162,6 +163,7 @@ class DataManager:
                            seed: int = 0) -> Tuple[AugmentedData, Scalers]:
         """Builds the augmented dataset."""
         rng = np.random.default_rng(seed=seed)
+        x, y = x.reset_index(drop=True), y.reset_index(drop=True)
         # handle input samples reduction
         if num_ground is not None:
             x = x.head(num_ground)

@@ -9,12 +9,12 @@ import seaborn as sns
 from sklearn.metrics import accuracy_score
 
 from moving_targets.util.typing import Splits
-from src.datasets.data_manager import DataManager
+from src.datasets.abstract_manager import AbstractManager
 from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, SamplingFunctions, Rng, Figsize, TightLayout
 
 
-class DefaultManager(DataManager):
+class DefaultManager(AbstractManager):
     """Data Manager for the Default Dataset."""
 
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}

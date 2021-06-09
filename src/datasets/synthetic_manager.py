@@ -9,13 +9,13 @@ import seaborn as sns
 from sklearn.metrics import r2_score
 
 from moving_targets.util.typing import Number, Vector, Splits
-from src.datasets.data_manager import DataManager
+from src.datasets.abstract_manager import AbstractManager
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, Rng, SamplingFunctions, Figsize, TightLayout
 
 
-class SyntheticManager(DataManager):
+class SyntheticManager(AbstractManager):
     """Data Manager for the Synthetic Dataset."""
 
     @staticmethod

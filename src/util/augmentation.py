@@ -5,12 +5,12 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from moving_targets.util.typing import Matrix, Vector, Monotonicities
-from src.util.typing import SamplingFunctions, AugmentedData, Directions
+from moving_targets.util.typing import Monotonicities
+from src.util.typing import SamplingFunctions, AugmentedData
 
 
-def augment_data(x: Matrix,
-                 y: Vector,
+def augment_data(x: pd.DataFrame,
+                 y: pd.Series,
                  sampling_functions: SamplingFunctions,
                  compute_monotonicities: Optional[Callable] = None) -> AugmentedData:
     """Augments the dataset using the given sampling functions, then computes its monotonicities wrt the ground samples.
@@ -25,6 +25,7 @@ def augment_data(x: Matrix,
         A tuple of augmented inputs/labels. The labels are no more in form of a vector, but rather a `DataFrame` with
         two additional features: 'ground_index' and 'monotonicity' (wrt the ground index).
     """
+    x, y = x.reset_index(drop=True), y.reset_index(drop=True)
     new_samples = []
     new_info = []
     for ground_index, sample in x.iterrows():
@@ -60,7 +61,7 @@ def augment_data(x: Matrix,
 
 def compute_numeric_monotonicities(samples: np.ndarray,
                                    references: np.ndarray,
-                                   directions: Directions,
+                                   directions: np.ndarray,
                                    eps: float = 1e-6) -> np.ndarray:
     """Default way of computing monotonicities in case all the features are numeric.
 
@@ -74,6 +75,10 @@ def compute_numeric_monotonicities(samples: np.ndarray,
         A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled with
         -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
     """
+    assert samples.ndim <= 2, f"'samples' should have 2 dimensions at most, but it has {samples.ndim}"
+    assert references.ndim <= 2, f"'references' should have 2 dimensions at most, but it has {references.ndim}"
+    # convert vectors into a matrices
+    samples, references = np.atleast_2d(samples), np.atleast_2d(references)
     # increase samples dimension to match references
     samples = np.hstack([samples] * len(references)).reshape((len(samples), len(references), -1))
     # compute differences between samples to get the number of different attributes
@@ -83,8 +88,10 @@ def compute_numeric_monotonicities(samples: np.ndarray,
     # get whole monotonicity (sum of monotonicity signs) and mask for pairs with just one different attribute
     # directions is either a float or an array that says whether the monotonicity is increasing or decreasing (or null)
     monotonicities = np.sign(directions * differences).sum(axis=-1)
-    monotonicities = monotonicities.astype('int') * (num_differences == 1)
-    return monotonicities
+    monotonicities = np.squeeze(monotonicities * (num_differences == 1)).astype('int')
+    # if a there is a single sample and a single reference, numpy.sum(axis=-1) will return a zero-dimensional array
+    # instead of a scalar, thus it is necessary to manually handle this case
+    return np.int32(monotonicities) if monotonicities.ndim == 0 else monotonicities
 
 
 def get_monotonicities_list(data: pd.DataFrame,

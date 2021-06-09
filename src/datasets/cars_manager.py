@@ -9,12 +9,12 @@ import seaborn as sns
 from sklearn.metrics import r2_score
 
 from moving_targets.util.typing import Splits
-from src.datasets.data_manager import DataManager
+from src.datasets.abstract_manager import AbstractManager
 from src.util.preprocessing import split_dataset
 from src.util.typing import Augmented, SamplingFunctions, Methods, Rng, Figsize, TightLayout
 
 
-class CarsManager(DataManager):
+class CarsManager(AbstractManager):
     """Data Manager for the Cars Dataset."""
 
     def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',

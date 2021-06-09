@@ -1,6 +1,6 @@
 """Semantic-Based Regularized MLP Model."""
 
-from typing import Optional, Callable
+from typing import Optional, Callable, Union
 
 import numpy as np
 import pandas as pd
@@ -9,6 +9,7 @@ import tensorflow.keras.backend as k
 from tensorflow.keras.metrics import Mean
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import Sequence
+from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2
 
 from moving_targets.util.typing import Matrix, Vector
 from src.models.mlp import MLP
@@ -53,8 +54,7 @@ class SBRBatchGenerator(Sequence):
         # place labelled values at the beginning, then shuffle the indices and create batches based on the index value
         data = data.sort_values(['index', 'label'], ascending=[True, False], ignore_index=True).astype('float32')
         shuffle = np.random.permutation(data['index'].unique())
-        shuffle = {i: m for i, m in enumerate(shuffle)}
-        data['batch'] = data['index'].map(shuffle) // batch_size
+        data['batch'] = data['index'].map({i: m for i, m in enumerate(shuffle)}) // batch_size
         # store list of batches by grouping dataframe by batches
         self.batches = [b.drop(['batch', 'index'], axis=1).reset_index(drop=True) for _, b in data.groupby('batch')]
 
@@ -79,14 +79,15 @@ class SBR(MLP):
         **kwargs: super-class arguments.
     """
 
-    def __init__(self, alpha: Optional[float] = None, regularizer_act: Optional[Callable] = None, **kwargs):
-        super(SBR, self).__init__(**kwargs)
-        if alpha is None:
-            self.alpha = tf.Variable(0., name='alpha')
-            self.alpha_optimizer = Adam()
-        else:
-            self.alpha = alpha
+    def __init__(self, alpha: Union[None, float, OptimizerV2] = None, regularizer_act: Optional[Callable] = None, **kw):
+        super(SBR, self).__init__(**kw)
+        if isinstance(alpha, float):
+            # we use a tf.Variable as well in order to retrieve nn_vars in an easier way as trainable_variables[:-1]
+            self.alpha = tf.Variable(alpha, name='alpha')
             self.alpha_optimizer = None
+        else:
+            self.alpha = tf.Variable(0., name='alpha')
+            self.alpha_optimizer = Adam(learning_rate=1.0) if alpha is None else alpha
         self.regularizer_act = regularizer_act
         self.alpha_tracker = Mean(name='alpha')
         self.tot_loss_tracker = Mean(name='tot_loss')
@@ -117,15 +118,14 @@ class SBR(MLP):
     def train_step(self, d):
         # unpack training data
         x, y = d
-        # split trainable variables
         nn_vars = self.trainable_variables[:-1]
         alpha_var = self.trainable_variables[-1:]
-        # first optimization step (network parameters)
+        # first optimization step: network parameters with alpha (last var) excluded -> loss minimization
         with tf.GradientTape() as tape:
-            tot_loss, def_loss, reg_loss = self._custom_loss(x, y)
+            tot_loss, def_loss, reg_loss = self._custom_loss(x, y, sign=1)
         grads = tape.gradient(tot_loss, nn_vars)
         self.optimizer.apply_gradients(zip(grads, nn_vars))
-        # second optimization step (alpha: maximization)
+        # second optimization step: alpha only -> loss maximization
         if self.alpha_optimizer is not None:
             with tf.GradientTape() as tape:
                 tot_loss, def_loss, reg_loss = self._custom_loss(x, y, sign=-1)
@@ -179,6 +179,6 @@ class UnivariateSBR(SBR):
         y_deltas = tf.repeat(pred, tf.size(pred), axis=1) - tf.squeeze(pred)
         if self.regularizer_act is not None:
             y_deltas = self.regularizer_act(y_deltas)
-        reg_loss = k.sum(k.maximum(0., -self.direction * tf.sign(x_deltas) * y_deltas))
+        reg_loss = k.mean(k.maximum(0., -self.direction * tf.sign(x_deltas) * y_deltas))
         # final losses
         return sign * (def_loss + self.alpha * reg_loss), def_loss, reg_loss

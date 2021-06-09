@@ -10,11 +10,11 @@ from sklearn.metrics import roc_auc_score, r2_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
 from moving_targets.util.typing import Vector, Splits
-from src.datasets.data_manager import DataManager
+from src.datasets.abstract_manager import AbstractManager
 from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
 
 
-class RestaurantsManager(DataManager):
+class RestaurantsManager(AbstractManager):
     """Data Manager for the Restaurant Dataset."""
 
     @staticmethod
@@ -126,6 +126,11 @@ class RestaurantsManager(DataManager):
             mono += 1 * (diffs == -6) - 1 * (diffs == 6)  # DD (2) > DDDD (8) -> DD - DDDD = -6, DDDD - DD = 6
             return mono
 
+        # check dimensions convert vectors into a matrices
+        assert samples.ndim <= 2, f"'samples' should have 2 dimensions at most, but it has {samples.ndim}"
+        assert references.ndim <= 2, f"'references' should have 2 dimensions at most, but it has {references.ndim}"
+        # convert vectors into a matrices
+        samples, references = np.atleast_2d(samples), np.atleast_2d(references)
         # transpose tensors to get shape (6, ...)
         samples, references = samples.copy().transpose(), references.copy().transpose()
         # store categorical values into single element (D -> 1, DD -> 2, DDD -> 4, DDDD -> 8)
@@ -137,13 +142,15 @@ class RestaurantsManager(DataManager):
         # compute differences between samples to get the number of different attributes
         differences = (samples - references).transpose()
         differences[np.abs(differences) < eps] = 0.
-        num_differences = np.sign(np.abs(differences)).sum(axis=0)
+        num_differences = np.sign(np.abs(differences)).sum(axis=0).transpose()
         # convert categorical differences to monotonicities and get whole monotonicity (sum of monotonicity signs)
         differences[-1] = _categorical_monotonicities(differences[-1])
         monotonicities = np.sign(differences).sum(axis=0).transpose()
         # the final monotonicities are masked for pairs with just one different attribute
-        monotonicities = monotonicities.astype('int') * (num_differences == 1)
-        return monotonicities
+        monotonicities = np.squeeze(monotonicities * (num_differences == 1)).astype('int')
+        # if a there is a single sample and a single reference, numpy.sum(axis=-1) will return a zero-dimensional array
+        # instead of a scalar, thus it is necessary to manually handle this case
+        return np.int32(monotonicities) if monotonicities.ndim == 0 else monotonicities
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 5) -> SamplingFunctions:
         dollar_rating = ('D', 'DD', 'DDD', 'DDDD')
