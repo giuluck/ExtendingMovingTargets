@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import roc_auc_score, r2_score
+from sklearn.metrics import roc_auc_score, r2_score, log_loss
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
 from moving_targets.util.typing import Vector, Splits
@@ -106,6 +106,8 @@ class RestaurantsManager(AbstractManager):
             y_column='clicked',
             y_scaling=None,
             directions=[1, 1, 'categorical', 'categorical', 'categorical' 'categorical'],
+            loss=log_loss,
+            loss_name='bce',
             metric=roc_auc_score,
             metric_name='auc',
             grid=grid,
@@ -186,7 +188,6 @@ class RestaurantsManager(AbstractManager):
 
     def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         res = kwargs.pop('res')
-        print(f'{self.compute_ground_r2(model):.4} (ground r2)')
         self.plot_conclusions(figsize=figsize, tight_layout=tight_layout, res=res, orient_columns=False, models={
             'Estimated CTR': model,
             'Real CTR': RestaurantsManager

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, log_loss
 
 from moving_targets.util.typing import Splits
 from src.datasets.abstract_manager import AbstractManager
@@ -29,6 +29,8 @@ class LawManager(AbstractManager):
             y_column='pass',
             y_scaling=y_scaling,
             directions=[1, 1],
+            loss=log_loss,
+            loss_name='bce',
             metric=accuracy_score,
             metric_name='acc',
             post_process=lambda x: x.round().astype(int),

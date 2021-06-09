@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 
 from moving_targets.util.typing import Number, Vector, Splits
 from src.datasets.abstract_manager import AbstractManager
@@ -43,6 +43,8 @@ class SyntheticManager(AbstractManager):
             y_column='label',
             y_scaling=y_scaling,
             directions=[1, 0],
+            loss=mean_squared_error,
+            loss_name='mse',
             metric=r2_score,
             metric_name='r2',
             grid=pd.DataFrame({'a': a.flatten(), 'b': b.flatten()}),

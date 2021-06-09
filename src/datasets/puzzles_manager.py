@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 
 from moving_targets.util.typing import Splits
 from src.datasets.abstract_manager import AbstractManager
@@ -33,6 +33,8 @@ class PuzzlesManager(AbstractManager):
             y_column='label',
             y_scaling=y_scaling,
             directions=[-1, 1, 1],
+            loss=mean_squared_error,
+            loss_name='mse',
             metric=r2_score,
             metric_name='r2',
             grid=pd.DataFrame({'word_count': wc.flatten(), 'star_rating': sr.flatten(), 'num_reviews': nr.flatten()}),

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 
 from moving_targets.util.typing import Splits
 from src.datasets.abstract_manager import AbstractManager
@@ -27,6 +27,8 @@ class CarsManager(AbstractManager):
             y_column='sales',
             y_scaling=y_scaling,
             directions=[-1],
+            loss=mean_squared_error,
+            loss_name='mse',
             metric=r2_score,
             metric_name='r2',
             grid=pd.DataFrame.from_dict({'price': np.linspace(self.bound[0], self.bound[1], res)}),

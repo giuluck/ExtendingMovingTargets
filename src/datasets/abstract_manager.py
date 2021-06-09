@@ -1,6 +1,6 @@
 """Data Manager."""
 
-from typing import List, Callable, Tuple, Dict, Optional as Opt, Union
+from typing import List, Callable, Tuple, Dict, Optional as Opt, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,20 +56,24 @@ class AbstractManager:
                  y_column: str,
                  y_scaling: Methods,
                  directions: List,
+                 loss: Callable,
                  metric: Callable,
                  grid: pd.DataFrame,
                  data_kwargs: Dict,
                  augmented_kwargs: Dict,
                  summary_kwargs: Dict,
-                 metric_name: str = None,
+                 loss_name: Optional[str] = None,
+                 metric_name: Optional[str] = None,
                  post_process: Callable = None):
         self.x_columns: List[str] = x_columns
         self.x_scaling: Methods = x_scaling
         self.y_column: str = y_column
         self.y_scaling: Methods = y_scaling
         self.directions: Dict = {k: v for k, v in zip(x_columns, directions)}
+        self.loss: Callable = loss
+        self.loss_name: Optional[str] = loss_name
         self.metric: Callable = metric
-        self.metric_name: str = metric_name
+        self.metric_name: Optional[str] = metric_name
         self.post_process: Callable = post_process
         self.grid: pd.DataFrame = grid
         self.monotonicities: Monotonicities = get_monotonicities_list(
@@ -207,6 +211,26 @@ class AbstractManager:
         self._augmented_plot(aug=aug, **kwargs)
         plt.show()
 
+    def losses_summary(self, model, return_type: str = 'str', **kwargs) -> Union[str, Dict[str, float]]:
+        """Computes the losses over a custom set of validation data, then builds a summary.
+
+        Args:
+            model: a model object having the 'predict(x)' method.
+            return_type: either 'str' to return the string, or 'dict' to return the dictionary.
+            **kwargs: a dictionary of named `Data` arguments.
+
+        Returns:
+            Either a dictionary for the metric values or a string representing the evaluation summary.
+        """
+        return metrics_summary(
+            model=model,
+            metric=self.loss,
+            metric_name=self.loss_name,
+            post_process=None,
+            return_type=return_type,
+            **kwargs
+        )
+
     def metrics_summary(self, model, return_type: str = 'str', **kwargs) -> Union[str, Dict[str, float]]:
         """Computes the metrics over a custom set of validation data, then builds a summary.
 
@@ -247,8 +271,9 @@ class AbstractManager:
     def evaluation_summary(self, model, **kwargs):
         """Evaluates the model."""
         # compute metrics on kwargs
-        print(self.violations_summary(model=model, return_type='str'))
+        print(self.losses_summary(model=model, return_type='str', **kwargs))
         print(self.metrics_summary(model=model, return_type='str', **kwargs))
+        print(self.violations_summary(model=model, return_type='str'))
         # plot summary
         kwargs = self.get_kwargs(default=self.summary_kwargs, **kwargs)
         self._summary_plot(model=model, **kwargs)

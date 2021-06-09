@@ -86,9 +86,15 @@ class AbstractHandler:
         if self.wandb_args is not None:
             config = {**self.wandb_args.pop('config'), 'fold': index}
             wandb.init(**self.wandb_args, config=config)
+            losses = self.manager.losses_summary(model, return_type='dict', **fold.validation)
             metrics = self.manager.metrics_summary(model, return_type='dict', **fold.validation)
             violations = self.manager.violations_summary(model, return_type='dict')
-            wandb.log({**violations, **{f'{t}_metric': v for t, v in metrics.items()}, 'elapsed_time': elapsed_time})
+            wandb.log({
+                **violations,
+                **{f'{t}_loss': v for t, v in losses.items()},
+                **{f'{t}_metric': v for t, v in metrics.items()},
+                'elapsed_time': elapsed_time
+            })
             wandb.finish()
         if summary_args is not None:
             self.manager.evaluation_summary(model, **fold.validation, **summary_args)
