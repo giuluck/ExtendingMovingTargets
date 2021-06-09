@@ -13,7 +13,7 @@ from src.util.typing import Augmented
 
 # noinspection PyMissingOrEmptyDocstring
 class DatasetFactory:
-    def __init__(self, res_folder: Optional[str] = '../res/', temp_folder: Optional[str] = 'temp/'):
+    def __init__(self, res_folder: Optional[str] = '../res/', temp_folder: Optional[str] = '../temp/'):
         self.res_folder: Optional[str] = res_folder.strip('/')
         self.temp_folder: Optional[str] = temp_folder.strip('/')
 

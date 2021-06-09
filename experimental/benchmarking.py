@@ -1,16 +1,15 @@
 """Benchmarking Script."""
 
 import os
-
 import wandb
-
-from experimental.utils import DatasetFactory
 
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import time
 import shutil
+
+from experimental.utils import DatasetFactory
 
 if __name__ == '__main__':
     alphas = [0.01, 0.1, 1.0]
@@ -25,7 +24,7 @@ if __name__ == '__main__':
         if dataset in ['cars', 'synthetic', 'puzzles']:
             mts = [factory.get_mt(mt_iterations=20, mst_alpha=alpha, wandb_name=f'MT {alpha}') for alpha in alphas]
         else:
-            mtr = [factory.get_mt(mt_iterations=20, mst_master_kind='regression', mst_loss_fn='mse',
+            mtr = [factory.get_mt(mt_iterations=20, mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse',
                                   mst_alpha=alpha, wandb_name=f'MT MSE {alpha}') for alpha in alphas]
             mtc = [factory.get_mt(mt_iterations=5, mst_master_kind='classification', mst_loss_fn='rbce',
                                   mst_alpha=alpha, wandb_name=f'MT BCE {alpha}') for alpha in alphas]

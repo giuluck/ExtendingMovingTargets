@@ -1,6 +1,7 @@
 """Semantic-Based Regularizer Handler."""
 
 from typing import Any, Callable, Optional, Union
+
 import numpy as np
 from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2
 

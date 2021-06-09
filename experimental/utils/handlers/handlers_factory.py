@@ -1,6 +1,7 @@
 """Model Handler's Factory."""
 
 from typing import Optional, List, Dict
+
 from tensorflow.python.keras.callbacks import Callback
 
 from experimental.utils.handlers.mlp_handler import MLPHandler
@@ -16,8 +17,8 @@ from src.util.typing import Augmented
 class HandlersFactory:
     def __init__(self,
                  manager: AbstractManager,
-                 model_name: Optional[str] = None,
-                 dataset_name: Optional[str] = None,
+                 model: Optional[str] = None,
+                 dataset: Optional[str] = None,
                  wandb_project: Optional[str] = 'shape_constraints',
                  wandb_entity: Optional[str] = 'giuluck',
                  seed: int = 0,
@@ -38,8 +39,8 @@ class HandlersFactory:
                  master_kind: Optional[str] = None,
                  mt_metrics: Optional[List[Metric]] = None):
         self.manager: AbstractManager = manager
-        self.model_name: Optional[str] = model_name
-        self.dataset_name: Optional[str] = dataset_name
+        self.model: Optional[str] = model
+        self.dataset: Optional[str] = dataset
         self.wandb_project: Optional[str] = wandb_project
         self.wandb_entity: Optional[str] = wandb_entity
         self.seed: int = seed
@@ -64,8 +65,8 @@ class HandlersFactory:
     def _get_args(self, kwargs_dict: Dict, **kwargs_default) -> Dict:
         kwargs_default.update({
             'manager': self.manager,
-            'model_name': self.model_name,
-            'dataset_name': self.dataset_name,
+            'model': self.model,
+            'dataset': self.dataset,
             'wandb_project': self.wandb_project,
             'wandb_entity': self.wandb_entity,
             'seed': self.seed

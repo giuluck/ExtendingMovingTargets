@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from tensorflow.python.keras.callbacks import EarlyStopping, History
 
-from experimental.utils.handlers import AbstractHandler, Fold
+from experimental.utils.handlers import AbstractHandler, Fold, setup
 from moving_targets.callbacks import WandBLogger, Callback
 from moving_targets.metrics import Metric, MonotonicViolation
 from src.datasets import AbstractManager
@@ -25,7 +25,7 @@ class MTHandler(AbstractHandler):
                  aug_num_ground: Optional[int] = None,
                  mnt_kind: str = 'group',
                  mnt_errors: str = 'raise',
-                 mt_iterations: int = 10,
+                 mt_iterations: int = 1,
                  mt_init_step: str = 'pretraining',
                  mt_metrics: Optional[List[Metric]] = None,
                  mt_verbose: Union[int, bool] = False,
@@ -121,7 +121,7 @@ class MTHandler(AbstractHandler):
         return model, history
 
     def fit(self, fold: Fold) -> Any:
-        model = self._fit(fold=fold, iterations=self.iterations, metrics=False, callbacks=[], verbose=self.verbose)
+        model, _ = self._fit(fold=fold, iterations=self.iterations, metrics=False, callbacks=[], verbose=self.verbose)
         return model
 
     def experiment(self,
@@ -134,7 +134,7 @@ class MTHandler(AbstractHandler):
                    callbacks: Optional[List[Callback]] = None,
                    plot_args: Dict = None,
                    summary_args: Dict = None):
-        AbstractHandler.setup(seed=self.seed)
+        setup(seed=self.seed)
         callbacks = [] if callbacks is None else callbacks
         iterations = self.iterations if iterations is None else iterations
         fold_verbosity = False if num_folds == 1 else fold_verbosity
