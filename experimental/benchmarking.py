@@ -2,6 +2,8 @@
 
 import os
 
+import wandb
+
 from experimental.utils import DatasetFactory
 
 os.environ['WANDB_SILENT'] = 'true'
@@ -39,5 +41,7 @@ if __name__ == '__main__':
             manager.validate(num_folds=10, summary_args=None)
             print(f'-- elapsed time: {time.time() - start_time}')
         except:
+            wandb.init(**manager.wandb_args, config={'crashed': True})
+            wandb.finish()
             print('-- errors')
     shutil.rmtree('wandb')
