@@ -274,7 +274,7 @@ class AbstractManager:
             return_type=return_type
         )
 
-    def evaluation_summary(self, model, **kwargs):
+    def evaluation_summary(self, model, model_name: Optional[str] = None, **kwargs):
         """Evaluates the model."""
         # compute metrics on kwargs
         print(self.losses_summary(model=model, return_type='str', **kwargs))
@@ -283,4 +283,6 @@ class AbstractManager:
         # plot summary
         kwargs = self.get_kwargs(default=self.summary_kwargs, **kwargs)
         self._summary_plot(model=model, **kwargs)
+        if model_name:
+            plt.suptitle(model_name)
         plt.show()

@@ -87,12 +87,12 @@ class AbstractHandler:
         return folds
 
     def validate(self, num_folds: int = 10, folds_index: Optional[List[int]] = None,
-                 extrapolation: bool = False, summary_args: Dict = None):
+                 extrapolation: bool = False, summary_args: Optional[Dict] = None):
         for i, fold in enumerate(self.get_folds(num_folds=num_folds, extrapolation=extrapolation)):
             if folds_index is None or i in folds_index:
                 self._run_instance(fold=fold, index=i, summary_args=summary_args)
 
-    def test(self, extrapolation: bool = False, summary_args: Dict = None):
+    def test(self, extrapolation: bool = False, summary_args: Optional[Dict] = None):
         fold = self.get_folds(num_folds=1, extrapolation=extrapolation)[0]
         self._run_instance(fold=fold, index='test', summary_args=summary_args)
 

@@ -1,7 +1,7 @@
-"""Pipelines Tests."""
+"""Pipelines Abstract Tests."""
 import inspect
 import unittest
-from typing import Dict, Tuple, Type, Callable
+from typing import Dict, Tuple, Type, Callable, Optional
 
 import numpy as np
 
@@ -21,15 +21,21 @@ DATASETS: Dict[str, Tuple[Type, Type]] = {
     'law': (ClassificationFactory, LawManager)
 }
 MODELS: Dict[str, Tuple[Callable, Type]] = {
-    'mlp': (lambda f: f.get_mlp(epochs=0), MLPHandler),
-    'sbr': (lambda f: f.get_sbr(epochs=0), SBRHandler),
-    'sbr univariate': (lambda f: f.get_univariate_sbr(epochs=0), UnivariateSBRHandler),
-    'tfl': (lambda f: f.get_tfl(epochs=0), TFLHandler),
-    'mt': (lambda f: f.get_mt(lrn_epochs=0, aug_num_ground=2, mt_iterations=1), MTHandler)
+    'mlp': (lambda f, p: f.get_mlp(**p), MLPHandler),
+    'sbr': (lambda f, p: f.get_sbr(**p), SBRHandler),
+    'sbr univariate': (lambda f, p: f.get_univariate_sbr(**p), UnivariateSBRHandler),
+    'tfl': (lambda f, p: f.get_tfl(**p), TFLHandler),
+    'mt': (lambda f, p: f.get_mt(**p), MTHandler)
 }
 
 
 class TestPipelines(unittest.TestCase):
+    def _model_parameters(self, model: str, dataset: str) -> Optional[Dict]:
+        raise NotImplementedError("please implement method '_model_parameters()'")
+
+    def _summary_args(self, model: str, dataset: str) -> Optional[Dict]:
+        raise NotImplementedError("please implement method '_summary_args()'")
+
     def _test(self):
         # the caller function name is in the form 'test_<optional: univariate>_<dataset>_<model>'
         # thus we split by '_' to retrieve the dataset and the model as the last two splits, then deal with univariate
@@ -45,10 +51,10 @@ class TestPipelines(unittest.TestCase):
         self.assertIsInstance(factory, expected_factory)
         # noinspection PyUnresolvedReferences
         self.assertIsInstance(factory.manager, expected_manager)
-        handler = handler_routine(factory)
+        handler = handler_routine(factory, self._model_parameters(model, dataset) or {})
         self.assertIsInstance(handler, expected_handler)
         # noinspection PyUnresolvedReferences
-        handler.test()
+        handler.test(summary_args=self._summary_args(model, dataset))
 
     def test_meta_tests(self):
         datasets, models = np.meshgrid(

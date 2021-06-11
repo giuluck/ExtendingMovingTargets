@@ -1,24 +1,25 @@
 """Moving Target's Test Script."""
 import numpy as np
+from tensorflow.python.keras.callbacks import EarlyStopping
 
 from experimental.utils import DatasetFactory
 
 if __name__ == '__main__':
-    iterations: int = 1
+    iterations: int = 0
     factory, callbacks = DatasetFactory().get_dataset(
-        name='law',
+        name='default',
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callbacks=['logger', 'adjustments', 'response']
     )
     manager = factory.get_mt(
         wandb_name=None,
         mst_master_kind='regression',
-        lrn_loss='binary_crossentropy',
+        lrn_loss='mse',
         lrn_warm_start=False,
         lrn_verbose=False,
         mst_backend='gurobi',
         mst_loss_fn='mse',
-        mst_alpha=0.01,
+        mst_alpha=1.0,
         mst_master_omega=1.0,
         mst_learner_omega=1.0,
         mst_learner_weights='all',

@@ -28,7 +28,7 @@ class PuzzlesManager(AbstractManager):
             np.linspace(self.bound['num_reviews'][0], self.bound['num_reviews'][1], res)
         )
         super(PuzzlesManager, self).__init__(
-            x_features={'word_count': -1, 'star_rating': -1, 'num_reviews': -1},
+            x_features={'word_count': -1, 'star_rating': 1, 'num_reviews': 1},
             x_scaling=x_scaling,
             y_feature='label',
             y_scaling=y_scaling,

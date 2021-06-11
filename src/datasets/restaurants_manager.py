@@ -61,7 +61,7 @@ class RestaurantsManager(AbstractManager):
 
     @staticmethod
     def plot_conclusions(models, figsize: Figsize = (10, 10), tight_layout: TightLayout = True,
-                         res: int = 100, orient_columns: bool = True):
+                         res: int = 100, orient_columns: bool = True, show: bool = True):
         """Plots the conclusions by comparing different models."""
         avg_ratings, num_reviews = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res))
         rows, cols = (4, len(models)) if orient_columns else (len(models), 4)
@@ -79,7 +79,8 @@ class RestaurantsManager(AbstractManager):
                 else:
                     axes[j, i].pcolor(avg_ratings, num_reviews, ctr.reshape(res, res), shading='auto', vmin=0, vmax=1)
                     axes[j, i].set(title=rating if j == 0 else None, xlabel=None, ylabel=title if i == 0 else None)
-        plt.show()
+        if show:
+            plt.show()
 
     @staticmethod
     def process_data(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
@@ -191,8 +192,5 @@ class RestaurantsManager(AbstractManager):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
     def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        res = kwargs.pop('res')
-        self.plot_conclusions(figsize=figsize, tight_layout=tight_layout, res=res, orient_columns=False, models={
-            'Estimated CTR': model,
-            'Real CTR': RestaurantsManager
-        })
+        self.plot_conclusions(models={'Estimated CTR': model, 'Real CTR': RestaurantsManager}, figsize=figsize,
+                              tight_layout=tight_layout, res=kwargs.pop('res'), orient_columns=False, show=False)
