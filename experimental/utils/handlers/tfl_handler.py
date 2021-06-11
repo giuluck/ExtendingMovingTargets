@@ -23,11 +23,13 @@ class TFLHandler(AbstractHandler):
 
     @staticmethod
     def get_numeric_features(columns: List[str], manager: AbstractManager) -> List[ColumnInfo]:
+        expected = list(manager.x_features.keys())
+        assert set(expected) <= set(columns), f"some of the expected columns {expected} are not present in {columns}"
         return [
             ColumnInfo(
                 name=column,
                 lattice_size=2,
-                monotonicity=manager.directions[column],
+                monotonicity=manager.x_features.get(column) or 0,
                 pwl_calibration_num_keypoints=25,
                 regularizer_configs=[tfl.configs.RegularizerConfig(name="calib_wrinkle", l2=1.0)]
             ) for column in columns

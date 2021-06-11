@@ -3,7 +3,7 @@
 from typing import Callable, Dict, Union
 
 from moving_targets.metrics import MonotonicViolation
-from moving_targets.util.typing import Data, Matrix, Monotonicities
+from moving_targets.util.typing import Data, Matrix, MonotonicitiesList
 
 
 def metrics_summary(model, metric, metric_name: str = None, post_process: Callable = None, return_type: str = 'str',
@@ -34,7 +34,9 @@ def metrics_summary(model, metric, metric_name: str = None, post_process: Callab
         ValueError(f"Unsupported return type '{return_type}'")
 
 
-def violations_summary(model, grid: Matrix, monotonicities: Monotonicities,
+def violations_summary(model,
+                       grid: Matrix,
+                       monotonicities: MonotonicitiesList,
                        return_type: str = 'str') -> Union[str, Dict[str, float]]:
     """Computes the violations over a custom set of validation data, then builds a summary.
 

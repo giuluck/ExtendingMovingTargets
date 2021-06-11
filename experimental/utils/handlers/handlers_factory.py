@@ -60,7 +60,6 @@ class HandlersFactory:
         self.errors: str = errors
         self.master_kind: Optional[str] = master_kind
         self.mt_metrics: Optional[List[Metric]] = mt_metrics
-        self.directions: Dict = manager.directions
 
     def _get_args(self, kwargs_dict: Dict, **kwargs_default) -> Dict:
         kwargs_default.update({
@@ -108,10 +107,12 @@ class HandlersFactory:
         ))
 
     def get_univariate_sbr(self, wandb_name: Optional[str] = None, **kwargs) -> UnivariateSBRHandler:
+        directions = list(self.manager.x_features.values())
+        assert len(directions) == 1
         return UnivariateSBRHandler(**self._get_args(
             kwargs_dict=kwargs,
             wandb_name=wandb_name,
-            direction=list(self.directions.values())[0],
+            direction=directions[0],
             loss=self.loss,
             optimizer=self.optimizer,
             output_act=self.output_act,

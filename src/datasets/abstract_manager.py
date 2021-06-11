@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from moving_targets.util.typing import Monotonicities, Vector, Matrix, Dataset, Splits
+from moving_targets.util.typing import MonotonicitiesList, Vector, Matrix, Dataset, Splits, MonotonicitiesMatrix
 from src.util.augmentation import get_monotonicities_list, augment_data, compute_numeric_monotonicities
 from src.util.model import violations_summary, metrics_summary
 from src.util.preprocessing import Scaler, Scalers, split_dataset, cross_validate
@@ -18,11 +18,10 @@ class AbstractManager:
     """Abstract dataset handler.
 
     Args:
-        x_columns: name of the x features.
+        x_features: dictionary containing the name of the x features and the respective expected monotonicity.
         x_scaling: x scaling methods.
-        y_column: name of the y feature.
+        y_feature: name of the y feature.
         y_scaling: y scaling method.
-        directions: monotonicity directions.
         metric: evaluation metric.
         grid: input space grid.
         data_kwargs: plot data arguments.
@@ -33,6 +32,7 @@ class AbstractManager:
     """
 
     DataInfo = Tuple[Dataset, Scalers]
+    Samples = Union[pd.DataFrame, pd.Series]
 
     @staticmethod
     def get_kwargs(default: Dict, **kwargs) -> Dict:
@@ -51,11 +51,10 @@ class AbstractManager:
         return output
 
     def __init__(self,
-                 x_columns: List[str],
+                 x_features: Dict[str, int],
                  x_scaling: Methods,
-                 y_column: str,
+                 y_feature: str,
                  y_scaling: Methods,
-                 directions: List,
                  loss: Callable,
                  metric: Callable,
                  grid: pd.DataFrame,
@@ -65,18 +64,25 @@ class AbstractManager:
                  loss_name: Optional[str] = None,
                  metric_name: Optional[str] = None,
                  post_process: Callable = None):
-        self.x_columns: List[str] = x_columns
+        self.x_features: Dict[str] = x_features
         self.x_scaling: Methods = x_scaling
-        self.y_column: str = y_column
+        self.y_feature: str = y_feature
         self.y_scaling: Methods = y_scaling
-        self.directions: Dict = {k: v for k, v in zip(x_columns, directions)}
+
+        # TODO: remove
+        # if isinstance(directions, Dict):
+        #     keys, columns = set(directions.keys()), set(x_features)
+        #     assert keys <= columns, f'the set of keys {keys} is not included in the set {columns} of given columns'
+        #     directions = {k: directions.get(k) or 0 for k in x_features}
+        # self.directions: List = directions
+
         self.loss: Callable = loss
         self.loss_name: Optional[str] = loss_name
         self.metric: Callable = metric
         self.metric_name: Optional[str] = metric_name
         self.post_process: Callable = post_process
         self.grid: pd.DataFrame = grid
-        self.monotonicities: Monotonicities = get_monotonicities_list(
+        self.monotonicities: MonotonicitiesList = get_monotonicities_list(
             data=self.grid,
             label=None,
             kind='all',
@@ -125,17 +131,17 @@ class AbstractManager:
         raise NotImplementedError("please implement method '_data_plot'")
 
     def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, axes = plt.subplots(1, len(self.x_columns), sharey='all', figsize=figsize, tight_layout=tight_layout)
-        for ax, feature in zip(axes, self.x_columns):
+        _, axes = plt.subplots(1, len(self.x_features), sharey='all', figsize=figsize, tight_layout=tight_layout)
+        for ax, feature in zip(axes, list(self.x_features.keys())):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
     def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         raise NotImplementedError("please implement method '_summary_plot'")
 
-    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
+    def compute_monotonicities(self, samples: Samples, references: Samples, eps: float = 1e-5) -> MonotonicitiesMatrix:
         """Routine to compute the monotonicities."""
-        directions = list(self.directions.values())
-        return compute_numeric_monotonicities(samples, references, directions=np.array(directions), eps=eps)
+        directions = np.array([self.x_features.get(c) or 0 for c in samples.columns])
+        return compute_numeric_monotonicities(samples.values, references.values, directions=directions, eps=eps)
 
     def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Scaler, Scaler]:
         """Returns the dataset scalers."""
@@ -188,8 +194,8 @@ class AbstractManager:
                                     y=y,
                                     sampling_functions=self._get_sampling_functions(rng=rng, **sampling_args),
                                     compute_monotonicities=self.compute_monotonicities if monotonicities else None)
-        mask = ~np.isnan(y_aug[self.y_column])
-        return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_column][mask])
+        mask = ~np.isnan(y_aug[self.y_feature])
+        return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.y_feature][mask])
 
     def plot_data(self, **kwargs):
         """Plots the given data."""
@@ -205,7 +211,7 @@ class AbstractManager:
         """Plots the given augmented data."""
         # retrieve augmented data
         aug = x.copy()
-        aug['Augmented'] = np.isnan(y[self.y_column])
+        aug['Augmented'] = np.isnan(y[self.y_feature])
         # plot augmented data
         kwargs = self.get_kwargs(default=self.augmented_kwargs, **kwargs)
         self._augmented_plot(aug=aug, **kwargs)

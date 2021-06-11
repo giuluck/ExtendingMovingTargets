@@ -91,11 +91,11 @@ class MTHandler(AbstractHandler):
 
     def _fit(self, fold: Fold, iterations: int, metrics: bool, callbacks: List[Callback],
              verbose: Union[bool, int]) -> Tuple[MT, History]:
-        label = self.manager.y_column
+        label = self.manager.y_feature
         (x, y), scalers = self.manager.get_augmented_data(x=fold.x, y=fold.y, monotonicities=False, **self.aug_args)
         mono = get_monotonicities_list(
             data=pd.concat((x, y), axis=1),
-            label=self.manager.y_column,
+            label=self.manager.y_feature,
             compute_monotonicities=self.manager.compute_monotonicities,
             **self.mono_args
         )

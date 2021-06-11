@@ -3,6 +3,7 @@ import unittest
 from collections import Callable
 
 import numpy as np
+import pandas as pd
 
 from src.datasets import RestaurantsManager
 from src.util.augmentation import compute_numeric_monotonicities
@@ -97,8 +98,15 @@ class TestMonotonicities(unittest.TestCase):
             [+1, .0, .0, .0, .0, .0, -1],
             [.0, .0, .0, .0, +1, +1, .0]
         ]).astype(int)
-        # noinspection PyTypeChecker
-        mono_fn = lambda samples, references: RestaurantsManager.compute_monotonicities(self=None,
-                                                                                        samples=samples,
-                                                                                        references=references)
-        self._test(data_points=data, monotonicities=mono, monotonicities_fn=mono_fn)
+
+        def _mono_fn(samples: np.ndarray, references: np.ndarray) -> np.ndarray:
+            columns = ['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']
+            samples = pd.DataFrame(samples.reshape(-1, 6), columns=columns)
+            if references.ndim == 1:
+                references = pd.DataFrame(references.reshape(-1, 6), columns=columns).iloc[0]
+            else:
+                references = pd.DataFrame(references.reshape(-1, 6), columns=columns)
+            # noinspection PyTypeChecker
+            return RestaurantsManager.compute_monotonicities(self=None, samples=samples, references=references)
+
+        self._test(data_points=data, monotonicities=mono, monotonicities_fn=_mono_fn)

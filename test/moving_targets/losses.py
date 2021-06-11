@@ -12,10 +12,10 @@ from tensorflow.keras.utils import to_categorical as one_hot
 
 from moving_targets.masters import CplexMaster, GurobiMaster
 
-SEED = 0
-NUM_KEYS = 50
-NUM_TESTS = 100
-PLACES = 3
+SEED: int = 0
+NUM_KEYS: int = 50
+NUM_TESTS: int = 100
+PLACES: int = 3
 k.set_epsilon(1e-15)
 
 

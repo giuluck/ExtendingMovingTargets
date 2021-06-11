@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from moving_targets.util.typing import Monotonicities
+from moving_targets.util.typing import MonotonicitiesList, MonotonicitiesMatrix
 from src.util.typing import SamplingFunctions, AugmentedData
 
 
@@ -39,7 +39,7 @@ def augment_data(x: pd.DataFrame,
                 if compute_monotonicities is None:
                     monotonicities = [np.nan] * num_augmented
                 else:
-                    monotonicities = compute_monotonicities(samples.values, sample.values.reshape(1, -1)).reshape(-1, )
+                    monotonicities = compute_monotonicities(samples, sample)
                 new_samples.append(samples.astype(x.dtypes))
                 new_info.append(pd.DataFrame(
                     data=zip([ground_index] * num_augmented, monotonicities),
@@ -62,7 +62,7 @@ def augment_data(x: pd.DataFrame,
 def compute_numeric_monotonicities(samples: np.ndarray,
                                    references: np.ndarray,
                                    directions: np.ndarray,
-                                   eps: float = 1e-6) -> np.ndarray:
+                                   eps: float = 1e-6) -> MonotonicitiesMatrix:
     """Default way of computing monotonicities in case all the features are numeric.
 
     Args:
@@ -98,7 +98,7 @@ def get_monotonicities_list(data: pd.DataFrame,
                             kind: str = 'group',
                             label: Optional[str] = None,
                             compute_monotonicities: Callable = None,
-                            errors: str = 'raise') -> Monotonicities:
+                            errors: str = 'raise') -> MonotonicitiesList:
     """Computes the monotonicities list from an augmented dataframe.
 
     Args:
@@ -125,7 +125,7 @@ def get_monotonicities_list(data: pd.DataFrame,
     # group monotonicities: retrieved using the 'compute_monotonicities' function, grouping by ground index
     elif kind == 'group':
         for index, group in data.groupby('ground_index'):
-            values = group.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1).values
+            values = group.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1)
             his, lis = np.where(compute_monotonicities(values, values) == 1)
             higher_indices.append(group.index.values[his])
             lower_indices.append(group.index.values[lis])
@@ -133,7 +133,7 @@ def get_monotonicities_list(data: pd.DataFrame,
         lower_indices = np.concatenate(lower_indices)
     # all monotonicities: retrieved using the 'compute_monotonicities' function independently from the ground index
     elif kind == 'all':
-        values = data.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1).values
+        values = data.drop([label, 'ground_index', 'monotonicity'], errors=errors, axis=1)
         higher_indices, lower_indices = np.where(compute_monotonicities(values, values) == 1)
     else:
         raise ValueError(f"'{kind}' is not a valid monotonicities kind")

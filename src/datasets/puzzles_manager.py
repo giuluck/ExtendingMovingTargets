@@ -28,11 +28,10 @@ class PuzzlesManager(AbstractManager):
             np.linspace(self.bound['num_reviews'][0], self.bound['num_reviews'][1], res)
         )
         super(PuzzlesManager, self).__init__(
-            x_columns=['word_count', 'star_rating', 'num_reviews'],
+            x_features={'word_count': -1, 'star_rating': -1, 'num_reviews': -1},
             x_scaling=x_scaling,
-            y_column='label',
+            y_feature='label',
             y_scaling=y_scaling,
-            directions=[-1, 1, 1],
             loss=mean_squared_error,
             loss_name='mse',
             metric=r2_score,

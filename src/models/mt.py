@@ -11,7 +11,7 @@ from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster, GurobiMaster
 from moving_targets.metrics import Metric
 from moving_targets.metrics.constraints import MonotonicViolation
-from moving_targets.util.typing import Matrix, Vector, Iteration, Monotonicities
+from moving_targets.util.typing import Matrix, Vector, Iteration, MonotonicitiesList
 from src.models import MLP
 from src.util.dictionaries import merge_dictionaries
 from src.util.preprocessing import Scalers
@@ -87,7 +87,7 @@ class MTMaster(CplexMaster, GurobiMaster):
     """
 
     def __init__(self,
-                 monotonicities: Monotonicities,
+                 monotonicities: MonotonicitiesList,
                  augmented_mask: Vector,
                  loss_fn: str,
                  backend: str = 'cplex',
@@ -224,7 +224,7 @@ class MTRegressionMaster(MTMaster):
     }
 
     def __init__(self,
-                 monotonicities: Monotonicities,
+                 monotonicities: MonotonicitiesList,
                  augmented_mask: Vector,
                  loss_fn: str = 'mse',
                  **kwargs):
@@ -278,7 +278,7 @@ class MTClassificationMaster(MTMaster):
     }
 
     def __init__(self,
-                 monotonicities: Monotonicities,
+                 monotonicities: MonotonicitiesList,
                  augmented_mask: Vector,
                  loss_fn: str = 'hd',
                  clip_value: Union[float, Tuple[float, float]] = 1e-3,

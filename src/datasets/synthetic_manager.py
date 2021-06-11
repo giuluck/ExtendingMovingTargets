@@ -38,11 +38,10 @@ class SyntheticManager(AbstractManager):
         self.noise: float = noise
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         super(SyntheticManager, self).__init__(
-            x_columns=['a', 'b'],
+            x_features={'a': 1, 'b': 0},
             x_scaling=x_scaling,
-            y_column='label',
+            y_feature='label',
             y_scaling=y_scaling,
-            directions=[1, 0],
             loss=mean_squared_error,
             loss_name='mse',
             metric=r2_score,

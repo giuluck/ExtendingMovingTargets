@@ -24,11 +24,10 @@ class DefaultManager(AbstractManager):
         self.train_fraction: float = train_fraction
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
         super(DefaultManager, self).__init__(
-            x_columns=['married', 'payment'],
+            x_features={'married': 0, 'payment': 1},
             x_scaling={'payment': x_scaling},
-            y_column='default',
+            y_feature='default',
             y_scaling=y_scaling,
-            directions=[0, 1],
             loss=log_loss,
             loss_name='bce',
             metric=accuracy_score,
@@ -65,8 +64,8 @@ class DefaultManager(AbstractManager):
                           ci=99, errwidth=1.5, capsize=0.1, dodge=0.25, join=False, ax=ax).set(title=title.capitalize())
 
     def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, axes = plt.subplots(1, len(self.x_columns), sharey='all', figsize=figsize, tight_layout=tight_layout)
-        for ax, feature in zip(axes, self.x_columns):
+        _, axes = plt.subplots(1, len(self.x_features), sharey='all', figsize=figsize, tight_layout=tight_layout)
+        for ax, feature in zip(axes, list(self.x_features.keys())):
             sns.histplot(data=aug, x=feature, hue='Augmented', discrete=True, ax=ax)
             ticks = np.unique(ax.get_xticks().round().astype(int))
             ax.set_xticks([t for t in ticks if t in range(aug[feature].min(), aug[feature].max() + 1)])

@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 
 from moving_targets.metrics.metric import Metric
-from moving_targets.util.typing import Classes, Monotonicities, Matrix, Vector
+from moving_targets.util.typing import Classes, MonotonicitiesList, Matrix, Vector
 
 
 class ClassFrequenciesStd(Metric):
@@ -43,7 +43,7 @@ class MonotonicViolation(Metric):
         name: the name of the metric.
     """
 
-    def __init__(self, monotonicities: Monotonicities, aggregation: str = 'average', eps: float = 1e-3,
+    def __init__(self, monotonicities: MonotonicitiesList, aggregation: str = 'average', eps: float = 1e-3,
                  name: str = 'monotonic violation'):
         super(MonotonicViolation, self).__init__(name=name)
         self.higher_indices: np.ndarray = np.array([hi for hi, _ in monotonicities])

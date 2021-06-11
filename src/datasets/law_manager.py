@@ -24,11 +24,10 @@ class LawManager(AbstractManager):
         self.train_fraction: float = train_fraction
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         super(LawManager, self).__init__(
-            x_columns=['lsat', 'ugpa'],
+            x_features={'lsat': 1, 'ugpa': 1},
             x_scaling=x_scaling,
-            y_column='pass',
+            y_feature='pass',
             y_scaling=y_scaling,
-            directions=[1, 1],
             loss=log_loss,
             loss_name='bce',
             metric=accuracy_score,

@@ -31,7 +31,7 @@ class SBRHandler(MLPHandler):
 
     def fit(self, fold: Fold) -> Any:
         # handle validation set manually by removing part of the original data
-        x, y, label = fold.x.reset_index(drop=True), fold.y.reset_index(drop=True), self.manager.y_column
+        x, y, label = fold.x.reset_index(drop=True), fold.y.reset_index(drop=True), self.manager.y_feature
         val_mask = np.isin(np.arange(len(y)), y.sample(frac=self.validation_split).index.values)
         val_data = (x[val_mask], y[val_mask])
         (x, y), scalers = self.manager.get_augmented_data(x=x[~val_mask],

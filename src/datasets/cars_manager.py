@@ -22,11 +22,10 @@ class CarsManager(AbstractManager):
         self.filepath: str = filepath
         self.bound: Tuple[int, int] = bound
         super(CarsManager, self).__init__(
-            x_columns=['price'],
+            x_features={'price': -1},
             x_scaling=x_scaling,
-            y_column='sales',
+            y_feature='sales',
             y_scaling=y_scaling,
-            directions=[-1],
             loss=mean_squared_error,
             loss_name='mse',
             metric=r2_score,

@@ -1,6 +1,7 @@
 """Balanced Counts Tests."""
 
 import unittest
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -12,8 +13,8 @@ from moving_targets.learners import LogisticRegression
 from moving_targets.masters import BalancedCounts
 from moving_targets.metrics import Accuracy, ClassFrequenciesStd
 
-SEED = 0
-DATASETS = {
+SEED: int = 0
+DATASETS: Dict[str, Dict[str, str]] = {
     'iris': dict(
         name='iris',
         separator=',',
@@ -30,7 +31,7 @@ DATASETS = {
         class_column='quality',
     )
 }
-RESULTS = {
+RESULTS: Dict[str, Dict[str, float]] = {
     'iris-pretraining-false': dict(
         train_acc=0.9464285714285714,
         train_std=0.011135885079684334,

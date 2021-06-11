@@ -9,7 +9,7 @@ import seaborn as sns
 from sklearn.metrics import roc_auc_score, r2_score, log_loss
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
-from moving_targets.util.typing import Vector, Splits
+from moving_targets.util.typing import Vector, Splits, MonotonicitiesMatrix
 from src.datasets.abstract_manager import AbstractManager
 from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
 
@@ -101,11 +101,10 @@ class RestaurantsManager(AbstractManager):
             'dollar_rating': dr.flatten()
         }))
         super(RestaurantsManager, self).__init__(
-            x_columns=['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD'],
+            x_features={'avg_rating': 1, 'num_reviews': 1},
             x_scaling=dict(avg_rating=x_scaling, num_reviews=x_scaling),
-            y_column='clicked',
+            y_feature='clicked',
             y_scaling=None,
-            directions=[1, 1, 'categorical', 'categorical', 'categorical' 'categorical'],
             loss=log_loss,
             loss_name='bce',
             metric=roc_auc_score,
@@ -122,17 +121,23 @@ class RestaurantsManager(AbstractManager):
         return r2_score(self.ground_truth, pred)
 
     # noinspection PyMissingOrEmptyDocstring
-    def compute_monotonicities(self, samples: np.ndarray, references: np.ndarray, eps: float = 1e-5) -> np.ndarray:
+    def compute_monotonicities(self,
+                               samples: AbstractManager.Samples,
+                               references: AbstractManager.Samples,
+                               eps: float = 1e-5) -> MonotonicitiesMatrix:
         def _categorical_monotonicities(diffs):
             mono = 1 * (diffs == 1) - 1 * (diffs == -1)  # DD (2) > D    (1) -> DD - D = 1, D - DD = -1
             mono += 1 * (diffs == -6) - 1 * (diffs == 6)  # DD (2) > DDDD (8) -> DD - DDDD = -6, DDDD - DD = 6
             return mono
 
-        # check dimensions convert vectors into a matrices
-        assert samples.ndim <= 2, f"'samples' should have 2 dimensions at most, but it has {samples.ndim}"
-        assert references.ndim <= 2, f"'references' should have 2 dimensions at most, but it has {references.ndim}"
-        # convert vectors into a matrices
-        samples, references = np.atleast_2d(samples), np.atleast_2d(references)
+        # check input data
+        columns = ['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']
+        if isinstance(references, pd.Series):
+            references = pd.DataFrame(references).transpose()
+        assert list(samples.columns) == columns, f"samples columns {list(samples.columns)} are not supported"
+        assert list(references.columns) == columns, f"references column {list(references.columns)} are not supported"
+        # convert dataframes/series into a matrices
+        samples, references = samples[columns].values, references[columns].values
         # transpose tensors to get shape (6, ...)
         samples, references = samples.copy().transpose(), references.copy().transpose()
         # store categorical values into single element (D -> 1, DD -> 2, DDD -> 4, DDDD -> 8)
@@ -148,7 +153,6 @@ class RestaurantsManager(AbstractManager):
         # convert categorical differences to monotonicities and get whole monotonicity (sum of monotonicity signs)
         differences[-1] = _categorical_monotonicities(differences[-1])
         monotonicities = np.sign(differences).sum(axis=0).transpose()
-        # the final monotonicities are masked for pairs with just one different attribute
         monotonicities = np.squeeze(monotonicities * (num_differences == 1)).astype('int')
         # if a there is a single sample and a single reference, numpy.sum(axis=-1) will return a zero-dimensional array
         # instead of a scalar, thus it is necessary to manually handle this case
