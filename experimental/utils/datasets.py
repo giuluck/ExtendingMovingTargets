@@ -28,8 +28,8 @@ class DatasetFactory:
         method = getattr(self, name.replace(' ', '_'))
         return method(**kwargs)
 
-    def cars_univariate(self, h_units: tuple = (16,) * 4, callbacks: Optional[List[str]] = None,
-                        num_col: int = 1, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
+    def cars_univariate(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4, num_col: int = 1,
+                        callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
             cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='price',
@@ -37,12 +37,13 @@ class DatasetFactory:
         if 'adjustments' in callbacks:
             cb.append(CarsAdjustments(num_columns=num_col, sorting_attribute='price', plot_kind='line',
                                       file_signature=f'{self.temp_folder}/cars_univariate_adjustments'))
-        ds = RegressionFactory(manager=CarsManager(filepath=f'{self.res_folder}/cars.csv'), h_units=h_units,
-                               num_augmented=0, monotonicities='all', errors='ignore', **kwargs)
+        data_args = {} if data_args is None else data_args
+        ds = RegressionFactory(manager=CarsManager(filepath=f'{self.res_folder}/cars.csv', **data_args),
+                               h_units=h_units, num_augmented=0, monotonicities='all', errors='ignore', **kwargs)
         return ds, cb
 
-    def cars(self, h_units: tuple = (16,) * 4, callbacks: Optional[List[str]] = None,
-             num_col: int = 1, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
+    def cars(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4, num_col: int = 1,
+             callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
             cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='price',
@@ -50,11 +51,13 @@ class DatasetFactory:
         if 'adjustments' in callbacks:
             cb.append(CarsAdjustments(num_columns=num_col, sorting_attribute='price', plot_kind='scatter',
                                       file_signature=f'{self.temp_folder}/cars_adjustments'))
-        ds = RegressionFactory(manager=CarsManager(filepath=f'{self.res_folder}/cars.csv'), h_units=h_units, **kwargs)
+        data_args = {} if data_args is None else data_args
+        ds = RegressionFactory(manager=CarsManager(filepath=f'{self.res_folder}/cars.csv', **data_args),
+                               h_units=h_units, **kwargs)
         return ds, cb
 
-    def synthetic(self, noise: float = 0.0, h_units: tuple = (16,) * 4, callbacks: Optional[List[str]] = None,
-                  num_col: int = 1, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
+    def synthetic(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4, num_col: int = 1,
+                  callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
             cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute='a',
@@ -68,12 +71,13 @@ class DatasetFactory:
         if 'response' in callbacks:
             cb.append(SyntheticResponse(num_columns=num_col, sorting_attribute='a',
                                         file_signature=f'{self.temp_folder}/synthetic_response'))
-        ds = RegressionFactory(manager=SyntheticManager(noise=noise), h_units=h_units, **kwargs)
+        data_args = {} if data_args is None else data_args
+        ds = RegressionFactory(manager=SyntheticManager(**data_args), h_units=h_units, **kwargs)
         return ds, cb
 
-    def puzzles(self, h_units: tuple = (16,) * 4, num_augmented: Augmented = (3, 4, 8),
-                num_random: int = 465, callbacks: Optional[List[str]] = None,
-                num_col: int = 1, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
+    def puzzles(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4,
+                num_col: int = 1, num_augmented: Augmented = (3, 4, 8), num_random: int = 465,
+                callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
             cb.append(DistanceAnalysis(ground_only=True, num_columns=num_col, sorting_attribute=None,
@@ -87,12 +91,13 @@ class DatasetFactory:
                 PuzzlesResponse(feature='num_reviews', num_columns=num_col, sorting_attribute='num_reviews',
                                 file_signature=f'{self.temp_folder}/puzzles_response_num_reviews')
             ]
-        ds = RegressionFactory(manager=PuzzlesManager(filepath=f'{self.res_folder}/puzzles.csv'), h_units=h_units,
-                               num_augmented=num_augmented, num_random=num_random, **kwargs)
+        data_args = {} if data_args is None else data_args
+        ds = RegressionFactory(manager=PuzzlesManager(filepath=f'{self.res_folder}/puzzles.csv', **data_args),
+                               h_units=h_units, num_augmented=num_augmented, num_random=num_random, **kwargs)
         return ds, cb
 
-    def restaurants(self, h_units: tuple = (16, 8, 8), callbacks: Optional[List[str]] = None,
-                    num_col: int = 1, **kwargs) -> Tuple[ClassificationFactory, List[Callback]]:
+    def restaurants(self, data_args: Optional[dict] = None, h_units: tuple = (16, 8, 8), num_col: int = 1,
+                    callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[ClassificationFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'response' in callbacks:
             cb += [
@@ -106,7 +111,7 @@ class DatasetFactory:
                                       file_signature=f'{self.temp_folder}/restaurant_response_DDDD'),
             ]
         ds = ClassificationFactory(
-            manager=RestaurantsManager(),
+            manager=RestaurantsManager(**{} if data_args is None else data_args),
             mt_evaluation_metric=AUC(name='metric'),
             h_units=h_units,
             **kwargs

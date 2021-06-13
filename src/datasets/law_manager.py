@@ -1,6 +1,6 @@
 """Law Data Manager."""
 
-from typing import Dict
+from typing import Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,12 +33,12 @@ class LawManager(AbstractManager):
         return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['pass'])
 
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False,
-                 x_scaling: Methods = 'std', train_fraction: float = 0.03, res: int = 64):
+                 grid_ground: Optional[int] = None, x_scaling: Methods = 'std', train_fraction: float = 0.03):
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
         elif full_grid:
-            lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
+            lsat, ugpa = np.meshgrid(np.linspace(0, 50, 64), np.linspace(0, 4, 64))
             grid = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
         super(LawManager, self).__init__(
             directions={'lsat': 1, 'ugpa': 1},
@@ -54,7 +54,7 @@ class LawManager(AbstractManager):
             data_kwargs=dict(figsize=(14, 8), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
             summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=50),
-            grid_kwargs=dict(),
+            grid_kwargs=dict() if grid_ground is None else dict(num_ground=grid_ground),
             grid=grid,
             filepath=filepath,
             train_fraction=train_fraction
