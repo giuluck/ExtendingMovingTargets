@@ -80,7 +80,7 @@ class AbstractHandler:
 
     def get_folds(self, num_folds: int, extrapolation: bool) -> List[Fold]:
         folds: List[Fold] = []
-        for data, scalers in self.manager.load_data(num_folds=num_folds, extrapolation=extrapolation):
+        for data, scalers in self.manager.get_folds(num_folds=num_folds):
             x, y = data['train']
             fold = Fold(x=x, y=y, scalers=scalers, validation=data)
             folds.append(fold)

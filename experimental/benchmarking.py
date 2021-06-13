@@ -2,9 +2,6 @@
 
 import os
 
-import numpy as np
-import wandb
-
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

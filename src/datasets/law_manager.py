@@ -1,6 +1,6 @@
 """Law Data Manager."""
 
-from typing import Optional
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,8 +8,8 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import accuracy_score, log_loss
 
-from moving_targets.util.typing import Splits
 from src.datasets.abstract_manager import AbstractManager
+from src.util.cleaning import FeatureInfo, clean_dataframe
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
 from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize, TightLayout
@@ -18,37 +18,47 @@ from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize,
 class LawManager(AbstractManager):
     """Data Manager for the Law Dataset."""
 
-    def __init__(self, filepath: str, x_scaling: Methods = 'std', y_scaling: Methods = 'norm',
-                 train_fraction: float = 0.03, res: int = 64):
-        self.filepath: str = filepath
-        self.train_fraction: float = train_fraction
-        lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
+    FEATURES: Dict[str, FeatureInfo] = {
+        'pass_bar': FeatureInfo(kind='float', alias='pass'),
+        'lsat': FeatureInfo(kind='float', alias=None),
+        'ugpa': FeatureInfo(kind='float', alias=None)
+    }
+
+    # noinspection PyMissingOrEmptyDocstring
+    @staticmethod
+    def load_data(filepath: str, train_fraction: float) -> AbstractManager.Data:
+        df = pd.read_csv(filepath)
+        df = clean_dataframe(df, LawManager.FEATURES)
+        df = df.dropna().reset_index(drop=True)
+        return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['pass'])
+
+    def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False,
+                 x_scaling: Methods = 'std', train_fraction: float = 0.03, res: int = 64):
+        grid = None
+        if full_features:
+            assert full_grid is False, "'full_grid' is not supported with 'full_features'"
+        elif full_grid:
+            lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
+            grid = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
         super(LawManager, self).__init__(
-            x_features={'lsat': 1, 'ugpa': 1},
+            directions={'lsat': 1, 'ugpa': 1},
+            stratify=True,
             x_scaling=x_scaling,
-            y_feature='pass',
-            y_scaling=y_scaling,
+            y_scaling=None,
+            label='pass',
             loss=log_loss,
             loss_name='bce',
             metric=accuracy_score,
             metric_name='acc',
             post_process=lambda x: x.round().astype(int),
-            grid=pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()}),
             data_kwargs=dict(figsize=(14, 8), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
-            summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=50)
+            summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=50),
+            grid_kwargs=dict(),
+            grid=grid,
+            filepath=filepath,
+            train_fraction=train_fraction
         )
-
-    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
-        assert extrapolation is False, "'extrapolation' is not supported for Law dataset"
-        # preprocess data
-        df = pd.read_csv(self.filepath)[['lsat', 'ugpa', 'pass_bar']]
-        df = df.dropna().reset_index(drop=True)
-        df = df.rename(columns={'pass_bar': 'pass'}).astype({'pass': int})
-        x, y = df[['lsat', 'ugpa']], df['pass']
-        # split train/test
-        splits = split_dataset(x, y, test_size=1 - self.train_fraction, val_size=0.0, stratify=y)
-        return self.cross_validate(splits=splits, num_folds=num_folds, stratify=True)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 5) -> SamplingFunctions:
         return {

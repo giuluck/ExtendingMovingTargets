@@ -17,7 +17,6 @@ from src.util.typing import Augmented
 class HandlersFactory:
     def __init__(self,
                  manager: AbstractManager,
-                 model: Optional[str] = None,
                  dataset: Optional[str] = None,
                  wandb_project: Optional[str] = 'shape_constraints',
                  wandb_entity: Optional[str] = 'giuluck',
@@ -39,7 +38,6 @@ class HandlersFactory:
                  master_kind: Optional[str] = None,
                  mt_metrics: Optional[List[Metric]] = None):
         self.manager: AbstractManager = manager
-        self.model: Optional[str] = model
         self.dataset: Optional[str] = dataset
         self.wandb_project: Optional[str] = wandb_project
         self.wandb_entity: Optional[str] = wandb_entity
@@ -64,7 +62,6 @@ class HandlersFactory:
     def _get_args(self, kwargs_dict: Dict, **kwargs_default) -> Dict:
         kwargs_default.update({
             'manager': self.manager,
-            'model': self.model,
             'dataset': self.dataset,
             'wandb_project': self.wandb_project,
             'wandb_entity': self.wandb_entity,
@@ -73,10 +70,11 @@ class HandlersFactory:
         kwargs_default.update(kwargs_dict)
         return kwargs_default
 
-    def get_mlp(self, wandb_name: Optional[str] = None, **kwargs) -> MLPHandler:
+    def get_mlp(self, wandb_name: Optional[str] = None, model: str = None, **kwargs) -> MLPHandler:
         return MLPHandler(**self._get_args(
             kwargs_dict=kwargs,
             wandb_name=wandb_name,
+            model=model,
             loss=self.loss,
             optimizer=self.optimizer,
             output_act=self.output_act,
@@ -88,10 +86,11 @@ class HandlersFactory:
             verbose=self.verbose
         ))
 
-    def get_sbr(self, wandb_name: Optional[str] = None, **kwargs) -> SBRHandler:
+    def get_sbr(self, wandb_name: Optional[str] = None, model: str = None, **kwargs) -> SBRHandler:
         return SBRHandler(**self._get_args(
             kwargs_dict=kwargs,
             wandb_name=wandb_name,
+            model=model,
             loss=self.loss,
             optimizer=self.optimizer,
             output_act=self.output_act,
@@ -106,12 +105,13 @@ class HandlersFactory:
             verbose=self.verbose
         ))
 
-    def get_univariate_sbr(self, wandb_name: Optional[str] = None, **kwargs) -> UnivariateSBRHandler:
-        directions = list(self.manager.x_features.values())
+    def get_univariate_sbr(self, wandb_name: Optional[str] = None, model: str = None, **kwargs) -> UnivariateSBRHandler:
+        directions = list(self.manager.directions.values())
         assert len(directions) == 1
         return UnivariateSBRHandler(**self._get_args(
             kwargs_dict=kwargs,
             wandb_name=wandb_name,
+            model=model,
             direction=directions[0],
             loss=self.loss,
             optimizer=self.optimizer,
@@ -124,19 +124,21 @@ class HandlersFactory:
             verbose=self.verbose
         ))
 
-    def get_tfl(self, wandb_name: Optional[str] = None, **kwargs) -> TFLHandler:
+    def get_tfl(self, wandb_name: Optional[str] = None, model: str = None, **kwargs) -> TFLHandler:
         return TFLHandler(**self._get_args(
             kwargs_dict=kwargs,
             wandb_name=wandb_name,
+            model=model,
             optimizer=self.optimizer.capitalize(),
             epochs=self.epochs,
             batch_size=self.batch_size
         ))
 
-    def get_mt(self, wandb_name: Optional[str] = None, **kwargs) -> MTHandler:
+    def get_mt(self, wandb_name: Optional[str] = None, model: str = None, **kwargs) -> MTHandler:
         return MTHandler(**self._get_args(
             kwargs_dict=kwargs,
             wandb_name=wandb_name,
+            model=model,
             aug_num_augmented=self.num_augmented,
             aug_num_random=self.num_random,
             aug_num_ground=self.num_ground,

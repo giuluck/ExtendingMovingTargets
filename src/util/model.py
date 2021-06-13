@@ -35,21 +35,21 @@ def metrics_summary(model, metric, metric_name: str = None, post_process: Callab
 
 
 def violations_summary(model,
-                       grid: Matrix,
+                       inputs: Matrix,
                        monotonicities: MonotonicitiesList,
                        return_type: str = 'str') -> Union[str, Dict[str, float]]:
     """Computes the violations over a custom set of validation data, then builds a summary.
 
     Args:
         model: a model object having the 'predict(x)' method.
-        grid: the matrix/dataframe representing the input space.
+        inputs: the matrix/dataframe representing the input space.
         monotonicities: the list of monotonicities.
         return_type: either 'str' to return the string, or 'dict' to return the dictionary.
 
     Returns:
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
-    p = model.predict(grid)
+    p = model.predict(inputs)
     summary = {
         'avg_violation': MonotonicViolation(monotonicities=monotonicities, aggregation='average', eps=0.0),
         'pct_violation': MonotonicViolation(monotonicities=monotonicities, aggregation='percentage', eps=0.0)

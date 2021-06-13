@@ -1,6 +1,6 @@
 """Synthetic Data Manager."""
 
-from typing import Union, Optional
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import r2_score, mean_squared_error
 
-from moving_targets.util.typing import Number, Vector, Splits
+from moving_targets.util.typing import Number, Vector
 from src.datasets.abstract_manager import AbstractManager
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
@@ -34,36 +34,45 @@ class SyntheticManager(AbstractManager):
         y = pd.Series(SyntheticManager.function(a, b), name='label') + rng.normal(scale=noise, size=len(x))
         return x, y
 
-    def __init__(self, noise: float = 0.0, x_scaling: str = 'std', y_scaling: str = 'norm', res: int = 80):
-        self.noise: float = noise
-        a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
+    # noinspection PyMissingOrEmptyDocstring
+    @staticmethod
+    def load_data(noise: float, extrapolation: bool) -> AbstractManager.Data:
+        rng = np.random.default_rng(seed=0)
+        if extrapolation:
+            x, y = SyntheticManager.sample_dataset(n=700, noise=noise, rng=rng, testing_set=True)
+            splits = split_dataset(x, y, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
+        else:
+            splits = {
+                'train': SyntheticManager.sample_dataset(n=200, noise=noise, rng=rng, testing_set=False),
+                'test': SyntheticManager.sample_dataset(n=500, noise=noise, rng=rng, testing_set=True)
+            }
+        return {split: pd.concat(data, axis=1) for split, data in splits.items()}
+
+    def __init__(self, noise: float = 0.0, extrapolation: bool = False, full_grid: bool = False,
+                 x_scaling: str = 'std', y_scaling: str = 'norm'):
+        if full_grid:
+            a, b = np.meshgrid(np.linspace(-1, 1, 80), np.linspace(-1, 1, 80))
+            grid = pd.DataFrame({'a': a.flatten(), 'b': b.flatten()})
+        else:
+            grid = None
         super(SyntheticManager, self).__init__(
-            x_features={'a': 1, 'b': 0},
+            directions={'a': 1, 'b': 0},
+            stratify=False,
             x_scaling=x_scaling,
-            y_feature='label',
             y_scaling=y_scaling,
+            label='label',
             loss=mean_squared_error,
             loss_name='mse',
             metric=r2_score,
             metric_name='r2',
-            grid=pd.DataFrame({'a': a.flatten(), 'b': b.flatten()}),
             data_kwargs=dict(figsize=(12, 10), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
-            summary_kwargs=dict(figsize=(10, 4), tight_layout=True, res=50)
+            summary_kwargs=dict(figsize=(10, 4), tight_layout=True, res=50),
+            grid_kwargs=dict(num_augmented=40),
+            grid=grid,
+            noise=noise,
+            extrapolation=extrapolation
         )
-
-    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
-        rng = np.random.default_rng(seed=0)
-        # generate and split train/test
-        if extrapolation:
-            x, y = self.sample_dataset(n=700, noise=self.noise, rng=rng, testing_set=True)
-            splits = split_dataset(x, y, extrapolation={'a': 0.7}, val_size=0.25, random_state=0)
-        else:
-            splits = {
-                'train': SyntheticManager.sample_dataset(n=200, noise=self.noise, rng=rng, testing_set=False),
-                'test': SyntheticManager.sample_dataset(n=500, noise=self.noise, rng=rng, testing_set=True)
-            }
-        return self.cross_validate(splits=splits, num_folds=num_folds, stratify=False)
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}

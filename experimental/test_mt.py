@@ -1,6 +1,5 @@
 """Moving Target's Test Script."""
 import numpy as np
-from tensorflow.python.keras.callbacks import EarlyStopping
 
 from experimental.utils import DatasetFactory
 

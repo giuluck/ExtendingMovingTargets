@@ -1,15 +1,15 @@
 """Restaurants Data Manager."""
 
-from typing import Tuple, Optional
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import roc_auc_score, r2_score, log_loss
+from sklearn.metrics import roc_auc_score, log_loss
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
-from moving_targets.util.typing import Vector, Splits, MonotonicitiesMatrix
+from moving_targets.util.typing import Vector, MonotonicitiesMatrix
 from src.datasets.abstract_manager import AbstractManager
 from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
 
@@ -94,32 +94,42 @@ class RestaurantsManager(AbstractManager):
         else:
             return dataset, RestaurantsManager.predict(dataset)
 
-    def __init__(self, x_scaling: str = 'std', res: int = 40):
-        ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res), ['D', 'DD', 'DDD', 'DDDD'])
-        grid, self.ground_truth = self.process_data(pd.DataFrame.from_dict({
-            'avg_rating': ar.flatten(),
-            'num_reviews': nr.flatten(),
-            'dollar_rating': dr.flatten()
-        }))
+    # noinspection PyMissingOrEmptyDocstring
+    @staticmethod
+    def load_data() -> AbstractManager.Data:
+        rng = np.random.default_rng(seed=0)
+        splits = {
+            'train': RestaurantsManager.process_data(RestaurantsManager.sample_dataset(1000, rng, testing_set=False)),
+            'test': RestaurantsManager.process_data(RestaurantsManager.sample_dataset(600, rng, testing_set=True))
+        }
+        return {split: pd.concat(data, axis=1) for split, data in splits.items()}
+
+    def __init__(self, full_grid: bool = False, x_scaling: str = 'std'):
+        if full_grid:
+            ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=40), np.linspace(0, 200, num=40), ['D', 'DD', 'DDD', 'DDDD'])
+            grid, self.ground_truth = self.process_data(pd.DataFrame.from_dict({
+                'avg_rating': ar.flatten(),
+                'num_reviews': nr.flatten(),
+                'dollar_rating': dr.flatten()
+            }))
+        else:
+            grid = None
         super(RestaurantsManager, self).__init__(
-            x_features={'avg_rating': 1, 'num_reviews': 1},
+            directions={'avg_rating': 1, 'num_reviews': 1},
+            stratify=True,
             x_scaling=dict(avg_rating=x_scaling, num_reviews=x_scaling),
-            y_feature='clicked',
             y_scaling=None,
+            label='clicked',
             loss=log_loss,
             loss_name='bce',
             metric=roc_auc_score,
             metric_name='auc',
-            grid=grid,
             data_kwargs=dict(figsize=(10, 8), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
-            summary_kwargs=dict(figsize=(14, 7), tight_layout=True, res=100)
+            summary_kwargs=dict(figsize=(14, 7), tight_layout=True, res=100),
+            grid_kwargs=dict(num_augmented=10),
+            grid=grid
         )
-
-    def compute_ground_r2(self, model):
-        """Computes the R2 score wrt the ground truths over the whole input space."""
-        pred = model.predict(self.grid)
-        return r2_score(self.ground_truth, pred)
 
     # noinspection PyMissingOrEmptyDocstring
     def compute_monotonicities(self,
@@ -166,16 +176,6 @@ class RestaurantsManager(AbstractManager):
             'num_reviews': (num_augmented, lambda s: np.round(np.exp(rng.uniform(0.0, np.log(200), size=s)))),
             dollar_rating: (num_augmented, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
-
-    def _load_splits(self, num_folds: Optional[int], extrapolation: bool) -> Splits:
-        assert extrapolation is False, "'extrapolation' is not supported for Restaurants dataset"
-        rng = np.random.default_rng(seed=0)
-        # generate and split train/test
-        splits = {
-            'train': self.process_data(self.sample_dataset(1000, rng, testing_set=False)),
-            'test': self.process_data(self.sample_dataset(600, rng, testing_set=True))
-        }
-        return self.cross_validate(splits=splits, num_folds=num_folds, stratify=True)
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, ax = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)

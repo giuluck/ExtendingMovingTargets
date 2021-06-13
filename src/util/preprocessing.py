@@ -168,7 +168,7 @@ def split_dataset(*args: SplitArgs,
         for a in args:
             splits.append(a[train_mask])
             splits.append(a[test_mask])
-    train_data, test_data = splits[::2], (splits[1] if len(args) == 1 else splits[1::2])
+    train_data, test_data = splits if len(args) == 1 else (splits[::2], splits[1::2])
     # split val/test only if necessary
     if val_size == 0.0:
         return {'train': train_data, 'test': test_data}
