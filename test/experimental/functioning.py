@@ -20,3 +20,12 @@ class TestFunctioning(TestPipelines):
 
     def _summary_args(self, model: str, dataset: str) -> Optional[Dict]:
         return None
+
+    def test_cars_tfl(self):
+        pass  # self._test(data_args={'full_features': True, 'full_grid': False, 'grid_ground': 2})
+
+    def test_default_tfl(self):
+        pass  # self._test(data_args={'full_features': True, 'full_grid': False, 'grid_ground': 2})
+
+    def test_law_tfl(self):
+        pass  # self._test(data_args={'full_features': True, 'full_grid': False, 'grid_ground': 2})

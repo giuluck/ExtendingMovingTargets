@@ -78,12 +78,17 @@ class AbstractHandler:
     def fit(self, fold: Fold) -> Any:
         raise NotImplementedError("Please implement method 'fit'")
 
-    def get_folds(self, num_folds: int) -> List[Fold]:
+    def get_folds(self, num_folds: Optional[int]) -> Union[Fold, List[Fold]]:
         folds: List[Fold] = []
-        for data, scalers in self.manager.get_folds(num_folds=num_folds):
+        if num_folds is None:
+            data, scalers = self.manager.get_folds(num_folds=None)
             x, y = data['train']
-            fold = Fold(x=x, y=y, scalers=scalers, validation=data)
-            folds.append(fold)
+            return Fold(x=x, y=y, scalers=scalers, validation=data)
+        else:
+            for data, scalers in self.manager.get_folds(num_folds=num_folds):
+                x, y = data['train']
+                fold = Fold(x=x, y=y, scalers=scalers, validation=data)
+                folds.append(fold)
         return folds
 
     def validate(self,
@@ -95,7 +100,7 @@ class AbstractHandler:
                 self._run_instance(fold=fold, index=i, summary_args=summary_args)
 
     def test(self, summary_args: Optional[Dict] = None):
-        fold = self.get_folds(num_folds=1)[0]
+        fold = self.get_folds(num_folds=None)
         self._run_instance(fold=fold, index='test', summary_args=summary_args)
 
     def _run_instance(self, fold: Fold, index: Union[int, str], summary_args: Dict):

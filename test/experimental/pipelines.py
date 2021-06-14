@@ -74,91 +74,91 @@ class TestPipelines(unittest.TestCase):
 
     def test_univariate_cars_mlp(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_univariate_cars_sbr(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_univariate_cars_tfl(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_univariate_cars_mt(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_cars_mlp(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_cars_sbr(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_cars_tfl(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_cars_mt(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_synthetic_mlp(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_synthetic_sbr(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_synthetic_tfl(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_synthetic_mt(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_puzzles_mlp(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_puzzles_sbr(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_puzzles_tfl(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_puzzles_mt(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False))
-        self._test(data_args=dict(full_features=True, full_grid=False))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_restaurants_mlp(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_restaurants_sbr(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_restaurants_tfl(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_restaurants_mt(self):
         self._test(data_args=dict(full_grid=True))
-        self._test(data_args=dict(full_grid=False))
+        self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_default_mlp(self):
         self._test(data_args=dict(full_features=False, full_grid=True))

@@ -42,7 +42,7 @@ class CarsManager(AbstractManager):
         df = clean_dataframe(df, CarsManager.FEATURES)
         if full_features:
             df['manufacturer'] = df['manufacturer'].map(lambda v: v.strip())
-            df = pd.get_dummies(df, prefix_sep='/').dropna()
+            df = pd.get_dummies(df.dropna(), prefix_sep=': ')
         else:
             df = df[['price', 'sales']].dropna()
         extrapolation = {'price': 0.2} if extrapolation else None

@@ -38,7 +38,7 @@ class LawManager(AbstractManager):
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, LawManager.FEATURES)
         if full_features:
-            df = pd.get_dummies(df, prefix_sep='/').dropna()
+            df = pd.get_dummies(df.dropna(), prefix_sep=': ')
         else:
             df = df[['lsat', 'ugpa', 'pass']].dropna()
         return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['pass'])

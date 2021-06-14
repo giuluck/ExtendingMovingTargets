@@ -73,6 +73,7 @@ class Scaler:
                 self.scaling[idx] = maximum - minimum
             elif method is not None:
                 raise ValueError(f'Method {method} is not supported')
+        self.scaling[self.scaling == 0] = 1.0  # handle case with null scaling factor
         return self
 
     def transform(self, data: Matrix) -> Matrix:

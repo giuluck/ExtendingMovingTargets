@@ -52,7 +52,7 @@ class DefaultManager(AbstractManager):
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, DefaultManager.FEATURES)
         if full_features:
-            df = pd.get_dummies(df, prefix_sep='/').dropna()
+            df = pd.get_dummies(df.dropna(), prefix_sep=': ')
         else:
             df['marriage'] = df['marriage'].astype('float') - 1
             df = df[np.in1d(df['marriage'], [0, 1])]
