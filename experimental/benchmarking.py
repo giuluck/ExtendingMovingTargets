@@ -1,6 +1,7 @@
 """Benchmarking Script."""
 
 import os
+from typing import Dict
 
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -9,16 +10,34 @@ import time
 import shutil
 
 from experimental.utils import DatasetFactory
+from experimental.utils.handlers import default_config
 
 if __name__ == '__main__':
-    study = [DatasetFactory().get_dataset(name=dataset)[0].get_mt(
-        mt_iterations=5,
-        mst_master_kind='classification',
-        lrn_loss='binary_crossentropy',
-        mst_loss_fn='rbce',
-        mst_alpha=alpha,
-        wandb_name=f'MT BCE {alpha}'
-    ) for alpha in [0.1, 1.0] for dataset in ['default', 'law']]
+    # noinspection PyMissingOrEmptyDocstring
+    def custom_config(handler, **kwargs) -> Dict:
+        config = default_config(handler)
+        config['dataset'] = config['dataset'] + ' 0.8'
+        return config
+
+
+    law, _ = DatasetFactory().law(data_args=dict(full_features=False, full_grid=True, train_fraction=0.8))
+    default, _ = DatasetFactory().default(data_args=dict(full_features=False, full_grid=True, train_fraction=0.8))
+    study = []
+    for ds in [law, default]:
+        study += [
+            ds.get_mlp(wandb_name='MLP', wandb_config=custom_config),
+            ds.get_sbr(wandb_name='SBR', wandb_config=custom_config),
+            ds.get_tfl(wandb_name='TFL', wandb_config=custom_config)
+        ]
+        study += [ds.get_mt(
+            mt_iterations=20,
+            mst_master_kind='regression',
+            lrn_loss='mse',
+            mst_loss_fn='mse',
+            mst_alpha=alpha,
+            wandb_name=f'MT MSE {alpha}',
+            wandb_config=custom_config
+        ) for alpha in [0.01, 0.1, 1.0]]
 
     # begin study
     for i, manager in enumerate(study):

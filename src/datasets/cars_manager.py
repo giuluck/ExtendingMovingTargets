@@ -1,6 +1,6 @@
 """Cars Data Manager."""
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -48,7 +48,8 @@ class CarsManager(AbstractManager):
         return split_dataset(df, extrapolation=extrapolation, test_size=0.2, val_size=0.0)
 
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, extrapolation: bool = False,
-                 x_scaling: Method = 'std', y_scaling: Method = 'norm', bound: Tuple[float, float] = (0, 100)):
+                 grid_augmented: int = 150, grid_ground: Optional[int] = None, x_scaling: Method = 'std',
+                 y_scaling: Method = 'norm', bound: Tuple[float, float] = (0, 100)):
         self.bound: Tuple[float, float] = bound
         # in case of full features, standardize floating features only (no skipped and no categorical features)
         grid = None
@@ -70,7 +71,7 @@ class CarsManager(AbstractManager):
             data_kwargs=dict(figsize=(14, 4), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4)),
             summary_kwargs=dict(figsize=(10, 4), res=100, ylim=(-5, 125)),
-            grid_kwargs=dict(num_augmented=150),
+            grid_kwargs=dict(num_augmented=grid_augmented, num_ground=grid_ground),
             grid=grid,
             filepath=filepath,
             full_features=full_features,

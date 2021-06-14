@@ -21,31 +21,29 @@ class PuzzlesManager(AbstractManager):
 
     # noinspection PyMissingOrEmptyDocstring
     @staticmethod
-    def load_data(filepath: str, extrapolation: bool) -> AbstractManager.Data:
-        df = pd.read_csv(filepath)  # raw dataframe with special preprocessing needs
-        for col in df.columns:
-            if col not in ['label', 'split']:
-                df[col] = df[col].map(lambda l: l.strip('[]').split(';')).map(lambda l: [float(v.strip()) for v in l])
-        # df = df.apply(lambda s: s.map(lambda l: np.mean(l)))
-        x = pd.DataFrame()
-        x['word_count'] = df['word_count'].map(lambda l: np.mean(l))
-        x['star_rating'] = df['star_rating'].map(lambda l: np.mean(l))
-        x['num_reviews'] = df['star_rating'].map(lambda l: len(l))
-        x['label'] = df['label']
-        x['split'] = df['split']
-        df = x.copy()
-        # split train/test
+    def load_data(filepath: str, full_features: bool, extrapolation: bool) -> AbstractManager.Data:
+        def _process(series: pd.Series) -> pd.Series:
+            # apart from these three columns, converts string into list and takes the average value
+            if series.name in ['label', 'split', 'num_reviews']:
+                return series
+            else:
+                return series.map(lambda l: np.mean([float(v.strip()) for v in l.strip('[]').split(';')]))
+
+        columns = ['star_rating', 'word_count', 'num_reviews']
+        df = pd.read_csv(filepath)
+        df['num_reviews'] = df['is_amazon'].map(lambda l: len(l.split(';')))
+        df = df.apply(_process)
+        df = df.dropna() if full_features else df[columns + ['label', 'split']].dropna()
         if extrapolation:
-            splits = split_dataset(df, val_size=0.2, extrapolation=0.2)
+            extrapolation = {c: 0.2 for c in columns}
+            splits = split_dataset(df, extrapolation=extrapolation, val_size=0.0)
         else:
-            splits = {
-                'train': df[np.in1d(df['split'], ['train', 'validation'])],
-                'test': df[df['split'] == 'test']
-            }
+            splits = {'train': df[np.in1d(df['split'], ['train', 'validation'])], 'test': df[df['split'] == 'test']}
         return {split: data.drop(columns='split') for split, data in splits.items()}
 
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, extrapolation: bool = False,
-                 x_scaling: Methods = 'std', y_scaling: Methods = 'norm', bound: Optional[Bound] = None):
+                 grid_augmented: int = 35, grid_ground: Optional[int] = None, x_scaling: Methods = 'std',
+                 y_scaling: Methods = 'norm', bound: Optional[Bound] = None):
         self.bound = {'word_count': (0, 230), 'star_rating': (0, 5), 'num_reviews': (0, 70)} if bound is None else bound
         grid = None
         if full_features:
@@ -70,9 +68,10 @@ class PuzzlesManager(AbstractManager):
             data_kwargs=dict(figsize=(12, 10)),
             augmented_kwargs=dict(figsize=(14, 4), tight_layout=True),
             summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=5),
-            grid_kwargs=dict(num_augmented=30),
+            grid_kwargs=dict(num_augmented=grid_augmented, num_ground=grid_ground),
             grid=grid,
             filepath=filepath,
+            full_features=full_features,
             extrapolation=extrapolation
         )
 

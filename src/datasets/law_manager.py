@@ -18,22 +18,33 @@ from src.util.typing import Methods, Augmented, SamplingFunctions, Rng, Figsize,
 class LawManager(AbstractManager):
     """Data Manager for the Law Dataset."""
 
+    # https://rdrr.io/cran/fairml/man/law.school.admissions.html
     FEATURES: Dict[str, FeatureInfo] = {
         'pass_bar': FeatureInfo(kind='float', alias='pass'),
-        'lsat': FeatureInfo(kind='float', alias=None),
-        'ugpa': FeatureInfo(kind='float', alias=None)
+        'lsat': FeatureInfo(kind='float', alias='lsat'),
+        'ugpa': FeatureInfo(kind='float', alias='ugpa'),
+        'decile1': FeatureInfo(kind='float', alias='first year decile'),
+        'decile3': FeatureInfo(kind='float', alias='third year decile'),
+        'fam_inc': FeatureInfo(kind='float', alias='family income'),
+        'gender': FeatureInfo(kind='category', alias='gender'),
+        'race1': FeatureInfo(kind='category', alias='race'),
+        'cluster': FeatureInfo(kind='category', alias='prestige'),
+        'fulltime': FeatureInfo(kind='category', alias='fulltime')
     }
 
     # noinspection PyMissingOrEmptyDocstring
     @staticmethod
-    def load_data(filepath: str, train_fraction: float) -> AbstractManager.Data:
+    def load_data(filepath: str, full_features: bool, train_fraction: float) -> AbstractManager.Data:
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, LawManager.FEATURES)
-        df = df.dropna().reset_index(drop=True)
+        if full_features:
+            df = pd.get_dummies(df).dropna()
+        else:
+            df = df[['lsat', 'ugpa', 'pass']].dropna()
         return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['pass'])
 
-    def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False,
-                 grid_ground: Optional[int] = None, x_scaling: Methods = 'std', train_fraction: float = 0.03):
+    def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, grid_augmented: int = 8,
+                 grid_ground: Optional[int] = None, x_scaling: Methods = 'std', train_fraction: float = 0.8):
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
@@ -54,9 +65,10 @@ class LawManager(AbstractManager):
             data_kwargs=dict(figsize=(14, 8), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
             summary_kwargs=dict(figsize=(14, 4), tight_layout=True, res=50),
-            grid_kwargs=dict() if grid_ground is None else dict(num_ground=grid_ground),
+            grid_kwargs=dict(num_augmented=grid_augmented, num_ground=grid_ground),
             grid=grid,
             filepath=filepath,
+            full_features=full_features,
             train_fraction=train_fraction
         )
 

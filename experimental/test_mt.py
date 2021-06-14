@@ -4,9 +4,10 @@ import numpy as np
 from experimental.utils import DatasetFactory
 
 if __name__ == '__main__':
-    iterations: int = 0
+    iterations: int = 1
     factory, callbacks = DatasetFactory().get_dataset(
         name='default',
+        data_args=dict(full_features=False, full_grid=True, train_fraction=0.8),
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callbacks=['logger', 'adjustments', 'response']
     )
@@ -15,7 +16,7 @@ if __name__ == '__main__':
         mst_master_kind='regression',
         lrn_loss='mse',
         lrn_warm_start=False,
-        lrn_verbose=False,
+        lrn_verbose=True,
         mst_backend='gurobi',
         mst_loss_fn='mse',
         mst_alpha=1.0,
@@ -23,7 +24,7 @@ if __name__ == '__main__':
         mst_learner_omega=1.0,
         mst_learner_weights='all',
         mst_time_limit=None,
-        mst_custom_args={'verbose': False}
+        mst_custom_args={'verbose': True}
     )
     plot_args = dict(columns=[
         'learner/loss',

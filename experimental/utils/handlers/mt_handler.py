@@ -128,7 +128,6 @@ class MTHandler(AbstractHandler):
                    iterations: Optional[int] = None,
                    num_folds: int = 1,
                    folds_index: Optional[List[int]] = None,
-                   extrapolation: bool = False,
                    fold_verbosity: Union[bool, int] = True,
                    model_verbosity: Union[bool, int] = False,
                    callbacks: Optional[List[Callback]] = None,
@@ -140,7 +139,7 @@ class MTHandler(AbstractHandler):
         fold_verbosity = False if num_folds == 1 else fold_verbosity
         if fold_verbosity is not False:
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
-        for i, fold in enumerate(self.get_folds(num_folds=num_folds, extrapolation=extrapolation)):
+        for i, fold in enumerate(self.get_folds(num_folds=num_folds)):
             if folds_index is not None and i not in folds_index:
                 continue
             # handle verbosity

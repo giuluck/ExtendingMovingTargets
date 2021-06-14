@@ -1,6 +1,6 @@
 """Restaurants Data Manager."""
 
-from typing import Tuple
+from typing import Tuple, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -104,7 +104,8 @@ class RestaurantsManager(AbstractManager):
         }
         return {split: pd.concat(data, axis=1) for split, data in splits.items()}
 
-    def __init__(self, full_grid: bool = False, x_scaling: str = 'std'):
+    def __init__(self, full_grid: bool = False, grid_augmented: int = 10,
+                 grid_ground: Optional[int] = None, x_scaling: str = 'std'):
         if full_grid:
             ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=40), np.linspace(0, 200, num=40), ['D', 'DD', 'DDD', 'DDDD'])
             grid, self.ground_truth = self.process_data(pd.DataFrame.from_dict({
@@ -127,7 +128,7 @@ class RestaurantsManager(AbstractManager):
             data_kwargs=dict(figsize=(10, 8), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
             summary_kwargs=dict(figsize=(14, 7), tight_layout=True, res=100),
-            grid_kwargs=dict(num_augmented=10),
+            grid_kwargs=dict(num_augmented=grid_augmented, num_ground=grid_ground),
             grid=grid
         )
 

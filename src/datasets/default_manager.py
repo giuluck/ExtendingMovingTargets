@@ -17,35 +17,63 @@ from src.util.typing import Augmented, SamplingFunctions, Rng, Figsize, TightLay
 class DefaultManager(AbstractManager):
     """Data Manager for the Default Dataset."""
 
-    MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
+    # https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients
     FEATURES: Dict[str, FeatureInfo] = {
-        'MARRIAGE': FeatureInfo(kind='float', alias='married'),
-        'PAY_0': FeatureInfo(kind='float', alias='payment'),
-        'default': FeatureInfo(kind='float', alias=None)
+        'default': FeatureInfo(kind='float', alias=None),
+        'LIMIT_BAL': FeatureInfo(kind='float', alias='limit'),
+        'SEX': FeatureInfo(kind='category', alias='sex'),
+        'EDUCATION': FeatureInfo(kind='category', alias='education'),
+        'MARRIAGE': FeatureInfo(kind='category', alias='marriage'),
+        'AGE': FeatureInfo(kind='float', alias='age'),
+        'PAY_0': FeatureInfo(kind='float', alias='sep status'),
+        'PAY_2': FeatureInfo(kind='float', alias='aug status'),
+        'PAY_3': FeatureInfo(kind='float', alias='jul status'),
+        'PAY_4': FeatureInfo(kind='float', alias='jun status'),
+        'PAY_5': FeatureInfo(kind='float', alias='may status'),
+        'PAY_6': FeatureInfo(kind='float', alias='apr status'),
+        'BILL_AMT1': FeatureInfo(kind='float', alias='sep bill'),
+        'BILL_AMT2': FeatureInfo(kind='float', alias='aug bill'),
+        'BILL_AMT3': FeatureInfo(kind='float', alias='jul bill'),
+        'BILL_AMT4': FeatureInfo(kind='float', alias='jun bill'),
+        'BILL_AMT5': FeatureInfo(kind='float', alias='may bill'),
+        'BILL_AMT6': FeatureInfo(kind='float', alias='apr bill'),
+        'PAY_AMT1': FeatureInfo(kind='float', alias='sep payment'),
+        'PAY_AMT2': FeatureInfo(kind='float', alias='aug payment'),
+        'PAY_AMT3': FeatureInfo(kind='float', alias='jul payment'),
+        'PAY_AMT4': FeatureInfo(kind='float', alias='jun payment'),
+        'PAY_AMT5': FeatureInfo(kind='float', alias='may payment'),
+        'PAY_AMT6': FeatureInfo(kind='float', alias='apr payment')
     }
+    MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
     # noinspection PyMissingOrEmptyDocstring
     @staticmethod
-    def load_data(filepath: str, train_fraction: float) -> AbstractManager.Data:
+    def load_data(filepath: str, full_features: bool, train_fraction: float) -> AbstractManager.Data:
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, DefaultManager.FEATURES)
-        df = df.dropna().reset_index(drop=True)
-        df = df[np.in1d(df['married'], [1, 2])]
-        df['married'] = df['married'] - 1
-        return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['married'])
+        if full_features:
+            df = pd.get_dummies(df).dropna()
+        else:
+            df['marriage'] = df['marriage'].astype('float') - 1
+            df = df[np.in1d(df['marriage'], [0, 1])]
+            df = df[['marriage', 'sep status', 'default']].dropna()
+        return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['default'])
 
-    def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False,
-                 grid_ground: Optional[int] = None, x_scaling: str = 'std', train_fraction: float = 0.025):
+    def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, grid_augmented: int = 10,
+                 grid_ground: Optional[int] = None, train_fraction: float = 0.8, x_scaling: str = 'std'):
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
-        elif full_grid:
-            married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
-            grid = pd.DataFrame.from_dict({'married': married.flatten(), 'payment': payment.flatten()})
+            self.months = ['sep', 'aug', 'jul', 'jun', 'may', 'apr']
+        else:
+            self.months = ['sep']
+            if full_grid:
+                marriage, status = np.meshgrid([0, 1], np.arange(-2, 9))
+                grid = pd.DataFrame.from_dict({'marriage': marriage.flatten(), 'sep status': status.flatten()})
         super(DefaultManager, self).__init__(
-            directions={'married': 0, 'payment': 1},
+            directions={f'{c} status': 1 for c in self.months},
             stratify=True,
-            x_scaling={'payment': x_scaling},
+            x_scaling={'sep status': x_scaling},
             y_scaling=None,
             label='default',
             loss=log_loss,
@@ -56,14 +84,16 @@ class DefaultManager(AbstractManager):
             data_kwargs=dict(figsize=(12, 10), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
             summary_kwargs=dict(figsize=(10, 4)),
-            grid_kwargs=dict() if grid_ground is None else dict(num_ground=grid_ground),
+            grid_kwargs=dict(num_augmented=grid_augmented, num_ground=grid_ground),
             grid=grid,
             filepath=filepath,
+            full_features=full_features,
             train_fraction=train_fraction
         )
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 7) -> SamplingFunctions:
-        return {'payment': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s))}
+        num_augmented = np.round(num_augmented / np.sqrt(len(self.months))).astype(int)
+        return {f'{m} status': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s)) for m in self.months}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, axes = plt.subplots(len(kwargs), 1, sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)

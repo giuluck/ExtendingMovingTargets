@@ -135,7 +135,7 @@ def split_dataset(*args: SplitArgs,
 
     Args:
         *args: the input data vectors.
-        test_size: the percentage of data left for testing.
+        test_size: the percentage of data left for testing (ignored in case of extrapolation).
         val_size: the percentage of data left for validation. If zero, no validation set is returned.
         extrapolation: whether to split the data randomly or to test on a given percentage of extrapolated data.
         **kwargs: 'sklearn.model_selection.train_test_split' arguments.

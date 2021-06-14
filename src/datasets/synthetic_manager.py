@@ -1,6 +1,6 @@
 """Synthetic Data Manager."""
 
-from typing import Union
+from typing import Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -48,8 +48,8 @@ class SyntheticManager(AbstractManager):
             }
         return {split: pd.concat(data, axis=1) for split, data in splits.items()}
 
-    def __init__(self, noise: float = 0.0, extrapolation: bool = False, full_grid: bool = False,
-                 x_scaling: str = 'std', y_scaling: str = 'norm'):
+    def __init__(self, noise: float = 0.0, extrapolation: bool = False, full_grid: bool = False, x_scaling: str = 'std',
+                 y_scaling: str = 'norm', grid_augmented: int = 35, grid_ground: Optional[int] = None):
         if full_grid:
             a, b = np.meshgrid(np.linspace(-1, 1, 80), np.linspace(-1, 1, 80))
             grid = pd.DataFrame({'a': a.flatten(), 'b': b.flatten()})
@@ -68,7 +68,7 @@ class SyntheticManager(AbstractManager):
             data_kwargs=dict(figsize=(12, 10), tight_layout=True),
             augmented_kwargs=dict(figsize=(10, 4), tight_layout=True),
             summary_kwargs=dict(figsize=(10, 4), tight_layout=True, res=50),
-            grid_kwargs=dict(num_augmented=40),
+            grid_kwargs=dict(num_augmented=grid_augmented, num_ground=grid_ground),
             grid=grid,
             noise=noise,
             extrapolation=extrapolation
