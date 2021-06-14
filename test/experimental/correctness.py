@@ -5,6 +5,9 @@ from test.experimental.pipelines import TestPipelines
 
 
 class TestCorrectness(TestPipelines):
+    def _grid_ground(self) -> Optional[int]:
+        return None
+
     def _model_parameters(self, model: str, dataset: str) -> Optional[Dict]:
         if model in ['mlp', 'sbr', 'sbr univariate', 'tfl']:
             return dict()

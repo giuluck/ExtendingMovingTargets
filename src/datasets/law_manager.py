@@ -23,9 +23,9 @@ class LawManager(AbstractManager):
         'pass_bar': FeatureInfo(kind='float', alias='pass'),
         'lsat': FeatureInfo(kind='float', alias='lsat'),
         'ugpa': FeatureInfo(kind='float', alias='ugpa'),
-        'decile1': FeatureInfo(kind='float', alias='first year decile'),
-        'decile3': FeatureInfo(kind='float', alias='third year decile'),
-        'fam_inc': FeatureInfo(kind='float', alias='family income'),
+        'decile1': FeatureInfo(kind='float', alias='first_year_decile'),
+        'decile3': FeatureInfo(kind='float', alias='third_year_decile'),
+        'fam_inc': FeatureInfo(kind='float', alias='family_income'),
         'gender': FeatureInfo(kind='category', alias='gender'),
         'race1': FeatureInfo(kind='category', alias='race'),
         'cluster': FeatureInfo(kind='category', alias='prestige'),
@@ -38,7 +38,7 @@ class LawManager(AbstractManager):
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, LawManager.FEATURES)
         if full_features:
-            df = pd.get_dummies(df).dropna()
+            df = pd.get_dummies(df, prefix_sep='/').dropna()
         else:
             df = df[['lsat', 'ugpa', 'pass']].dropna()
         return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['pass'])
@@ -48,9 +48,11 @@ class LawManager(AbstractManager):
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
+            x_scaling = {v.alias or k: x_scaling for k, v in LawManager.FEATURES.items() if v.kind == 'float'}
         elif full_grid:
             lsat, ugpa = np.meshgrid(np.linspace(0, 50, 64), np.linspace(0, 4, 64))
             grid = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
+            x_scaling = {'lsat': x_scaling, 'ugpa': x_scaling}
         super(LawManager, self).__init__(
             directions={'lsat': 1, 'ugpa': 1},
             stratify=True,

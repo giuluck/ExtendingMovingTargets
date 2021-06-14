@@ -67,6 +67,9 @@ class TFLHandler(AbstractHandler):
                 x = x[['num_reviews', 'avg_rating', 'dollar_rating']]
                 return x, y
 
+            def post_processing(y):
+                return y_scaler.inverse_transform(y)
+
             columns = TFLHandler.get_numeric_features(columns=['num_reviews', 'avg_rating'], manager=self.manager) + [
                 ColumnInfo(
                     kind='categorical',
@@ -76,11 +79,14 @@ class TFLHandler(AbstractHandler):
                     monotonicity=[('D', 'DD'), ('DDDD', 'D')]
                 )
             ]
-            post_processing = lambda y: y_scaler.inverse_transform(y)
         elif config == 'numeric':
+            def pre_processing(x, y):
+                return x_scaler.transform(x), y_scaler.transform(y)
+
+            def post_processing(y):
+                return y_scaler.inverse_transform(y)
+
             columns = TFLHandler.get_numeric_features(columns=list(fold.x.columns), manager=self.manager)
-            pre_processing = lambda x, y: (x_scaler.transform(x), y_scaler.transform(y))
-            post_processing = lambda y: y_scaler.inverse_transform(y)
         else:
             raise ValueError(f"{config} is not a supported configuration.")
         # CREATE AND BUILD MODEL

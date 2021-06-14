@@ -25,24 +25,24 @@ class DefaultManager(AbstractManager):
         'EDUCATION': FeatureInfo(kind='category', alias='education'),
         'MARRIAGE': FeatureInfo(kind='category', alias='marriage'),
         'AGE': FeatureInfo(kind='float', alias='age'),
-        'PAY_0': FeatureInfo(kind='float', alias='sep status'),
-        'PAY_2': FeatureInfo(kind='float', alias='aug status'),
-        'PAY_3': FeatureInfo(kind='float', alias='jul status'),
-        'PAY_4': FeatureInfo(kind='float', alias='jun status'),
-        'PAY_5': FeatureInfo(kind='float', alias='may status'),
-        'PAY_6': FeatureInfo(kind='float', alias='apr status'),
-        'BILL_AMT1': FeatureInfo(kind='float', alias='sep bill'),
-        'BILL_AMT2': FeatureInfo(kind='float', alias='aug bill'),
-        'BILL_AMT3': FeatureInfo(kind='float', alias='jul bill'),
-        'BILL_AMT4': FeatureInfo(kind='float', alias='jun bill'),
-        'BILL_AMT5': FeatureInfo(kind='float', alias='may bill'),
-        'BILL_AMT6': FeatureInfo(kind='float', alias='apr bill'),
-        'PAY_AMT1': FeatureInfo(kind='float', alias='sep payment'),
-        'PAY_AMT2': FeatureInfo(kind='float', alias='aug payment'),
-        'PAY_AMT3': FeatureInfo(kind='float', alias='jul payment'),
-        'PAY_AMT4': FeatureInfo(kind='float', alias='jun payment'),
-        'PAY_AMT5': FeatureInfo(kind='float', alias='may payment'),
-        'PAY_AMT6': FeatureInfo(kind='float', alias='apr payment')
+        'PAY_0': FeatureInfo(kind='float', alias='sep_status'),
+        'PAY_2': FeatureInfo(kind='float', alias='aug_status'),
+        'PAY_3': FeatureInfo(kind='float', alias='jul_status'),
+        'PAY_4': FeatureInfo(kind='float', alias='jun_status'),
+        'PAY_5': FeatureInfo(kind='float', alias='may_status'),
+        'PAY_6': FeatureInfo(kind='float', alias='apr_status'),
+        'BILL_AMT1': FeatureInfo(kind='float', alias='sep_bill'),
+        'BILL_AMT2': FeatureInfo(kind='float', alias='aug_bill'),
+        'BILL_AMT3': FeatureInfo(kind='float', alias='jul_bill'),
+        'BILL_AMT4': FeatureInfo(kind='float', alias='jun_bill'),
+        'BILL_AMT5': FeatureInfo(kind='float', alias='may_bill'),
+        'BILL_AMT6': FeatureInfo(kind='float', alias='apr_bill'),
+        'PAY_AMT1': FeatureInfo(kind='float', alias='sep_payment'),
+        'PAY_AMT2': FeatureInfo(kind='float', alias='aug_payment'),
+        'PAY_AMT3': FeatureInfo(kind='float', alias='jul_payment'),
+        'PAY_AMT4': FeatureInfo(kind='float', alias='jun_payment'),
+        'PAY_AMT5': FeatureInfo(kind='float', alias='may_payment'),
+        'PAY_AMT6': FeatureInfo(kind='float', alias='apr_payment')
     }
     MARKERS = {k: v for k, v in enumerate(['o', 's', '^', '+'])}
 
@@ -52,11 +52,11 @@ class DefaultManager(AbstractManager):
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, DefaultManager.FEATURES)
         if full_features:
-            df = pd.get_dummies(df).dropna()
+            df = pd.get_dummies(df, prefix_sep='/').dropna()
         else:
             df['marriage'] = df['marriage'].astype('float') - 1
             df = df[np.in1d(df['marriage'], [0, 1])]
-            df = df[['marriage', 'sep status', 'default']].dropna()
+            df = df[['marriage', 'sep_status', 'default']].dropna()
         return split_dataset(df, test_size=1 - train_fraction, val_size=0.0, stratify=df['default'])
 
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, grid_augmented: int = 10,
@@ -65,15 +65,17 @@ class DefaultManager(AbstractManager):
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
             self.months = ['sep', 'aug', 'jul', 'jun', 'may', 'apr']
+            x_scaling = {v.alias or k: x_scaling for k, v in DefaultManager.FEATURES.items() if v.kind == 'float'}
         else:
             self.months = ['sep']
+            x_scaling = {'sep_status': x_scaling}
             if full_grid:
                 marriage, status = np.meshgrid([0, 1], np.arange(-2, 9))
-                grid = pd.DataFrame.from_dict({'marriage': marriage.flatten(), 'sep status': status.flatten()})
+                grid = pd.DataFrame.from_dict({'marriage': marriage.flatten(), 'sep_status': status.flatten()})
         super(DefaultManager, self).__init__(
-            directions={f'{c} status': 1 for c in self.months},
+            directions={f'{c}_status': 1 for c in self.months},
             stratify=True,
-            x_scaling={'sep status': x_scaling},
+            x_scaling=x_scaling,
             y_scaling=None,
             label='default',
             loss=log_loss,
@@ -93,7 +95,7 @@ class DefaultManager(AbstractManager):
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 7) -> SamplingFunctions:
         num_augmented = np.round(num_augmented / np.sqrt(len(self.months))).astype(int)
-        return {f'{m} status': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s)) for m in self.months}
+        return {f'{m}_status': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s)) for m in self.months}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
         _, axes = plt.subplots(len(kwargs), 1, sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)

@@ -31,7 +31,7 @@ class PuzzlesManager(AbstractManager):
 
         columns = ['star_rating', 'word_count', 'num_reviews']
         df = pd.read_csv(filepath)
-        df['num_reviews'] = df['is_amazon'].map(lambda l: len(l.split(';')))
+        df['num_reviews'] = df['is_amazon'].map(lambda l: len(l.split(';'))).astype(float)
         df = df.apply(_process)
         df = df.dropna() if full_features else df[columns + ['label', 'split']].dropna()
         if extrapolation:

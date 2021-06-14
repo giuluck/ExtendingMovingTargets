@@ -30,6 +30,9 @@ MODELS: Dict[str, Tuple[Callable, Type]] = {
 
 
 class TestPipelines(unittest.TestCase):
+    def _grid_ground(self) -> Optional[int]:
+        raise NotImplementedError("please implement method '_grid_ground()'")
+
     def _model_parameters(self, model: str, dataset: str) -> Optional[Dict]:
         raise NotImplementedError("please implement method '_model_parameters()'")
 
@@ -44,10 +47,10 @@ class TestPipelines(unittest.TestCase):
         dataset, model = caller_info[-2], caller_info[-1]
         if 'univariate' in caller_function_name:
             dataset, model = f'{dataset} univariate', 'sbr univariate' if model == 'sbr' else model
+        expected_factory, expected_manager = DATASETS[dataset]
+        handler_routine, expected_handler = MODELS[model]
         # noinspection PyBroadException
         try:
-            expected_factory, expected_manager = DATASETS[dataset]
-            handler_routine, expected_handler = MODELS[model]
             # we can now use these information to retrieve the correct pipeline
             factory, _ = DatasetFactory(res_folder=RES_FOLDER).get_dataset(name=dataset, **kwargs)
             self.assertIsInstance(factory, expected_factory)
@@ -57,8 +60,8 @@ class TestPipelines(unittest.TestCase):
             self.assertIsInstance(handler, expected_handler)
             # noinspection PyUnresolvedReferences
             handler.test(summary_args=self._summary_args(model, dataset))
-        except Exception as exception:
-            self.fail(f'Arguments: {kwargs}\n{exception}')
+        except Exception:
+            self.fail(f'Arguments: {kwargs}')
 
     def test_meta_tests(self):
         datasets, models = np.meshgrid(
@@ -159,40 +162,40 @@ class TestPipelines(unittest.TestCase):
 
     def test_default_mlp(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_default_sbr(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_default_tfl(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_default_mt(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_law_mlp(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_law_sbr(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_law_tfl(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
 
     def test_law_mt(self):
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=100))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=100))
+        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))

@@ -41,7 +41,8 @@ class CarsManager(AbstractManager):
         df = pd.read_csv(filepath).replace({'.': np.nan})
         df = clean_dataframe(df, CarsManager.FEATURES)
         if full_features:
-            df = pd.get_dummies(df).dropna()
+            df['manufacturer'] = df['manufacturer'].map(lambda v: v.strip())
+            df = pd.get_dummies(df, prefix_sep='/').dropna()
         else:
             df = df[['price', 'sales']].dropna()
         extrapolation = {'price': 0.2} if extrapolation else None
@@ -58,6 +59,7 @@ class CarsManager(AbstractManager):
             x_scaling = {v.alias or k: x_scaling for k, v in CarsManager.FEATURES.items() if v.kind == 'float'}
         elif full_grid:
             grid = pd.DataFrame.from_dict({'price': np.linspace(self.bound[0], self.bound[1], 700)})
+            x_scaling = {'price': x_scaling}
         super(CarsManager, self).__init__(
             directions={'price': -1},
             stratify=False,
