@@ -1,7 +1,7 @@
 """Cplex Master interface."""
 import logging
 from abc import ABC
-from typing import Optional
+from typing import Optional, Any
 
 from docplex.mp.dvar import Var
 from docplex.mp.model import Model
@@ -33,13 +33,12 @@ class CplexMaster(Master, ABC):
         self.time_limit: Optional[float] = time_limit
 
     # noinspection PyMissingOrEmptyDocstring
-    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         # build model and get losses
         model = Model(name='model')
         if self.time_limit is not None:
             model.set_time_limit(self.time_limit)
         model_info = self.build_model(macs, model, x, y, iteration)
-
         # algorithm core: check for feasibility and behave depending on that
         y_loss = self.y_loss(macs, model, model_info, x, y, iteration)
         p_loss = self.p_loss(macs, model, model_info, x, y, iteration)
@@ -48,7 +47,6 @@ class CplexMaster(Master, ABC):
             model.minimize(y_loss)
         else:
             model.minimize(y_loss + (1.0 / self.alpha) * p_loss)
-
         # solve the problem and get the adjusted labels
         solution = model.solve()
         if solution is None:

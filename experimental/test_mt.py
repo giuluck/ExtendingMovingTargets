@@ -6,8 +6,8 @@ from experimental.utils import DatasetFactory
 if __name__ == '__main__':
     iterations: int = 1
     factory, callbacks = DatasetFactory().get_dataset(
-        name='default',
-        data_args=dict(full_features=False, full_grid=True, train_fraction=0.8),
+        name='cars',
+        data_args=dict(full_features=False, full_grid=True),
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callbacks=['logger', 'adjustments', 'response']
     )
@@ -15,16 +15,17 @@ if __name__ == '__main__':
         wandb_name=None,
         mst_master_kind='regression',
         lrn_loss='mse',
+        lrn_epochs=0,
         lrn_warm_start=False,
         lrn_verbose=True,
-        mst_backend='gurobi',
-        mst_loss_fn='mse',
+        mst_backend='cvxpy',
+        mst_loss_fn='mae',
         mst_alpha=1.0,
         mst_master_omega=1.0,
         mst_learner_omega=1.0,
         mst_learner_weights='all',
         mst_time_limit=None,
-        mst_custom_args={'verbose': True}
+        mst_custom_args=dict(verbose=True, solver='GUROBI')
     )
     plot_args = dict(columns=[
         'learner/loss',
@@ -40,5 +41,5 @@ if __name__ == '__main__':
         'metrics/test metric',
         'metrics/avg. violation'
     ])
-    manager.experiment(iterations=iterations, callbacks=None, plot_args=None, summary_args={},
+    manager.experiment(iterations=iterations, callbacks=callbacks, plot_args=None, summary_args={},
                        num_folds=1, fold_verbosity=False, model_verbosity=1)

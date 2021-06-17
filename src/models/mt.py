@@ -1,14 +1,16 @@
 """Moving Target Models."""
 
 import time
-from typing import Optional, List, Tuple, Union
+from typing import Optional, List, Tuple, Union, Any
 
+import cvxpy as cp
 import numpy as np
 from gurobipy import GRB
 
 from moving_targets import MACS
 from moving_targets.learners import Learner
 from moving_targets.masters import CplexMaster, GurobiMaster
+from moving_targets.masters.cvxpy_master import CvxpyMaster
 from moving_targets.metrics import Metric
 from moving_targets.metrics.constraints import MonotonicViolation
 from moving_targets.util.typing import Matrix, Vector, Iteration, MonotonicitiesList
@@ -71,13 +73,14 @@ class MTLearner(Learner):
         return self.model.predict(x).flatten()
 
 
-class MTMaster(CplexMaster, GurobiMaster):
+class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
     """Custom Moving Target Master Interface.
 
     Args:
         monotonicities: list of monotonicities.
         augmented_mask: boolean mask to distinguish between original and augmented samples.
         loss_fn: the master loss.
+        backend: the solver to be used.
         alpha: the non-negative real number which is used to calibrate the two losses in the alpha step.
         learner_weights: either 'all' or 'infeasible'.
         learner_omega: real number that decides the weight of augmented samples during the learning step.
@@ -108,6 +111,10 @@ class MTMaster(CplexMaster, GurobiMaster):
             super(CplexMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit, **kwargs)
             self.y_loss_fn = getattr(GurobiMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
+        elif self.backend == 'cvxpy':
+            super(GurobiMaster, self).__init__(alpha=alpha, beta=0.0, **kwargs)
+            self.y_loss_fn = getattr(CvxpyMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
+            self.p_loss_fn = getattr(CvxpyMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         else:
             raise ValueError(f"'{self.backend}' is not a supported backend.")
         self.higher_indices = np.array([hi for hi, _ in monotonicities])
@@ -131,15 +138,15 @@ class MTMaster(CplexMaster, GurobiMaster):
         self.start_time = None
 
     # noinspection PyMissingOrEmptyDocstring
-    def build_variables(self, model, y) -> Vector:
+    def build_variables(self, model, y: Vector) -> Vector:
         raise NotImplementedError("Please implement method 'build_variables'")
 
     # noinspection PyMissingOrEmptyDocstring, PyMethodMayBeStatic
-    def build_predictions(self, macs, x):
+    def build_predictions(self, macs, x: Matrix) -> Vector:
         return macs.predict(x)
 
     # noinspection PyMissingOrEmptyDocstring
-    def build_model(self, macs, model, x, y, iteration: Iteration):
+    def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         self.start_time = time.time()
         # handle 'projection' initial step (p = None)
         pred = None if not macs.fitted else self.build_predictions(macs, x)
@@ -150,6 +157,8 @@ class MTMaster(CplexMaster, GurobiMaster):
                 model.add_constraints([h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])])
             elif self.backend == 'gurobi':
                 model.addConstrs((h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])), name='c')
+            elif self.backend == 'cvxpy':
+                model += [h >= l for h, l in zip(var[self.higher_indices], var[self.lower_indices])]
         # return model info
         return var, pred
 
@@ -158,19 +167,19 @@ class MTMaster(CplexMaster, GurobiMaster):
         return False
 
     # noinspection PyMissingOrEmptyDocstring
-    def y_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
         return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
 
     # noinspection PyMissingOrEmptyDocstring
-    def p_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
+    def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         var, pred = model_info
         sw = np.where(self.augmented_mask, self.master_omega_p, 1)
         return 0.0 if pred is None else self.p_loss_fn(model, pred, var, sample_weight=sw)
 
     # noinspection PyMissingOrEmptyDocstring
-    def return_solutions(self, macs, solution, model_info, x, y, iteration: Iteration) -> object:
+    def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         var, pred = model_info
         # adjusted targets
         adj = None
@@ -178,6 +187,8 @@ class MTMaster(CplexMaster, GurobiMaster):
             adj = np.array([vy.solution_value for vy in var])
         elif self.backend == 'gurobi':
             adj = np.array([vy.x for vy in var])
+        elif self.backend == 'cvxpy':
+            adj = np.array([vy.value[0] for vy in var])
         # sample weights
         if self.learner_weights == 'infeasible':
             infeasible_mask = (pred[self.lower_indices] - pred[self.higher_indices]) > self.eps
@@ -196,11 +207,13 @@ class MTMaster(CplexMaster, GurobiMaster):
         return adj.astype(y.dtype), {'sample_weight': sample_weight}
 
     # noinspection PyMissingOrEmptyDocstring
-    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         if self.backend == 'cplex':
             return super(MTMaster, self).adjust_targets(macs, x, y, iteration)
         elif self.backend == 'gurobi':
             return super(CplexMaster, self).adjust_targets(macs, x, y, iteration)
+        elif self.backend == 'cvxpy':
+            return super(GurobiMaster, self).adjust_targets(macs, x, y, iteration)
 
 
 class MTRegressionMaster(MTMaster):
@@ -238,13 +251,19 @@ class MTRegressionMaster(MTMaster):
         )
 
     # noinspection PyMissingOrEmptyDocstring
-    def build_variables(self, model, y) -> Vector:
+    def build_variables(self, model, y: Vector) -> Vector:
         var = None
         if self.backend == 'cplex':
             var = model.continuous_var_list(keys=len(y), lb=-float('inf'), ub=float('inf'), name='y')
         elif self.backend == 'gurobi':
             var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=-float('inf'), ub=float('inf'), name='y').values()
             model.update()
+        elif self.backend == 'cvxpy':
+            var = []
+            for _ in range(len(y)):
+                v = cp.Variable((1,))
+                v.lb, v.ub = -float('inf'), float('inf')
+                var.append(v)
         return var
 
 
@@ -278,6 +297,11 @@ class MTClassificationMaster(MTMaster):
         'symmetric binary crossentropy': 'symmetric_binary_crossentropy'
     }
 
+    unsupported = {
+        'cplex': ['reversed_binary_crossentropy', 'symmetric_binary_crossentropy'],
+        'cvxpy': ['binary_hamming', 'binary_crossentropy', 'symmetric_binary_crossentropy']
+    }
+
     def __init__(self,
                  monotonicities: MonotonicitiesList,
                  augmented_mask: Vector,
@@ -300,12 +324,13 @@ class MTClassificationMaster(MTMaster):
         assert y_clip > 0 and p_clip > 0, f"{clip_value} is not a valid clip value instance"
         self.y_loss_fn.clip_value = y_clip
         self.p_loss_fn.clip_value = p_clip
-        # raise error if losses involving logarithms are called with cplex
-        if self.backend == 'cplex' and ('reversed' in self.loss_fn or 'symmetric' in self.loss_fn):
-            raise ValueError(f"Cplex Master cannot handle {self.loss_fn.replace('_', ' ')}")
+        # raise error if losses involving logarithms are called with cplex or binary variables with cvxpy
+        for backend, losses in MTClassificationMaster.unsupported.items():
+            if self.backend == backend and self.loss_fn in losses:
+                raise ValueError(f"{backend.capitalize()} Master cannot handle {self.loss_fn.replace('_', ' ')}")
 
     # noinspection PyMissingOrEmptyDocstring
-    def build_variables(self, model, y) -> Vector:
+    def build_variables(self, model, y: Vector) -> Vector:
         var = None
         if self.backend == 'cplex':
             var = model.binary_var_list(keys=len(y), lb=0.0, ub=1.0, name='y')
@@ -316,17 +341,23 @@ class MTClassificationMaster(MTMaster):
                 lb, ub = self.cont_eps, 1 - self.cont_eps
                 var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=lb, ub=ub, name='y').values()
             model.update()
+        elif self.backend == 'cvxpy':
+            var = []
+            for _ in range(len(y)):
+                v = cp.Variable((1,))
+                v.lb, v.ub = self.cont_eps, 1 - self.cont_eps
+                model += [v >= v.lb, v <= v.ub]
         return var
 
     # noinspection PyMissingOrEmptyDocstring
-    def build_predictions(self, macs, x):
+    def build_predictions(self, macs, x: Matrix) -> Vector:
         p = macs.predict(x)
         if self.loss_fn in ['binary_hamming']:
             p = p.round().astype(int)
         return p
 
     # noinspection PyMissingOrEmptyDocstring
-    def y_loss(self, macs, model, model_info, x, y, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         m = ~np.isnan(y)
         v, p = model_info
         # masks both y variables and model variables (v) to transform the vector to type int in order to deal with loss

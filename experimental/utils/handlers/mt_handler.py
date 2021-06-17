@@ -126,7 +126,7 @@ class MTHandler(AbstractHandler):
 
     def experiment(self,
                    iterations: Optional[int] = None,
-                   num_folds: int = 1,
+                   num_folds: Optional[int] = 1,
                    folds_index: Optional[List[int]] = None,
                    fold_verbosity: Union[bool, int] = True,
                    model_verbosity: Union[bool, int] = False,
@@ -136,10 +136,11 @@ class MTHandler(AbstractHandler):
         setup(seed=self.seed)
         callbacks = [] if callbacks is None else callbacks
         iterations = self.iterations if iterations is None else iterations
-        fold_verbosity = False if num_folds == 1 else fold_verbosity
+        fold_verbosity = False if num_folds is None or num_folds == 1 else fold_verbosity
         if fold_verbosity is not False:
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
-        for i, fold in enumerate(self.get_folds(num_folds=num_folds)):
+        folds = self.get_folds(num_folds=num_folds)
+        for i, fold in enumerate([folds] if num_folds is None else folds):
             if folds_index is not None and i not in folds_index:
                 continue
             # handle verbosity

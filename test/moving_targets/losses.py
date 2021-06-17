@@ -1,7 +1,8 @@
 """Losses Tests."""
-
+import inspect
 import unittest
 
+import cvxpy as cp
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as k
@@ -11,15 +12,20 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, log_loss, p
 from tensorflow.keras.utils import to_categorical as one_hot
 
 from moving_targets.masters import CplexMaster, GurobiMaster
+from moving_targets.masters.cvxpy_master import CvxpyMaster
 
 SEED: int = 0
-NUM_KEYS: int = 50
-NUM_TESTS: int = 100
+NUM_KEYS: int = 10
+NUM_TESTS: int = 10
 PLACES: int = 3
 k.set_epsilon(1e-15)
 
 
 class TestLosses:
+    @staticmethod
+    def _tested_loss():
+        return inspect.stack()[2][3].replace('test_', '').replace('_weights', '')
+
     @staticmethod
     def _custom_loss(name):
         def _ce_handler(y, p, sw, loss_fn):
@@ -246,6 +252,10 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
         return CplexMaster.losses
 
     def _test(self, model_loss, scikit_loss, classes=None, weights=False):
+        # skip reversed and symmetric crossentropy, both binary and categorical
+        if TestLosses._tested_loss() in ['reversed_bce', 'reversed_cce', 'symmetric_bce', 'symmetric_cce']:
+            return
+
         # fix a random seed for data generation and repeat for the given number of tests
         np.random.seed(SEED)
         for i in range(NUM_TESTS):
@@ -296,30 +306,6 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
             cplex_objective = model.solve().objective_value
             scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
             self.assertAlmostEqual(cplex_objective, scikit_objective, places=PLACES)
-
-    def test_reversed_bce(self):
-        pass
-
-    def test_reversed_bce_weights(self):
-        pass
-
-    def test_symmetric_bce(self):
-        pass
-
-    def test_symmetric_bce_weights(self):
-        pass
-
-    def test_reversed_cce(self):
-        pass
-
-    def test_reversed_cce_weights(self):
-        pass
-
-    def test_symmetric_cce(self):
-        pass
-
-    def test_symmetric_cce_weights(self):
-        pass
 
 
 class TestGurobiLosses(TestLosses, unittest.TestCase):
@@ -400,3 +386,63 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
                     gurobi_objective = model.objVal
                     scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
                     self.assertAlmostEqual(gurobi_objective, scikit_objective, places=PLACES)
+
+
+class TestCvxpyLosses(TestLosses, unittest.TestCase):
+    def _losses(self):
+        return CvxpyMaster.losses
+
+    def _test(self, model_loss, scikit_loss, classes=None, weights=False):
+        # skip hamming distance, crossentropy, and symmetric binary, both binary and categorical
+        if TestLosses._tested_loss() in ['bh', 'ch', 'bce', 'cce', 'symmetric_bce', 'symmetric_cce']:
+            return
+        # fix a random seed for data generation and repeat for the given number of tests
+        np.random.seed(SEED)
+        for i in range(NUM_TESTS):
+            # generate random data (ground truths, predictions, and sample weights) and fix the model variable to be
+            # the same as the ground truths in order to obtain the loss as objective function from the minimization
+            sample_weight = np.random.uniform(size=NUM_KEYS) if weights else None
+            if classes is None:
+                model_variables = [cp.Variable((1,)) for _ in range(NUM_KEYS)]
+                model_assignments = np.random.uniform(-100, 100, size=NUM_KEYS)
+                numeric_variables = np.random.uniform(-100, 100, size=NUM_KEYS)
+                constraints = []
+                for v, p in zip(model_variables, model_assignments):
+                    v.lb, v.ub = -100, 100
+                    constraints.append(v == p)
+            else:
+                num_classes, kind = classes
+                if num_classes == 2:
+                    model_variables = [cp.Variable((1,)) for _ in range(NUM_KEYS)]
+                    numeric_variables = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
+                    model_assignments = np.random.uniform(0.001, 0.999, size=NUM_KEYS)
+                    constraints = []
+                    for v, p in zip(model_variables, model_assignments):
+                        v.lb, v.ub = 0, 1
+                        constraints.append(v == p)
+                elif isinstance(num_classes, int) and num_classes > 2:
+                    model_variables = [cp.Variable((1,)) for _ in range(NUM_KEYS * num_classes)]
+                    numeric_variables = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
+                    numeric_variables = numeric_variables.transpose() / numeric_variables.sum(axis=1)
+                    numeric_variables = numeric_variables.transpose()
+                    model_assignments = np.random.uniform(0.001, 0.999, size=(NUM_KEYS, num_classes))
+                    model_assignments = model_assignments.transpose() / model_assignments.sum(axis=1)
+                    model_assignments = model_assignments.transpose()
+                    constraints = []
+                    for v, p in zip(model_variables, model_assignments.flatten()):
+                        v.lb, v.ub = 0, 1
+                        constraints.append(v == p)
+                    model_variables = np.array(model_variables).reshape(NUM_KEYS, num_classes)
+                else:
+                    raise ValueError(f"'num_classes' should be either None or a tuple, but it is {num_classes}")
+            model_variables = np.array(model_variables)
+            objective = cp.Minimize(model_loss(
+                model=constraints,
+                numeric_variables=numeric_variables,
+                model_variables=model_variables,
+                sample_weight=sample_weight
+            ))
+            model = cp.Problem(objective, constraints)
+            cvxpy_objective = model.solve()
+            scikit_objective = scikit_loss(model_assignments, numeric_variables, sample_weight=sample_weight)
+            self.assertAlmostEqual(cvxpy_objective, scikit_objective, places=PLACES)

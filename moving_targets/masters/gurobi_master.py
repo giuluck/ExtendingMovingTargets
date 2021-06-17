@@ -1,7 +1,7 @@
 """Gurobi Master interface."""
 import logging
 from abc import ABC
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 from gurobipy import Model, Env, GRB, Var
@@ -53,7 +53,7 @@ class GurobiMaster(Master, ABC):
         self.verbose: bool = verbose
 
     # noinspection PyMissingOrEmptyDocstring
-    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         # build model and get losses
         with Env(empty=True) as env:
             if not self.verbose:

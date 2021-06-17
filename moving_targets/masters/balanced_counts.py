@@ -1,4 +1,5 @@
 """Master implementation for the Balance Counts problem."""
+from typing import Any
 
 import numpy as np
 
@@ -26,7 +27,7 @@ class BalancedCounts(CplexMaster):
         self.slack = slack
 
     # noinspection PyMissingOrEmptyDocstring
-    def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         # if the model has not been fitted yet (i.e., the initial macs step is 'projection') we use the original labels
         # otherwise we use either the predicted classes or the predicted probabilities
         if not macs.fitted:
@@ -65,12 +66,12 @@ class BalancedCounts(CplexMaster):
         return np.all(pred_classes_counts <= max_count)
 
     # noinspection PyMissingOrEmptyDocstring
-    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         variables, _, _, _ = model_info
         return CplexMaster.losses.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
 
     # noinspection PyMissingOrEmptyDocstring
-    def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> float:
+    def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         variables, pred, prob, _ = model_info
         if prob is None:
             return CplexMaster.losses.categorical_hamming(
@@ -86,7 +87,7 @@ class BalancedCounts(CplexMaster):
             )
 
     # noinspection PyMissingOrEmptyDocstring
-    def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         variables, _, _, _ = model_info
         y_adj = [sum(c * solution.get_value(variables[i, c]) for c in range(self.num_classes)) for i in range(len(y))]
         y_adj = np.array([int(v) for v in y_adj])

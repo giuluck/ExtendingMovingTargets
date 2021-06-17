@@ -1,4 +1,5 @@
 """Basic Master Interface."""
+from typing import Any
 
 from moving_targets.util.typing import Matrix, Vector, Iteration
 
@@ -21,7 +22,7 @@ class Master:
         self.alpha: float = alpha
         self.beta: float = beta
 
-    def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         """Creates the model variables and adds the problem constraints.
 
         Args:
@@ -52,7 +53,7 @@ class Master:
         """
         return False
 
-    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         """Computes the loss of the model variables wrt real targets.
 
         Args:
@@ -68,7 +69,7 @@ class Master:
         """
         return 0.0
 
-    def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> float:
+    def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         """Computes the loss of the model variables wrt predictions.
 
         Args:
@@ -84,7 +85,7 @@ class Master:
         """
         return 0.0
 
-    def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         """Processes and returns the solutions given by the optimization model.
 
         Args:
@@ -100,7 +101,7 @@ class Master:
         """
         raise NotImplementedError("Please implement method 'return_solutions'")
 
-    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> object:
+    def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         """Core function of the Master object. Builds the model dependently on the kind solver and returns the adjusted
         targets.
 

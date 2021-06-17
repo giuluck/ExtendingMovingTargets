@@ -165,7 +165,9 @@ class LossesHandler:
         return self.sum_fn(model, -model_variable * np.log(numeric_variable))
 
     def _reversed_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Vector):
-        _log = lambda x: self.log_fn(model, x, lb=x.lb, ub=x.ub)
+        def _log(x):
+            return self.log_fn(model, x, lb=x.lb, ub=x.ub)
+
         return self.sum_fn(model, [-nv * _log(mv) for nv, mv in zip(numeric_variable, model_variable)])
 
     def _symmetric_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Any):
