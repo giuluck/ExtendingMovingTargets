@@ -272,7 +272,7 @@ class AbstractManager:
             return_type=return_type
         )
 
-    def evaluation_summary(self, model, model_name: Opt[str] = None, **kwargs):
+    def evaluation_summary(self, model, do_plot: bool = True, model_name: Opt[str] = None, **kwargs):
         """Evaluates the model."""
         # compute metrics on kwargs
         print(self.losses_summary(model=model, return_type='str', **kwargs))
@@ -280,7 +280,8 @@ class AbstractManager:
         print(self.violations_summary(model=model, return_type='str'))
         # plot summary
         kwargs = self.get_kwargs(default=self.summary_kwargs, **kwargs)
-        self._summary_plot(model=model, **kwargs)
-        if model_name:
-            plt.suptitle(model_name)
-        plt.show()
+        if do_plot:
+            self._summary_plot(model=model, **kwargs)
+            if model_name:
+                plt.suptitle(model_name)
+            plt.show()

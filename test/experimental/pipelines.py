@@ -29,6 +29,7 @@ MODELS: Dict[str, Tuple[Callable, Type]] = {
 }
 
 
+# noinspection DuplicatedCode
 class TestPipelines(unittest.TestCase):
     def _grid_ground(self) -> Optional[int]:
         raise NotImplementedError("please implement method '_grid_ground()'")
@@ -161,41 +162,49 @@ class TestPipelines(unittest.TestCase):
         self._test(data_args=dict(full_grid=False, grid_ground=self._grid_ground()))
 
     def test_default_mlp(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.025, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.025, grid_ground=ground))
 
     def test_default_sbr(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.025, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.025, grid_ground=ground))
 
     def test_default_tfl(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.025, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.025, grid_ground=ground))
 
     def test_default_mt(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.025, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.025, grid_ground=ground))
 
     def test_law_mlp(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.03, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.03, grid_ground=ground))
 
     def test_law_sbr(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.03, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.03, grid_ground=ground))
 
     def test_law_tfl(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.03, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.03, grid_ground=ground))
 
     def test_law_mt(self):
+        ground = self._grid_ground()
         self._test(data_args=dict(full_features=False, full_grid=True))
-        self._test(data_args=dict(full_features=False, full_grid=False, grid_ground=self._grid_ground()))
-        self._test(data_args=dict(full_features=True, full_grid=False, grid_ground=self._grid_ground()))
+        self._test(data_args=dict(full_features=False, full_grid=False, train_fraction=0.03, grid_ground=ground))
+        self._test(data_args=dict(full_features=True, full_grid=False, train_fraction=0.03, grid_ground=ground))

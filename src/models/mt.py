@@ -55,6 +55,7 @@ class MTLearner(Learner):
         if not self.warm_start:
             self.model = MLP(output_act=self.output_act, h_units=self.h_units, scalers=self.scalers)
         self.model.compile(optimizer=self.optimizer, loss=self.loss)
+
         # fit model
         fit_args = merge_dictionaries(self.fit_args, kwargs)
         fit = self.model.fit(x[~np.isnan(y)], y[~np.isnan(y)], **fit_args)
@@ -280,7 +281,7 @@ class MTClassificationMaster(MTMaster):
     def __init__(self,
                  monotonicities: MonotonicitiesList,
                  augmented_mask: Vector,
-                 loss_fn: str = 'hd',
+                 loss_fn: str = 'rbce',
                  clip_value: Union[float, Tuple[float, float]] = 1e-3,
                  cont_eps: float = 1e-3,
                  **kwargs):

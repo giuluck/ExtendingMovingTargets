@@ -22,18 +22,37 @@ class TFLHandler(AbstractHandler):
     }
 
     @staticmethod
-    def get_numeric_features(columns: List[str], manager: AbstractManager) -> List[ColumnInfo]:
+    def get_features(columns: List[str], manager: AbstractManager) -> List[ColumnInfo]:
         expected = list(manager.directions.keys())
         assert set(expected) <= set(columns), f"some of the expected columns {expected} are not present in {columns}"
-        return [
-            ColumnInfo(
-                name=column,
-                lattice_size=2,
-                monotonicity=manager.directions.get(column) or 0,
-                pwl_calibration_num_keypoints=25,
-                regularizer_configs=[tfl.configs.RegularizerConfig(name="calib_wrinkle", l2=1.0)]
-            ) for column in columns
-        ]
+        # handle categorical features (formatted as "<category_name>: <category_value>")
+        columns_info = {}
+        for c in columns:
+            if ': ' in c:
+                k, v = c.split(': ')
+                columns_info[k] = 1 + (columns_info.get(k) or 0)
+            else:
+                columns_info[c] = 0
+        # create numeric or categorical columns based on the kind of inputs
+        tfl_columns = []
+        for column, length in columns_info.items():
+            if length == 0:
+                info = ColumnInfo(
+                    name=column,
+                    lattice_size=2,
+                    monotonicity=manager.directions.get(column) or 0,
+                    pwl_calibration_num_keypoints=25,
+                    regularizer_configs=[tfl.configs.RegularizerConfig(name="calib_wrinkle", l2=1.0)]
+                )
+            else:
+                info = ColumnInfo(
+                    kind='categorical',
+                    name=column,
+                    lattice_size=2,
+                    pwl_calibration_num_keypoints=length,
+                )
+            tfl_columns.append(info)
+        return tfl_columns
 
     def __init__(self,
                  manager: AbstractManager,
@@ -67,10 +86,7 @@ class TFLHandler(AbstractHandler):
                 x = x[['num_reviews', 'avg_rating', 'dollar_rating']]
                 return x, y
 
-            def post_processing(y):
-                return y_scaler.inverse_transform(y)
-
-            columns = TFLHandler.get_numeric_features(columns=['num_reviews', 'avg_rating'], manager=self.manager) + [
+            columns = TFLHandler.get_features(columns=['num_reviews', 'avg_rating'], manager=self.manager) + [
                 ColumnInfo(
                     kind='categorical',
                     name='dollar_rating',
@@ -81,17 +97,28 @@ class TFLHandler(AbstractHandler):
             ]
         elif config == 'numeric':
             def pre_processing(x, y):
-                return x_scaler.transform(x), y_scaler.transform(y)
+                x, y = x_scaler.transform(x), y_scaler.transform(y)
+                # retrieve categorical features (formatted as "<category_name>: <category_value>")
+                categories = {}
+                for c in x.columns:
+                    if ': ' in c:
+                        k, v = c.split(': ')
+                        categories[k] = (categories.get(k) or []) + [v]
+                # get category value, map it to the respective value, then drop the one-hot encoded columns
+                for category, values in categories.items():
+                    cols = [f'{category}: {value}' for value in values]
+                    x[category] = x[cols].values.argmax(axis=1)
+                    x[category] = x[category].map({i: v for i, v in enumerate(values)})
+                    x = x.drop(columns=cols)
+                return x, y
 
-            def post_processing(y):
-                return y_scaler.inverse_transform(y)
-
-            columns = TFLHandler.get_numeric_features(columns=list(fold.x.columns), manager=self.manager)
+            columns = TFLHandler.get_features(columns=list(fold.x.columns), manager=self.manager)
         else:
             raise ValueError(f"{config} is not a supported configuration.")
         # CREATE AND BUILD MODEL
         x_pre, y_pre = pre_processing(x=fold.x, y=fold.y)
-        model = TFL(head=head, columns=columns, pre_processing=pre_processing, post_processing=post_processing)
+        model = TFL(head=head, columns=columns, pre_processing=pre_processing,
+                    post_processing=lambda y: y_scaler.inverse_transform(y))
         model.build(x=x_pre, y=y_pre, optimizer=self.optimizer, seed=self.seed)
         model.fit(x=fold.x, y=fold.y, epochs=self.epochs, batch_size=self.batch_size)
         return model
