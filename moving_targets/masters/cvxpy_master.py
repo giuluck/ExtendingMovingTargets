@@ -27,11 +27,11 @@ class CvxpyMaster(Master, ABC):
                            abs_fn=lambda model, x, lb=None, ub=None: cp.abs(x),
                            log_fn=lambda model, x, lb=None, ub=None: cp.log(x))
 
-    def __init__(self, verbose: bool = False, solver: Opt[str] = None, solve_args: Opt[Dict] = None, **kwargs):
-        super(CvxpyMaster, self).__init__(**kwargs)
+    def __init__(self, alpha: float = 1., beta: float = 1., verbose: bool = False, solver: Opt[str] = 'SCS', **kwargs):
+        super(CvxpyMaster, self).__init__(alpha=alpha, beta=beta)
         self.verbose: bool = verbose
         self.solver: Opt[str] = solver
-        self.solve_args: Dict = {} if solve_args is None else solve_args
+        self.solve_args: Dict = {} if kwargs is None else kwargs
 
     # noinspection PyMissingOrEmptyDocstring
     def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:

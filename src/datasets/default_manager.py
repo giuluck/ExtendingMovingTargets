@@ -101,7 +101,7 @@ class DefaultManager(AbstractManager):
         _, axes = plt.subplots(len(kwargs), 1, sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)
         for ax, (title, (x, y)) in zip(axes, kwargs.items()):
             data = pd.concat((x, y), axis=1).astype(int)
-            sns.pointplot(data=data, x='payment', y='default', hue='married', scale=0.8, markers=DefaultManager.MARKERS,
+            sns.pointplot(data=data, x='sep_status', y='default', hue='marriage', scale=0.8, markers=self.MARKERS,
                           ci=99, errwidth=1.5, capsize=0.1, dodge=0.25, join=False, ax=ax).set(title=title.capitalize())
 
     def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
@@ -115,7 +115,7 @@ class DefaultManager(AbstractManager):
         plt.figure(figsize=figsize)
         plt.title('Estimated Function')
         y = model.predict(self.grid).flatten()
-        sns.lineplot(data=self.grid, x='payment', y=y, hue='married').set(
+        sns.lineplot(data=self.grid, x='sep_status', y=y, hue='marriage').set(
             xlabel='Payment Status',
             ylabel='Default Probability'
         )

@@ -168,9 +168,10 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
 
     # noinspection PyMissingOrEmptyDocstring
     def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
+        mask = ~np.isnan(y)
         var, _ = model_info
         sw = np.where(self.augmented_mask, 1 / self.master_omega_y, 1)
-        return self.y_loss_fn(model, y[~np.isnan(y)], var[~np.isnan(y)], sample_weight=sw)
+        return self.y_loss_fn(model, y[mask], var[mask], sample_weight=sw[mask])
 
     # noinspection PyMissingOrEmptyDocstring
     def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
@@ -259,11 +260,9 @@ class MTRegressionMaster(MTMaster):
             var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=-float('inf'), ub=float('inf'), name='y').values()
             model.update()
         elif self.backend == 'cvxpy':
-            var = []
-            for _ in range(len(y)):
-                v = cp.Variable((1,))
+            var = [cp.Variable((1,)) for _ in range(len(y))]
+            for v in var:
                 v.lb, v.ub = -float('inf'), float('inf')
-                var.append(v)
         return var
 
 
@@ -342,9 +341,8 @@ class MTClassificationMaster(MTMaster):
                 var = model.addVars(len(y), vtype=GRB.CONTINUOUS, lb=lb, ub=ub, name='y').values()
             model.update()
         elif self.backend == 'cvxpy':
-            var = []
-            for _ in range(len(y)):
-                v = cp.Variable((1,))
+            var = [cp.Variable((1,)) for _ in range(len(y))]
+            for v in var:
                 v.lb, v.ub = self.cont_eps, 1 - self.cont_eps
                 model += [v >= v.lb, v <= v.ub]
         return var
@@ -355,13 +353,6 @@ class MTClassificationMaster(MTMaster):
         if self.loss_fn in ['binary_hamming']:
             p = p.round().astype(int)
         return p
-
-    # noinspection PyMissingOrEmptyDocstring
-    def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
-        m = ~np.isnan(y)
-        v, p = model_info
-        # masks both y variables and model variables (v) to transform the vector to type int in order to deal with loss
-        return super(MTClassificationMaster, self).y_loss(macs, model, (v[m], p), x, y[m].astype(int), iteration)
 
 
 class MT(MACS):
