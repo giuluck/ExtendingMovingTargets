@@ -28,7 +28,7 @@ class DatasetFactory:
         method = getattr(self, name.replace(' ', '_'))
         return method(**kwargs)
 
-    def cars_univariate(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4, num_col: int = 1,
+    def cars_univariate(self, data_args: Optional[dict] = None, h_units: tuple = (128, 128), num_col: int = 1,
                         callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
@@ -42,7 +42,7 @@ class DatasetFactory:
                                h_units=h_units, num_augmented=0, monotonicities='all', errors='ignore', **kwargs)
         return ds, cb
 
-    def cars(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4, num_col: int = 1,
+    def cars(self, data_args: Optional[dict] = None, h_units: tuple = (128, 128), num_col: int = 1,
              callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
@@ -56,7 +56,7 @@ class DatasetFactory:
                                h_units=h_units, **kwargs)
         return ds, cb
 
-    def synthetic(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4, num_col: int = 1,
+    def synthetic(self, data_args: Optional[dict] = None, h_units: tuple = (128, 128), num_col: int = 1,
                   callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'distance' in callbacks:
@@ -75,7 +75,7 @@ class DatasetFactory:
         ds = RegressionFactory(manager=SyntheticManager(**data_args), h_units=h_units, **kwargs)
         return ds, cb
 
-    def puzzles(self, data_args: Optional[dict] = None, h_units: tuple = (16,) * 4,
+    def puzzles(self, data_args: Optional[dict] = None, h_units: tuple = (128, 128),
                 num_col: int = 1, num_augmented: Augmented = (3, 4, 8), num_random: int = 465,
                 callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[RegressionFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
@@ -96,7 +96,7 @@ class DatasetFactory:
                                h_units=h_units, num_augmented=num_augmented, num_random=num_random, **kwargs)
         return ds, cb
 
-    def restaurants(self, data_args: Optional[dict] = None, h_units: tuple = (16, 8, 8), num_col: int = 1,
+    def restaurants(self, data_args: Optional[dict] = None, h_units: tuple = (128, 128), num_col: int = 1,
                     callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[ClassificationFactory, List[Callback]]:
         cb, callbacks = self._get_shared_callbacks(callbacks)
         if 'response' in callbacks:
