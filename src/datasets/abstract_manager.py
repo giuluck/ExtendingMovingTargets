@@ -154,7 +154,9 @@ class AbstractManager:
             return splits, self.get_scalers(*self.train_data)
         elif num_folds > 0:
             if num_folds == 1:
-                folds = [split_dataset(*self.train_data, test_size=0.2, val_size=0.0, stratify=self.stratify, **kwargs)]
+                fold = split_dataset(*self.train_data, test_size=0.2, val_size=0.0, stratify=self.stratify, **kwargs)
+                fold['validation'] = fold.pop('test')
+                folds = [fold]
             else:
                 folds = cross_validate(*self.train_data, num_folds=num_folds, stratify=self.stratify, **kwargs)
             return [({**fold, 'test': self.test_data}, self.get_scalers(*fold['train'])) for fold in folds]

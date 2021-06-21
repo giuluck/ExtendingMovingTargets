@@ -17,11 +17,10 @@ from src.util.dictionaries import cartesian_product
 if __name__ == '__main__':
     # create study list
     study = cartesian_product(
+        dataset=['cars univariate', 'cars', 'synthetic', 'puzzles'],
         mst_alpha=[0.01, 0.1, 1.0],
-        dataset=['restaurants', 'default', 'law'],
-        mst_loss_fn=['mse', 'mae'],
+        mst_loss_fn=['mse'],
         mst_backend=['gurobi'],
-        master_kind=['regression'],
         mst_learner_weights=['all'],
         mst_learner_omega=[1],
         mst_master_omega=[1],
@@ -34,12 +33,19 @@ if __name__ == '__main__':
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end=' ')
         dataset = config.pop('dataset')
         try:
-            factory, _ = DatasetFactory().get_dataset(name=dataset)
+            if dataset == 'cars univariate':
+                data_args = dict(full_features=False, full_grid=False)
+            elif dataset == 'synthetic':
+                data_args = dict(full_grid=False)
+            else:
+                data_args = dict(full_features=True, full_grid=False)
+
+            factory, _ = DatasetFactory().get_dataset(name=dataset, data_args=data_args)
             factory.get_mt(**config).experiment(
-                num_folds=5,
-                iterations=10,
+                num_folds=10,
+                iterations=50,
                 fold_verbosity=True,
-                callbacks=[WandBLogger(project='sc_classification', entity='giuluck', run_name=dataset, **config)]
+                callbacks=[WandBLogger(project='temp', entity='giuluck', run_name=dataset, **config, **data_args)]
             )
             print(f'-- elapsed time: {time.time() - start_time}')
         except:
