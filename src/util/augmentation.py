@@ -27,36 +27,36 @@ def augment_data(x: pd.DataFrame,
     """
     x, y = x.reset_index(drop=True), y.reset_index(drop=True)
     new_samples = []
-    new_info = []
-    for ground_index, sample in x.iterrows():
-        for attribute, (num_augmented, function) in sampling_functions.items():
-            if num_augmented > 0:
-                samples = pd.DataFrame([sample] * num_augmented)
-                # handle monotonicities on multiple attribute with tuples (python dict do not allow lists as key)
-                if isinstance(attribute, tuple):
-                    attribute = list(attribute)
-                samples[attribute] = function(num_augmented)
-                if compute_monotonicities is None:
-                    monotonicities = [np.nan] * num_augmented
-                else:
-                    monotonicities = compute_monotonicities(samples, sample)
-                new_samples.append(samples.astype(x.dtypes))
-                new_info.append(pd.DataFrame(
-                    data=zip([ground_index] * num_augmented, monotonicities),
-                    columns=['ground_index', 'monotonicity'],
-                    dtype='int'
-                ))
+    for attribute, (num_augmented, function) in sampling_functions.items():
+        if num_augmented > 0:
+            samples = np.hstack([x.values] * num_augmented).reshape(-1, x.shape[1])
+            samples = pd.DataFrame(samples, columns=x.columns).astype(x.dtypes)
+            # handle monotonicities on multiple attribute with tuples (python dict do not allow lists as key)
+            if isinstance(attribute, tuple):
+                attribute = list(attribute)
+            samples[attribute] = function(len(samples))
+            samples['ground_index'] = np.repeat(np.arange(len(x)), num_augmented)
+            if compute_monotonicities is None:
+                samples['monotonicity'] = np.nan
             else:
-                new_samples.append(x.head(0))
-                new_info.append(pd.DataFrame(data=[], columns=['ground_index', 'monotonicity'], dtype='int'))
-    x_aug = pd.concat([x] + new_samples).reset_index(drop=True).astype(x.dtypes)
-    y_aug = pd.concat([pd.DataFrame(y)] + new_info).reset_index(drop=True).rename({0: y.name}, axis=1)
+                monotonicities = []
+                for index, group in samples.groupby('ground_index'):
+                    monotonicities += list(compute_monotonicities(group.drop(columns='ground_index'), x.iloc[index]))
+                samples['monotonicity'] = monotonicities
+            samples[y.name] = np.nan
+        else:
+            samples = x.head(0)
+            samples['ground_index'] = []
+            samples['monotonicity'] = []
+            samples[y.name] = []
+        new_samples.append(samples)
+    df = pd.concat((x, y), axis=1)
     # there is no way to return integer labels due to the presence of nan values (pd.Int64 type have problems with tf)
-    y_aug = y_aug.fillna({
+    aug = pd.concat([df] + new_samples).sort_values([y.name, 'ground_index']).reset_index(drop=True).fillna({
         'ground_index': pd.Series(y.index),
-        'monotonicity': pd.Series(np.zeros(len(y)))
+        **({} if compute_monotonicities is None else {'monotonicity': pd.Series(np.zeros(len(y)))})
     }).astype({'ground_index': int})
-    return x_aug, y_aug
+    return aug[x.columns], aug[[y.name, 'ground_index', 'monotonicity']]
 
 
 def compute_numeric_monotonicities(samples: np.ndarray,

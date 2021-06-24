@@ -46,7 +46,7 @@ class MTHandler(AbstractHandler):
                  mst_learner_omega: float = 1.0,
                  mst_master_omega: Optional[float] = None,
                  mst_eps: float = 1e-3,
-                 mst_time_limit: Optional[float] = None,
+                 mst_time_limit: Optional[float] = 60,
                  mst_custom_args: Dict = None,
                  plt_figsize=(20, 10),
                  plt_num_columns=4,

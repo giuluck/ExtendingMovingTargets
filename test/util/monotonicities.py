@@ -41,6 +41,9 @@ class TestMonotonicities(unittest.TestCase):
         self.assertListEqual(expected, computed, msg='samples=all, references=all')
 
     def test_univariate(self):
+        def _mono_fn(samples: np.ndarray, references: np.ndarray) -> np.ndarray:
+            return compute_numeric_monotonicities(samples=samples, references=references, directions=np.array([1]))
+
         data = np.array([[0], [1], [2], [3]])
         mono = np.array([
             [.0, -1, -1, -1],
@@ -48,12 +51,13 @@ class TestMonotonicities(unittest.TestCase):
             [+1, +1, .0, -1],
             [+1, +1, +1, .0]
         ]).astype(int)
-        mono_fn = lambda samples, references: compute_numeric_monotonicities(samples=samples,
-                                                                             references=references,
-                                                                             directions=np.array([1]))
-        self._test(data_points=data, monotonicities=mono, monotonicities_fn=mono_fn)
+        self._test(data_points=data, monotonicities=mono, monotonicities_fn=_mono_fn)
 
     def test_numeric(self):
+        def _mono_fn(samples: np.ndarray, references: np.ndarray) -> np.ndarray:
+            directions = np.array([1, 0, -1])
+            return compute_numeric_monotonicities(samples=samples, references=references, directions=directions)
+
         data = np.array([
             [0, 0, 0],
             [1, 0, 0],
@@ -74,12 +78,19 @@ class TestMonotonicities(unittest.TestCase):
             [.0, .0, -1, .0, .0, .0, .0, -1],
             [.0, .0, .0, .0, -1, .0, +1, .0]
         ]).astype(int)
-        mono_fn = lambda samples, references: compute_numeric_monotonicities(samples=samples,
-                                                                             references=references,
-                                                                             directions=np.array([1, 0, -1]))
-        self._test(data_points=data, monotonicities=mono, monotonicities_fn=mono_fn)
+        self._test(data_points=data, monotonicities=mono, monotonicities_fn=_mono_fn)
 
     def test_restaurants(self):
+        def _mono_fn(samples: np.ndarray, references: np.ndarray) -> np.ndarray:
+            columns = ['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']
+            samples = pd.DataFrame(samples.reshape(-1, 6), columns=columns)
+            if references.ndim == 1:
+                references = pd.DataFrame(references.reshape(-1, 6), columns=columns).iloc[0]
+            else:
+                references = pd.DataFrame(references.reshape(-1, 6), columns=columns)
+            # noinspection PyTypeChecker
+            return RestaurantsManager.compute_monotonicities(self=None, samples=samples, references=references)
+
         data = np.array([
             [0, 0, 1, 0, 0, 0],
             [0, 0, 0, 1, 0, 0],
@@ -98,15 +109,5 @@ class TestMonotonicities(unittest.TestCase):
             [+1, .0, .0, .0, .0, .0, -1],
             [.0, .0, .0, .0, +1, +1, .0]
         ]).astype(int)
-
-        def _mono_fn(samples: np.ndarray, references: np.ndarray) -> np.ndarray:
-            columns = ['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']
-            samples = pd.DataFrame(samples.reshape(-1, 6), columns=columns)
-            if references.ndim == 1:
-                references = pd.DataFrame(references.reshape(-1, 6), columns=columns).iloc[0]
-            else:
-                references = pd.DataFrame(references.reshape(-1, 6), columns=columns)
-            # noinspection PyTypeChecker
-            return RestaurantsManager.compute_monotonicities(self=None, samples=samples, references=references)
 
         self._test(data_points=data, monotonicities=mono, monotonicities_fn=_mono_fn)

@@ -30,7 +30,7 @@ if __name__ == '__main__':
         for i, manager in enumerate(study):
             start_time = time.time()
             print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end=' ')
-            manager.validate(num_folds=10, summary_args=None)
+            manager.validate(num_folds=5, summary_args=None)
             print(f'-- elapsed time: {time.time() - start_time}')
         print()
 
@@ -142,11 +142,11 @@ if __name__ == '__main__':
     ])
 
     _study([
-        restaurants.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.01,
+        restaurants.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.01,
                            mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse'),
-        restaurants.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.1,
+        restaurants.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.1,
                            mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse'),
-        restaurants.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=1.0,
+        restaurants.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=1.0,
                            mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse')
         # rest.get_mt(wandb_name='MT BCE 0.01', wandb_project=WANDB_PROJECT, mt_iterations=5, mst_alpha=0.01,
         #             mst_master_kind='classification', mst_loss_fn='binary_crossentropy', lrn_loss='rbce'),
@@ -157,32 +157,32 @@ if __name__ == '__main__':
     ])
 
     _study([
-        default_full.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.01,
+        default_full.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.01,
                             mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_full_config),
-        default_full.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.1,
+        default_full.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.1,
                             mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_full_config),
-        default_full.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=1.0,
+        default_full.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=1.0,
                             mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_full_config),
-        default_slim.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.01,
+        default_slim.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.01,
                             mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_slim_config),
-        default_slim.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.1,
+        default_slim.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.1,
                             mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_slim_config),
-        default_slim.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=1.0,
+        default_slim.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=1.0,
                             mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_slim_config),
     ])
 
     _study([
-        law_full.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.01,
+        law_full.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.01,
                         mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_full_config),
-        law_full.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.1,
+        law_full.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.1,
                         mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_full_config),
-        law_full.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=1.0,
+        law_full.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=1.0,
                         mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_full_config),
-        law_slim.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.01,
+        law_slim.get_mt(wandb_name='MT 0.01', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.01,
                         mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_slim_config),
-        law_slim.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=0.1,
+        law_slim.get_mt(wandb_name='MT 0.1', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=0.1,
                         mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_slim_config),
-        law_slim.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=30, mst_alpha=1.0,
+        law_slim.get_mt(wandb_name='MT 1.0', wandb_project=WANDB_PROJECT, mt_iterations=10, mst_alpha=1.0,
                         mst_master_kind='regression', mst_loss_fn='mse', lrn_loss='mse', wandb_config=_slim_config)
     ])
 
