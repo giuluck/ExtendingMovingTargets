@@ -1,5 +1,5 @@
 """History Callback"""
-
+import logging
 from typing import List, Optional as Opt
 
 import matplotlib.pyplot as plt
@@ -25,7 +25,8 @@ class History(Logger):
 
     # noinspection PyMissingOrEmptyDocstring
     def on_process_end(self, macs, val_data: Opt[Dataset], **kwargs):
-        self.history = pd.concat(self.history)
+        if len(self.history) > 0:
+            self.history = pd.concat(self.history)
 
     def plot(self, columns: Opt[List[str]] = None, num_columns: int = 4, show: bool = True, **kwargs):
         """Plot the training information.
@@ -36,8 +37,10 @@ class History(Logger):
             show: whether or not to call matplotlib.pyplot.show().
             **kwargs: additional plot arguments.
         """
+        if not isinstance(self.history, pd.DataFrame):
+            logging.warning('Process did not end correctly, therefore no dataframe can be plotted')
+            return
         # handle columns and number of rows
-        assert isinstance(self.history, pd.DataFrame), 'Process did not end correctly, therefore no dataframe was built'
         columns = self.history.columns if columns is None else columns
         for i, c in enumerate(columns):
             if c is None or c not in self.history.columns or not np.issubdtype(self.history[c].dtype, np.number):

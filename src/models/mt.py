@@ -86,7 +86,6 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         learner_omega: real number that decides the weight of augmented samples during the learning step.
         master_omega: real number that decides the weight of augmented samples during the master step.
         eps: the slack value under which a violation is considered to be acceptable.
-        time_limit: the maximal time for which the master can run during each iteration.
         **kwargs: any other specific argument to be passed to the super class.
     """
 
@@ -100,15 +99,14 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
                  learner_omega: float = 1.0,
                  master_omega: Optional[float] = None,
                  eps: float = 1e-3,
-                 time_limit: Optional[float] = None,
                  **kwargs):
         self.backend: str = backend
         if self.backend == 'cplex':
-            super(MTMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit, **kwargs)
+            super(MTMaster, self).__init__(alpha=alpha, beta=0.0, **kwargs)
             self.y_loss_fn = getattr(CplexMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(CplexMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         elif self.backend == 'gurobi':
-            super(CplexMaster, self).__init__(alpha=alpha, beta=0.0, time_limit=time_limit, **kwargs)
+            super(CplexMaster, self).__init__(alpha=alpha, beta=0.0, **kwargs)
             self.y_loss_fn = getattr(GurobiMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         elif self.backend == 'cvxpy':

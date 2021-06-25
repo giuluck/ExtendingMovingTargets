@@ -51,11 +51,12 @@ def augment_data(x: pd.DataFrame,
             samples[y.name] = []
         new_samples.append(samples)
     df = pd.concat((x, y), axis=1)
+    df['ground_index'] = np.arange(len(df))
+    df['monotonicity'] = np.nan if compute_monotonicities is None else 0.0
+    aug = pd.concat(new_samples).sort_values('ground_index')
+    aug = pd.concat((df, aug)).reset_index(drop=True)
     # there is no way to return integer labels due to the presence of nan values (pd.Int64 type have problems with tf)
-    aug = pd.concat([df] + new_samples).sort_values([y.name, 'ground_index']).reset_index(drop=True).fillna({
-        'ground_index': pd.Series(y.index),
-        **({} if compute_monotonicities is None else {'monotonicity': pd.Series(np.zeros(len(y)))})
-    }).astype({'ground_index': int})
+    aug = aug.astype({'ground_index': int})
     return aug[x.columns], aug[[y.name, 'ground_index', 'monotonicity']]
 
 

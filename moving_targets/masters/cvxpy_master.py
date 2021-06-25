@@ -19,19 +19,18 @@ class CvxpyMaster(Master, ABC):
     """Master interface to Cvxpy solver.
 
     Args:
-        time_limit: the maximal time for which the master can run during each iteration.
-        **kwargs: super-class arguments.
+        solver: the type of solver.
+        **solver_args: parameters of the solver to be passed to the `model.solve()` function.
     """
 
     losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x),
                            abs_fn=lambda model, x, lb=None, ub=None: cp.abs(x),
                            log_fn=lambda model, x, lb=None, ub=None: cp.log(x))
 
-    def __init__(self, alpha: float = 1., beta: float = 1., verbose: bool = False, solver: Opt[str] = 'SCS', **kwargs):
+    def __init__(self, alpha: float = 1., beta: float = 1., solver: Opt[str] = 'SCS', **solver_args):
         super(CvxpyMaster, self).__init__(alpha=alpha, beta=beta)
-        self.verbose: bool = verbose
         self.solver: Opt[str] = solver
-        self.solve_args: Dict = {} if kwargs is None else kwargs
+        self.solver_args: Dict[str, Any] = solver_args
 
     # noinspection PyMissingOrEmptyDocstring
     def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:
@@ -48,7 +47,7 @@ class CvxpyMaster(Master, ABC):
             objective = cp.Minimize(y_loss + (1.0 / self.alpha) * p_loss)
         # solve the problem and get the adjusted labels
         model = cp.Problem(objective, constraints)
-        model.solve(solver=self.solver, verbose=self.verbose, **self.solve_args)
+        model.solve(solver=self.solver, **self.solver_args)
         if model.status in ['infeasible', 'unbounded']:
             logging.warning(f'Status {model.status} returned at iteration {iteration}, stop training.')
             return None

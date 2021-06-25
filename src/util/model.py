@@ -2,6 +2,8 @@
 
 from typing import Callable, Dict, Union
 
+import numpy as np
+
 from moving_targets.metrics import MonotonicViolation
 from moving_targets.util.typing import Data, Matrix, MonotonicitiesList
 
@@ -25,7 +27,7 @@ def metrics_summary(model, metric, metric_name: str = None, post_process: Callab
     metric_name = metric.__name__ if metric_name is None else metric_name
     for title, (x, y) in kwargs.items():
         p = model.predict(x) if post_process is None else post_process(model.predict(x))
-        summary[title] = metric(y, p)
+        summary[title] = metric(y, p.astype(np.float64))
     if return_type in ['dict', 'dictionary']:
         return summary
     elif return_type in ['str', 'string']:
@@ -49,7 +51,7 @@ def violations_summary(model,
     Returns:
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
-    p = model.predict(inputs)
+    p = model.predict(inputs).astype(np.float64)
     summary = {
         'avg_violation': MonotonicViolation(monotonicities=monotonicities, aggregation='average', eps=0.0),
         'pct_violation': MonotonicViolation(monotonicities=monotonicities, aggregation='percentage', eps=0.0)

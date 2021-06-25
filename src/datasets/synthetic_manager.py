@@ -36,7 +36,7 @@ class SyntheticManager(AbstractManager):
 
     # noinspection PyMissingOrEmptyDocstring
     @staticmethod
-    def load_data(noise: float, extrapolation: bool) -> AbstractManager.Data:
+    def load_data(noise: float = 0.0, extrapolation: bool = False) -> AbstractManager.Data:
         rng = np.random.default_rng(seed=0)
         if extrapolation:
             x, y = SyntheticManager.sample_dataset(n=700, noise=noise, rng=rng, testing_set=True)

@@ -1,7 +1,7 @@
 """Gurobi Master interface."""
 import logging
 from abc import ABC
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 import numpy as np
 from gurobipy import Model, Env, GRB, Var
@@ -40,16 +40,15 @@ class GurobiMaster(Master, ABC):
     """Master interface to Gurobi solver.
 
     Args:
-        time_limit: the maximal time for which the master can run during each iteration.
-        **kwargs: super-class arguments.
+        verbose: whether or not to print information during the optimization process.
+        **solver_args: parameters of the solver to be set via the `model.SetParam()` function.
     """
 
     losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x), abs_fn=_abs, log_fn=_log)
 
-    def __init__(self, time_limit: Optional[float] = None, pre_passes: int = -1, verbose: bool = False, **kwargs):
-        super(GurobiMaster, self).__init__(**kwargs)
-        self.time_limit: Optional[float] = time_limit
-        self.pre_passes: int = pre_passes
+    def __init__(self, alpha: float = 1., beta: float = 1., verbose: bool = False, **solver_args):
+        super(GurobiMaster, self).__init__(alpha=alpha, beta=beta)
+        self.solver_args: Dict[str, Any] = solver_args
         self.verbose: bool = verbose
 
     # noinspection PyMissingOrEmptyDocstring
@@ -60,9 +59,8 @@ class GurobiMaster(Master, ABC):
                 env.setParam('OutputFlag', 0)
             env.start()
             with Model(env=env, name='model') as model:
-                if self.time_limit is not None:
-                    model.setParam('TimeLimit', self.time_limit)
-                model.setParam('PrePasses', self.pre_passes)
+                for param, value in self.solver_args.items():
+                    model.setParam(param, value)
                 model_info = self.build_model(macs, model, x, y, iteration)
                 # algorithm core: check for feasibility and behave depending on that
                 y_loss = self.y_loss(macs, model, model_info, x, y, iteration)
@@ -73,8 +71,13 @@ class GurobiMaster(Master, ABC):
                     model.setObjective(y_loss, GRB.MINIMIZE)
                 else:
                     model.setObjective(y_loss + (1.0 / self.alpha) * p_loss, GRB.MINIMIZE)
-                # solve the problem and get the adjusted labels
+                # run the optimization procedure (if the time limit expires, tries to reach at least one solution)
                 model.optimize()
+                if model.Status == GRB.TIME_LIMIT:
+                    model.setParam('TimeLimit', GRB.INFINITY)
+                    model.setParam('SolutionLimit', 1)
+                    model.optimize()
+                # if no solution can be found due to, e.g., infeasibility, no labels are returned
                 if model.SolCount == 0:
                     logging.warning(f'Status {model.Status} returned at iteration {iteration}, stop training.')
                     return None
