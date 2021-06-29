@@ -18,7 +18,7 @@ class HandlersFactory:
     def __init__(self,
                  manager: AbstractManager,
                  dataset: Optional[str] = None,
-                 wandb_project: Optional[str] = 'shape_constraints',
+                 wandb_project: Optional[str] = 'moving_targets',
                  wandb_entity: Optional[str] = 'giuluck',
                  seed: int = 0,
                  loss: Optional[str] = None,

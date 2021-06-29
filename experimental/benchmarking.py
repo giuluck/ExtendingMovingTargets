@@ -35,7 +35,7 @@ if __name__ == '__main__':
         print()
 
 
-    WANDB_PROJECT: str = 'movingtarg_benchmarking'
+    WANDB_PROJECT: str = 'mt_benchmarking'
 
     # BASELINES
     cars_full, _ = DatasetFactory().cars(data_args=dict(full_features=True, full_grid=False))

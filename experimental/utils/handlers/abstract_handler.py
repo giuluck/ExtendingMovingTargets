@@ -53,7 +53,7 @@ class AbstractHandler:
                  model: Optional[str] = None,
                  dataset: Optional[str] = None,
                  wandb_name: Optional[str] = None,
-                 wandb_project: Optional[str] = 'shape_constraints',
+                 wandb_project: Optional[str] = 'moving_targets',
                  wandb_entity: Optional[str] = 'giuluck',
                  wandb_config: Callable = default_config,
                  seed: int = 0):

@@ -1,12 +1,12 @@
 """Moving Targets Handler."""
 import time
-from typing import Any, Union, List, Optional, Dict, Type, Tuple
+from typing import Any, Union, List, Optional, Dict, Type, Tuple, Callable
 
 import numpy as np
 import pandas as pd
 from tensorflow.python.keras.callbacks import EarlyStopping, History
 
-from experimental.utils.handlers import AbstractHandler, Fold, setup
+from experimental.utils.handlers import AbstractHandler, Fold, setup, default_config
 from moving_targets.callbacks import WandBLogger, Callback
 from moving_targets.metrics import Metric, MonotonicViolation
 from src.datasets import AbstractManager
@@ -20,6 +20,13 @@ from src.util.typing import Augmented
 class MTHandler(AbstractHandler):
     def __init__(self,
                  manager: AbstractManager,
+                 model: Optional[str] = None,
+                 dataset: Optional[str] = None,
+                 wandb_name: Optional[str] = None,
+                 wandb_project: Optional[str] = 'moving_targets',
+                 wandb_entity: Optional[str] = 'giuluck',
+                 wandb_config: Callable = default_config,
+                 seed: int = 0,
                  aug_num_augmented: Optional[Augmented] = None,
                  aug_num_random: int = 0,
                  aug_num_ground: Optional[int] = None,
@@ -40,18 +47,24 @@ class MTHandler(AbstractHandler):
                  lrn_warm_start: bool = False,
                  mst_master_kind: Optional[str] = None,
                  mst_backend: str = 'gurobi',
-                 mst_loss_fn: Optional[str] = None,
+                 mst_loss_fn: str = 'default',
                  mst_alpha: float = 1.0,
+                 mst_beta: Optional[float] = None,
                  mst_learner_weights: str = 'all',
                  mst_learner_omega: float = 1.0,
                  mst_master_omega: Optional[float] = None,
                  mst_eps: float = 1e-3,
-                 mst_time_limit: Optional[float] = 60,
-                 mst_custom_args: Dict = None,
                  plt_figsize=(20, 10),
                  plt_num_columns=4,
-                 **kwargs):
-        super(MTHandler, self).__init__(manager=manager, **kwargs)
+                 **mst_kwargs):
+        super(MTHandler, self).__init__(manager=manager,
+                                        model=model,
+                                        dataset=dataset,
+                                        wandb_name=wandb_name,
+                                        wandb_project=wandb_project,
+                                        wandb_entity=wandb_entity,
+                                        wandb_config=wandb_config,
+                                        seed=seed)
         if mst_master_kind in ['cls', 'classification']:
             self.master_class: Type[MTMaster] = MTClassificationMaster
         elif mst_master_kind in ['reg', 'regression']:
@@ -76,16 +89,17 @@ class MTHandler(AbstractHandler):
             callbacks=[] if lrn_early_stop is None else [lrn_early_stop],
             warm_start=lrn_warm_start
         )
+        if mst_loss_fn != 'default':
+            mst_kwargs['loss_fn'] = mst_loss_fn
         self.master_args: Dict = dict(
             backend=mst_backend,
             alpha=mst_alpha,
+            beta=mst_beta,
             learner_weights=mst_learner_weights,
             learner_omega=mst_learner_omega,
             master_omega=mst_master_omega,
             eps=mst_eps,
-            time_limit=mst_time_limit,
-            **({} if mst_loss_fn is None else {'loss_fn': mst_loss_fn}),
-            **({} if mst_custom_args is None else mst_custom_args)
+            **mst_kwargs
         )
         self.plot_args: Dict = dict(figsize=plt_figsize, num_columns=plt_num_columns)
 

@@ -95,22 +95,26 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
                  loss_fn: str,
                  backend: str = 'cplex',
                  alpha: float = 1.0,
+                 beta: Optional[float] = None,
                  learner_weights: str = 'all',
                  learner_omega: float = 1.0,
                  master_omega: Optional[float] = None,
                  eps: float = 1e-3,
                  **kwargs):
+        assert eps >= 0, f"'eps' must be non-negative, but value {eps} was passed"
         self.backend: str = backend
+        self.use_beta: bool = beta is not None
+        beta: float = 0.0 if beta is None else beta
         if self.backend == 'cplex':
-            super(MTMaster, self).__init__(alpha=alpha, beta=0.0, **kwargs)
+            super(MTMaster, self).__init__(alpha=alpha, beta=beta, **kwargs)
             self.y_loss_fn = getattr(CplexMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(CplexMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         elif self.backend == 'gurobi':
-            super(CplexMaster, self).__init__(alpha=alpha, beta=0.0, **kwargs)
+            super(CplexMaster, self).__init__(alpha=alpha, beta=beta, **kwargs)
             self.y_loss_fn = getattr(GurobiMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(GurobiMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         elif self.backend == 'cvxpy':
-            super(GurobiMaster, self).__init__(alpha=alpha, beta=0.0, **kwargs)
+            super(GurobiMaster, self).__init__(alpha=alpha, beta=beta, **kwargs)
             self.y_loss_fn = getattr(CvxpyMaster.losses, loss_fn[0] if isinstance(loss_fn, tuple) else loss_fn)
             self.p_loss_fn = getattr(CvxpyMaster.losses, loss_fn[1] if isinstance(loss_fn, tuple) else loss_fn)
         else:
@@ -162,7 +166,11 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
 
     # noinspection PyMissingOrEmptyDocstring
     def beta_step(self, macs, model, model_info, x, y, iteration: Iteration) -> bool:
-        return False
+        if self.use_beta and len(self.higher_indices) > 0:
+            _, pred = model_info
+            return np.all(pred[self.lower_indices] - pred[self.higher_indices] <= self.eps)
+        else:
+            return False
 
     # noinspection PyMissingOrEmptyDocstring
     def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
