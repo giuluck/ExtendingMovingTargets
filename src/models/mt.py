@@ -166,8 +166,8 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
 
     # noinspection PyMissingOrEmptyDocstring
     def beta_step(self, macs, model, model_info, x, y, iteration: Iteration) -> bool:
-        if self.use_beta and len(self.higher_indices) > 0:
-            _, pred = model_info
+        _, pred = model_info
+        if self.use_beta and pred is not None and len(self.higher_indices) > 0:
             return np.all(pred[self.lower_indices] - pred[self.higher_indices] <= self.eps)
         else:
             return False
@@ -197,11 +197,11 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         elif self.backend == 'cvxpy':
             adj = np.array([vy.value[0] for vy in var])
         # sample weights
-        if self.learner_weights == 'infeasible':
+        if self.learner_weights == 'infeasible' and pred is not None:
             infeasible_mask = (pred[self.lower_indices] - pred[self.higher_indices]) > self.eps
             self.infeasible_mask[self.higher_indices[infeasible_mask]] = True
             self.infeasible_mask[self.lower_indices[infeasible_mask]] = True
-        sample_weight = np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
+        sample_weight = np.ones(len(y)) if pred is None else np.where(self.infeasible_mask, 1 / self.learner_omega, 0.0)
         sample_weight[~self.augmented_mask] = 1.0
         # logs and outputs
         diffs = adj[~np.isnan(y)] - y[~np.isnan(y)]

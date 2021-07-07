@@ -1,58 +1,59 @@
-"""Script to get LaTeX Tables from Benchmarking Results."""
+"""Script to get LaTeX Tables from Benchmarking Tests."""
 import pandas as pd
 import wandb
 
+COLUMNS = {
+    'dataset': 'Dataset',
+    'name': 'Model',
+    'test_metric': 'Test Metric',
+    'test_loss': 'Test Loss',
+    'validation_metric': 'Val Metric',
+    'validation_loss': 'Val Loss',
+    'train_metric': 'Train Metric',
+    'train_loss': 'Train Loss',
+    'avg_violation': 'Avg. Violation',
+    'pct_violation': 'Pct. Violations',
+    'elapsed_time': 'Training Time'
+}
+
+MODELS = {
+    'MLP': 'MLP',
+    'SBR': 'SBR',
+    'TFL': 'TFL',
+    'MT 0.01': 'MT 0.01',
+    'MT 0.1': 'MT 0.1',
+    'MT 1.0': 'MT 1.0',
+    'SBR (No Augmentation)': 'SBR (NA)',
+    'MT 0.01 (No Augmentation)': 'MT 0.01 (NA)',
+    'MT 0.1 (No Augmentation)': 'MT 0.1 (NA)',
+    'MT 1.0 (No Augmentation)': 'MT 1.0 (NA)'
+}
+
+DATASETS = {
+    'Synthetic': ('$R^2$', 'MSE'),
+    'Cars Slim': ('$R^2$', 'MSE'),
+    'Cars Full': ('$R^2$', 'MSE'),
+    'Puzzles Slim': ('$R^2$', 'MSE'),
+    'Puzzles Full': ('$R^2$', 'MSE'),
+    'Restaurants': ('AUC', 'BCE'),
+    'Law Slim': ('Acc.', 'BCE'),
+    'Law Full': ('Acc.', 'BCE'),
+    'Default Slim': ('Acc.', 'BCE'),
+    'Default Full': ('Acc.', 'BCE')
+}
+
+
+def _float_format(fp: float, max_digits: int = 7) -> str:
+    # up to 'max_digits' (point included), except for 0
+    # still, take at least the number of digits up to the point
+    fp_digits = f'{fp:.{max_digits}f}'
+    integer_digits = fp_digits.find('.') - (1 if fp_digits.startswith('-') else 0)
+    decimal_digits = max(0, max_digits - integer_digits - 1)
+    fp = f'{fp:.{decimal_digits}f}'
+    return '< 1e-5' if fp.strip('0.') == '' else fp
+
+
 if __name__ == '__main__':
-    def _float_format(fp: float, max_digits: int = 7) -> str:
-        # up to 'max_digits' (point included), except for 0
-        # still, take at least the number of digits up to the point
-        fp_digits = f'{fp:.{max_digits}f}'
-        integer_digits = fp_digits.find('.') - (1 if fp_digits.startswith('-') else 0)
-        decimal_digits = max(0, max_digits - integer_digits - 1)
-        fp = f'{fp:.{decimal_digits}f}'
-        return '< 1e-5' if fp.strip('0.') == '' else fp
-
-
-    COLUMNS = {
-        'dataset': 'Dataset',
-        'name': 'Model',
-        'test_metric': 'Test Metric',
-        'test_loss': 'Test Loss',
-        'validation_metric': 'Val Metric',
-        'validation_loss': 'Val Loss',
-        'train_metric': 'Train Metric',
-        'train_loss': 'Train Loss',
-        'avg_violation': 'Avg. Violation',
-        'pct_violation': 'Pct. Violations',
-        'elapsed_time': 'Training Time'
-    }
-
-    MODELS = {
-        'MLP': 'MLP',
-        'SBR': 'SBR',
-        'TFL': 'TFL',
-        'MT 0.01': 'MT 0.01',
-        'MT 0.1': 'MT 0.1',
-        'MT 1.0': 'MT 1.0',
-        'SBR (No Augmentation)': 'SBR (NA)',
-        'MT 0.01 (No Augmentation)': 'MT 0.01 (NA)',
-        'MT 0.1 (No Augmentation)': 'MT 0.1 (NA)',
-        'MT 1.0 (No Augmentation)': 'MT 1.0 (NA)'
-    }
-
-    DATASETS = {
-        'Synthetic': ('$R^2$', 'MSE'),
-        'Cars Slim': ('$R^2$', 'MSE'),
-        'Cars Full': ('$R^2$', 'MSE'),
-        'Puzzles Slim': ('$R^2$', 'MSE'),
-        'Puzzles Full': ('$R^2$', 'MSE'),
-        'Restaurants': ('AUC', 'BCE'),
-        'Law Slim': ('Acc.', 'BCE'),
-        'Law Full': ('Acc.', 'BCE'),
-        'Default Slim': ('Acc.', 'BCE'),
-        'Default Full': ('Acc.', 'BCE')
-    }
-
     # download results using wandb api
     runs = wandb.Api().runs('giuluck/mt_benchmarking')
     df = pd.DataFrame([{'name': run.name, **run.config, **run.summary} for run in runs])
@@ -97,7 +98,7 @@ if __name__ == '__main__':
             # convert the dataset to latex, the do some manual postprocessing
             latex = ddf.to_latex(
                 float_format=_float_format,
-                caption=f'Results for {dataset.lower()} dataset',
+                caption=f'Results for {dataset.lower()} dataset.',
                 bold_rows=True,
                 escape=False
             )
@@ -112,14 +113,15 @@ if __name__ == '__main__':
             latex = latex.split('\n')
             for i in range(1, len(latex) - 2):
                 latex[i] = ('\t' if i < 4 or i == len(latex) - 3 else '\t\t') + latex[i]
-            latex.insert(3, '\t\\small')
+            latex.insert(3, '\t\\footnotesize')
+            latex.insert(3, '\t\\label{tab:' + dataset.lower().replace(' ', '_') + '_results}')
             # make best values bold line by line (this must me handled manually as formatters work for columns only)
             for i, v in best.items():
                 v = _float_format(v)
-                latex[i + 8] = latex[i + 8].replace(f'{v} &', '\\textbf{' + v + '} &')
-                latex[i + 8] = latex[i + 8].replace(f'{v} \\', '\\textbf{' + v + '} \\')
+                latex[i + 9] = latex[i + 9].replace(f'{v} &', '\\textbf{' + v + '} &')
+                latex[i + 9] = latex[i + 9].replace(f'{v} \\', '\\textbf{' + v + '} \\')
             # save the table
             latex = '\n'.join(latex)
             name = dataset if len(df_datasets) == 1 else f'{dataset}_{k}'
-            with open(f'../temp/{name}.txt', 'w') as f:
+            with open(f'../temp/{name}.tex', 'w') as f:
                 f.write(latex)

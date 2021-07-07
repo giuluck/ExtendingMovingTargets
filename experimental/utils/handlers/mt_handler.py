@@ -140,7 +140,7 @@ class MTHandler(AbstractHandler):
 
     def experiment(self,
                    iterations: Optional[int] = None,
-                   num_folds: Optional[int] = 1,
+                   num_folds: Optional[int] = None,
                    folds_index: Optional[List[int]] = None,
                    fold_verbosity: Union[bool, int] = True,
                    model_verbosity: Union[bool, int] = False,

@@ -72,12 +72,12 @@ class RestaurantsManager(AbstractManager):
             for d in ['D', 'DD', 'DDD', 'DDDD']:
                 df[d] = 1 if rating == d else 0
             for j, (title, model) in enumerate(models.items()):
-                ctr = model.predict(df)
+                ctr = model.predict(df).reshape(res, res)
                 if orient_columns:
-                    axes[i, j].pcolor(avg_ratings, num_reviews, ctr.reshape(res, res), shading='auto', vmin=0, vmax=1)
+                    axes[i, j].pcolor(avg_ratings, num_reviews, ctr, shading='auto', cmap='viridis', vmin=0, vmax=1)
                     axes[i, j].set(title=title if i == 0 else None, xlabel=None, ylabel=rating if j == 0 else None)
                 else:
-                    axes[j, i].pcolor(avg_ratings, num_reviews, ctr.reshape(res, res), shading='auto', vmin=0, vmax=1)
+                    axes[j, i].pcolor(avg_ratings, num_reviews, ctr, shading='auto', cmap='viridis', vmin=0, vmax=1)
                     axes[j, i].set(title=rating if j == 0 else None, xlabel=None, ylabel=title if i == 0 else None)
         if show:
             plt.show()
