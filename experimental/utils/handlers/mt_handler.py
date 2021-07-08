@@ -147,7 +147,6 @@ class MTHandler(AbstractHandler):
                    callbacks: Optional[List[Callback]] = None,
                    plot_args: Dict = None,
                    summary_args: Dict = None):
-        setup(seed=self.seed)
         callbacks = [] if callbacks is None else callbacks
         iterations = self.iterations if iterations is None else iterations
         fold_verbosity = False if num_folds is None or num_folds == 1 else fold_verbosity
@@ -155,6 +154,7 @@ class MTHandler(AbstractHandler):
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
         folds = self.get_folds(num_folds=num_folds)
         for i, fold in enumerate([folds] if num_folds is None else folds):
+            setup(seed=self.seed)
             if folds_index is not None and i not in folds_index:
                 continue
             # handle verbosity
