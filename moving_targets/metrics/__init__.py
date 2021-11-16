@@ -1,4 +1,4 @@
-"""__init__.py file for moving_targets.metrics package."""
+"""Predefined metrics for classification, regression, and constraint satisfaction for Moving Targets."""
 
 from moving_targets.metrics.classification import Accuracy, AUC, ClassificationMetric, CrossEntropy, F1, Precision
 from moving_targets.metrics.classification import Recall

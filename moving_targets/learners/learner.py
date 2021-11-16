@@ -4,30 +4,39 @@ from moving_targets.util.typing import Vector, Iteration, Matrix
 
 
 class Learner:
-    """Basic interface for a Moving Target's learner."""
+    """Basic interface for a Moving Targets learner."""
 
     def __init__(self):
+        """"""
         super(Learner, self).__init__()
 
-    def fit(self, macs, x: Matrix, y: Vector, iteration: Iteration, **kwargs):
+    def fit(self, macs, x: Matrix, y: Vector, iteration: Iteration, **additional_kwargs):
         """Fits the learner according to the implemented procedure using (x, y) as training data.
 
-        Args:
-            macs: reference to the MACS object encapsulating the learner.
-            x: the matrix/dataframe of training samples.
-            y: the vector of training labels.
-            iteration: the current MACS iteration, usually a number.
-            **kwargs: any other useful parameter.
+        :param macs:
+            Reference to the `MACS` object encapsulating the learner.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number.
+
+        :param additional_kwargs:
+            Any other useful parameter.
         """
         raise NotImplementedError("Please implement method 'fit'")
 
     def predict(self, x: Matrix) -> Vector:
         """Uses the fitted learner configuration to predict labels from input samples.
 
-        Args:
-            x: the matrix/dataframe of input samples.
+        :param x:
+            The matrix/dataframe of input samples.
 
-        Returns:
+        :returns:
             The vector of predicted labels.
         """
         raise NotImplementedError("Please implement method 'predict'")

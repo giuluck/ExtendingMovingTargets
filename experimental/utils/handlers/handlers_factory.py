@@ -173,7 +173,7 @@ class ClassificationFactory(HandlersFactory):
     def __init__(self, manager: AbstractManager, mt_evaluation_metric: Optional[Metric] = Accuracy(), **kwargs):
         super(ClassificationFactory, self).__init__(
             manager=manager,
-            master_kind='classification',
+            master_kind='regression',
             mt_metrics=[CrossEntropy(name='loss'), mt_evaluation_metric],
             loss='binary_crossentropy',
             output_act='sigmoid',

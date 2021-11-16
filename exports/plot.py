@@ -22,7 +22,7 @@ class ExportAnalysis(AnalysisCallback):
         super(ExportAnalysis, self).__init__()
         self.config_name = config_name
 
-    def on_process_end(self, macs, val_data: Optional[Dataset], **kwargs):
+    def on_process_end(self, macs, val_data: Optional[Dataset], **additional_kwargs):
         self.data = self.data.sort_values('price')
         plt.figure(tight_layout=True, figsize=FIG_SIZE)
         self.plot_function(1)

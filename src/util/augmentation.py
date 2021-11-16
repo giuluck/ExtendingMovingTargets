@@ -15,15 +15,27 @@ def augment_data(x: pd.DataFrame,
                  compute_monotonicities: Optional[Callable] = None) -> AugmentedData:
     """Augments the dataset using the given sampling functions, then computes its monotonicities wrt the ground samples.
 
-    Args:
-        x: the matrix/dataframe of samples.
-        y: the vector of labels.
-        sampling_functions: sampling routine associated to each x feature, with respective number of augmented samples.
-        compute_monotonicities: routine that computes the monotonicities of some data points wrt a reference point.
+    :param x:
+        The matrix/dataframe of samples.
 
-    Returns:
-        A tuple of augmented inputs/labels. The labels are no more in form of a vector, but rather a `DataFrame` with
-        two additional features: 'ground_index' and 'monotonicity' (wrt the ground index).
+    :param y:
+        The vector of labels.
+
+    :param sampling_functions:
+        Sampling routine associated to each x feature, with respective number of augmented samples, it must be a
+        dictionary which associates to each string key representing the attribute a tuple
+        (<number_of_augmented_samples>, <callable_sampling_function>), where <callable_sampling_function> is a function
+        f(<n>) -> {x_1, ..., x_n} which returns <n> scalar values sampled from the data distribution related to the
+        specified attribute.
+
+    :param compute_monotonicities:
+        Routine that computes the monotonicities of some data points wrt a reference point, it must be a function
+        f(<x>, <y>) -> <monotonicities_matrix> that computes pairwise expected monotonicities between two vectors <x>
+        and <y> (with size <n> and <m>, respectively) and stores them in a matrix having shape (<n>, <m>).
+
+    :returns:
+        A tuple of augmented inputs/labels. The labels are no more in form of a vector, but rather a `pandas.DataFrame`
+        with two additional features: 'ground_index' and 'monotonicity' (wrt the ground index).
     """
     x, y = x.reset_index(drop=True), y.reset_index(drop=True)
     new_samples = []
@@ -66,13 +78,19 @@ def compute_numeric_monotonicities(samples: np.ndarray,
                                    eps: float = 1e-6) -> MonotonicitiesMatrix:
     """Default way of computing monotonicities in case all the features are numeric.
 
-    Args:
-        samples: the matrix of data points.
-        references: the vector/matrix of reference data point(s).
-        directions: the direction of the monotonicity wrt each feature.
-        eps: the slack value under which a violation is considered to be acceptable
+    :param samples:
+        The matrix of data points.
 
-    Returns:
+    :param references:
+        The vector/matrix of reference data point(s).
+
+    :param directions:
+        The direction of the monotonicity wrt each feature.
+
+    :param eps:
+        The slack value under which a violation is considered to be acceptable.
+
+    :returns:
         A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled with
         -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
     """
@@ -102,17 +120,28 @@ def get_monotonicities_list(data: pd.DataFrame,
                             errors: str = 'raise') -> MonotonicitiesList:
     """Computes the monotonicities list from an augmented dataframe.
 
-    Args:
-        data: the augmented dataframe.
-        kind: the monotonicity computation modality:
-              - 'ground', which computes the monotonicity within each subgroup respectively to the ground index only.
-              - 'group', which computes the monotonicity within each subgroup between each pair in the subgroup.
-              - 'all', which computes the monotonicity between each pair in the whole dataset (very slow).
-        label: the y label to be dropped, if present.
-        compute_monotonicities: routine that computes the monotonicities of some data points wrt a reference point.
-        errors: pandas argument that sets the behaviour in case a non present column is being dropped.
+    :param data:
+        The augmented dataframe.
 
-    Returns:
+    :param kind:
+        The monotonicity computation modality:
+
+        - 'ground', which computes the monotonicity within each subgroup respectively to the ground index only.
+        - 'group', which computes the monotonicity within each subgroup between each pair in the subgroup.
+        - 'all', which computes the monotonicity between each pair in the whole dataset (very slow).
+
+    :param label:
+        The y label to be dropped, if present.
+
+    :param compute_monotonicities:
+        Routine that computes the monotonicities of some data points wrt a reference point, it must be a function
+        f(<x>, <y>) -> <monotonicities_matrix> that computes pairwise expected monotonicities between two vectors <x>
+        and <y> (with size <n> and <m>, respectively) and stores them in a matrix having shape (<n>, <m>).
+
+    :param errors:
+        Pandas argument that sets the behaviour in case a non present column is being dropped.
+
+    :returns:
         A list of tuples where the first element is the higher index and the second element is the lower one.
     """
     higher_indices, lower_indices = [], []

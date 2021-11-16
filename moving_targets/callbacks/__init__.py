@@ -1,4 +1,4 @@
-"""__init__.py file for moving_targets.callbacks package."""
+"""Callback and Logger classes for Moving Targets."""
 
 from moving_targets.callbacks.callback import Callback
 from moving_targets.callbacks.console_logger import ConsoleLogger

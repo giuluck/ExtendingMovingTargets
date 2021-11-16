@@ -20,21 +20,35 @@ class LawManager(AbstractManager):
 
     # https://rdrr.io/cran/fairml/man/law.school.admissions.html
     FEATURES: Dict[str, FeatureInfo] = {
-        'pass_bar': FeatureInfo(kind='float', alias='pass'),
-        'lsat': FeatureInfo(kind='float', alias='lsat'),
-        'ugpa': FeatureInfo(kind='float', alias='ugpa'),
-        'decile1': FeatureInfo(kind='float', alias='first_year_decile'),
-        'decile3': FeatureInfo(kind='float', alias='third_year_decile'),
-        'fam_inc': FeatureInfo(kind='float', alias='family_income'),
-        'gender': FeatureInfo(kind='category', alias='gender'),
-        'race1': FeatureInfo(kind='category', alias='race'),
-        'cluster': FeatureInfo(kind='category', alias='prestige'),
-        'fulltime': FeatureInfo(kind='category', alias='fulltime')
+        'pass_bar': FeatureInfo(dtype='float', alias='pass'),
+        'lsat': FeatureInfo(dtype='float', alias='lsat'),
+        'ugpa': FeatureInfo(dtype='float', alias='ugpa'),
+        'decile1': FeatureInfo(dtype='float', alias='first_year_decile'),
+        'decile3': FeatureInfo(dtype='float', alias='third_year_decile'),
+        'fam_inc': FeatureInfo(dtype='float', alias='family_income'),
+        'gender': FeatureInfo(dtype='category', alias='gender'),
+        'race1': FeatureInfo(dtype='category', alias='race'),
+        'cluster': FeatureInfo(dtype='category', alias='prestige'),
+        'fulltime': FeatureInfo(dtype='category', alias='fulltime')
     }
+    """The law dataset features."""
 
-    # noinspection PyMissingOrEmptyDocstring
     @staticmethod
     def load_data(filepath: str, full_features: bool, train_fraction: float) -> AbstractManager.Data:
+        """Loads the dataset.
+
+        :param filepath:
+            The dataset filepath.
+
+        :param full_features:
+            If True considers all the dataset features, otherwise considers only the monotonic ones.
+
+        :param train_fraction:
+            The amount of total samples to be considered for training.
+
+        :returns:
+            A dictionary of dataframes representing the train and test sets, respectively.
+        """
         df = pd.read_csv(filepath)
         df = clean_dataframe(df, LawManager.FEATURES)
         if full_features:
@@ -45,10 +59,33 @@ class LawManager(AbstractManager):
 
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, grid_augmented: int = 8,
                  grid_ground: Optional[int] = None, x_scaling: Methods = 'std', train_fraction: float = 0.8):
+        """
+        :param filepath:
+            The cars dataset filepath.
+
+        :param full_features:
+            Whether or not to use all the input features.
+
+        :param full_grid:
+            Whether or not to evaluate the results on an explicit full grid. This option is possible only if
+            full_features is set to false, since there is no way to create an explicit grid on the full set of features.
+
+        :param grid_augmented:
+            Number of augmented features for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param grid_ground:
+            Number of ground samples for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param x_scaling:
+            Scaling methods for the input data.
+
+        :param train_fraction:
+            The fraction of input data used for training (the remaining one is used for testing).
+        """
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
-            x_scaling = {v.alias or k: x_scaling for k, v in LawManager.FEATURES.items() if v.kind == 'float'}
+            x_scaling = {v.alias or k: x_scaling for k, v in LawManager.FEATURES.items() if v.dtype == 'float'}
         elif full_grid:
             lsat, ugpa = np.meshgrid(np.linspace(0, 50, 64), np.linspace(0, 4, 64))
             grid = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
@@ -80,17 +117,17 @@ class LawManager(AbstractManager):
             'ugpa': (num_augmented, lambda s: rng.uniform(0, 4, size=s))
         }
 
-    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, ax = plt.subplots(2, len(kwargs), sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)
-        for i, (title, (x, y)) in enumerate(kwargs.items()):
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        _, ax = plt.subplots(2, len(additional_kwargs), sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)
+        for i, (title, (x, y)) in enumerate(additional_kwargs.items()):
             for c, label in enumerate(['Passed', 'Not Passed']):
                 data = x[y == 1 - c]
                 sns.kdeplot(x='ugpa', y='lsat', data=data, fill=True, ax=ax[c, i])
                 sns.scatterplot(x='ugpa', y='lsat', data=data, s=25, alpha=0.7, marker='+', color='black', ax=ax[c, i])
                 ax[c, i].set(title=title.capitalize(), ylabel=label if i == 0 else None, xlim=(1.4, 4.3), ylim=(0, 52))
 
-    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        res = kwargs.pop('res')
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        res = additional_kwargs.pop('res')
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
         grid = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
         grid['pred'] = model.predict(grid)

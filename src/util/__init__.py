@@ -1,3 +1,3 @@
-"""__init__.py file for src.util package."""
+"""Utilities for Augmentation, Data Cleaning, Preprocessing, Plotting, and others."""
 
 from src.util import augmentation, cleaning, dictionaries, model, plot, preprocessing, typing

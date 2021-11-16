@@ -1,6 +1,6 @@
 """Synthetic Data Manager."""
 
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,23 +20,59 @@ class SyntheticManager(AbstractManager):
 
     @staticmethod
     def function(a: Union[Vector, Number], b: Union[Vector, Number]) -> Union[Vector, Number]:
-        """Ground function."""
+        """Ground function.
+
+        :param a:
+            Either a single floating point value or a vector of floating point values representing the first feature.
+
+        :param b:
+            Either a single floating point value or a vector of floating point values representing the second feature.
+
+        :returns:
+            Either a single floating point value or a vector of floating point values representing the function output.
+        """
         a = a ** 3
         b = np.sin(np.pi * (b - 0.01)) ** 2 + 1
         return a / b + b
 
     @staticmethod
-    def sample_dataset(n, noise, rng, testing_set=True):
-        """Sample data points with the given amount of noise."""
+    def sample_dataset(n: int, noise: float, rng: Rng, testing_set: bool = True) -> Tuple[pd.DataFrame, pd.Series]:
+        """Sample data points with the given amount of noise.
+
+        :param n:
+            The number of samples.
+
+        :param noise:
+            The amount of output noise when sampling the function.
+
+        :param rng:
+            A random number generator.
+
+        :param testing_set:
+            Whether or not to use test set sampling distributions when sampling the input features.
+
+        :returns:
+            A tuple (x, y) containing the input data and the output labels.
+        """
         a = rng.uniform(low=-1, high=1, size=n) if testing_set else rng.normal(scale=0.3, size=n).clip(min=-1, max=1)
         b = rng.uniform(low=-1, high=1, size=n)
         x = pd.DataFrame.from_dict({'a': a, 'b': b})
         y = pd.Series(SyntheticManager.function(a, b), name='label') + rng.normal(scale=noise, size=len(x))
         return x, y
 
-    # noinspection PyMissingOrEmptyDocstring
     @staticmethod
     def load_data(noise: float = 0.0, extrapolation: bool = False) -> AbstractManager.Data:
+        """Loads the dataset.
+
+        :param noise:
+            The amount of output noise to add to the labels.
+
+        :param extrapolation:
+            Whether to consider a test set with border samples or with random samples (interpolation).
+
+        :returns:
+            A dictionary of dataframes representing the train and test sets, respectively.
+        """
         rng = np.random.default_rng(seed=0)
         if extrapolation:
             x, y = SyntheticManager.sample_dataset(n=700, noise=noise, rng=rng, testing_set=True)
@@ -50,6 +86,29 @@ class SyntheticManager(AbstractManager):
 
     def __init__(self, noise: float = 0.0, extrapolation: bool = False, full_grid: bool = False, x_scaling: str = 'std',
                  y_scaling: str = 'norm', grid_augmented: int = 35, grid_ground: Optional[int] = None):
+        """
+        :param noise:
+            The amount of output noise to add to the labels.
+
+        :param extrapolation:
+            Whether or not to test on extrapolation instead of interpolation.
+
+        :param full_grid:
+            Whether or not to evaluate the results on an explicit full grid. This option is possible only if
+            full_features is set to false, since there is no way to create an explicit grid on the full set of features.
+
+        :param x_scaling:
+            Scaling methods for the input data.
+
+        :param y_scaling:
+            Scaling methods for the output data.
+
+        :param grid_augmented:
+            Number of augmented features for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param grid_ground:
+            Number of ground samples for grid_kwargs. This will not have any effect if an explicit grid is passed.
+        """
         if full_grid:
             a, b = np.meshgrid(np.linspace(-1, 1, 80), np.linspace(-1, 1, 80))
             grid = pd.DataFrame({'a': a.flatten(), 'b': b.flatten()})
@@ -77,13 +136,13 @@ class SyntheticManager(AbstractManager):
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}
 
-    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, ax = plt.subplots(3, len(kwargs), sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        _, ax = plt.subplots(3, len(additional_kwargs), sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
         # hue/size bounds
-        ybn = np.concatenate([[y.min(), y.max()] for _, y in kwargs.values()])
+        ybn = np.concatenate([[y.min(), y.max()] for _, y in additional_kwargs.values()])
         abn, bbn, ybn = (-1, 1), (-1, 1), (np.min(ybn), np.max(ybn))
         # plots
-        for i, (title, (x, y)) in enumerate(kwargs.items()):
+        for i, (title, (x, y)) in enumerate(additional_kwargs.items()):
             a, b = x['a'], x['b']
             ax[0, i].set(title=title.capitalize())
             sns.scatterplot(x=a, y=y, hue=b, hue_norm=bbn, size=b, size_norm=bbn, ax=ax[0, i], legend=False)
@@ -93,8 +152,8 @@ class SyntheticManager(AbstractManager):
             sns.scatterplot(x=a, y=b, hue=y, hue_norm=ybn, size=y, size_norm=ybn, ax=ax[2, i], legend=False)
             ax[2, i].legend([f'label ({ybn[0]:.0f}, {ybn[1]:.0f})'], markerscale=0, handlelength=0)
 
-    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        res = kwargs.pop('res')
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        res = additional_kwargs.pop('res')
         # get data
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})

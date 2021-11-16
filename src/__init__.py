@@ -1,3 +1,3 @@
-"""__init__.py file for src package."""
+"""Classes and functions specifically built to experiment with our Moving Targets extension."""
 
 from src import models, datasets, util

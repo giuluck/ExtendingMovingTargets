@@ -6,16 +6,19 @@ from moving_targets.callbacks.callback import Callback
 
 
 class Logger(Callback):
-    """Basic interface for a Moving Target's logger callback."""
+    """Basic interface for a Moving Targets Logger callback."""
 
     def __init__(self):
+        """"""
         super(Logger, self).__init__()
-        self.cache: Dict = {}
 
-    def log(self, **kwargs):
+        self._cache: Dict = {}
+        """The internally stored cache."""
+
+    def log(self, **cache):
         """Adds the given keyword argument to the inner cache.
 
-        Args:
-            **kwargs: optional keyword arguments.
+        :param cache:
+            Key-value pairs to be added to the cache (if the key is already present, the value is overwrote).
         """
-        self.cache.update(kwargs)
+        self._cache.update(cache)

@@ -1,4 +1,4 @@
-"""Moving Target's Hyper-parameter Tuning & Investigation Script."""
+"""Moving Targets Hyper-parameter Tuning & Investigation Script."""
 
 import os
 

@@ -19,14 +19,34 @@ class RestaurantsManager(AbstractManager):
 
     @staticmethod
     def ctr_estimate(avg_ratings: Vector, num_reviews: Vector, dollar_ratings: Vector) -> Vector:
-        """Computes the real click-trough rate estimate"""
+        """Computes the real click-trough rate estimate.
+
+        :param avg_ratings:
+            Input vector of average ratings.
+
+        :param num_reviews:
+            Input vector of num reviews.
+
+        :param dollar_ratings:
+            Input vector of dollar ratings.
+
+        :return:
+            Output vector of click-through rate vlues.
+        """
         dollar_rating_baseline = {'D': 3, 'DD': 2, 'DDD': 4, 'DDDD': 4.5}
         dollar_ratings = np.array([dollar_rating_baseline[d] for d in dollar_ratings])
         return 1 / (1 + np.exp(dollar_ratings - avg_ratings * np.log1p(num_reviews) / 4))
 
     @staticmethod
     def predict(dataframe: pd.DataFrame) -> Vector:
-        """Predicts the real click-trough rate estimate from a dataframe"""
+        """Predicts the real click-trough rate estimate from a dataframe.
+
+        :param dataframe:
+            The input data.
+
+        :return:
+            The output vector predicted click-through rates.
+        """
         return RestaurantsManager.ctr_estimate(
             avg_ratings=dataframe['avg_rating'],
             num_reviews=dataframe['num_reviews'],
@@ -35,7 +55,18 @@ class RestaurantsManager(AbstractManager):
 
     @staticmethod
     def sample_restaurants(n: int, rng: Rng) -> Tuple[Vector, Vector, Vector, Vector]:
-        """Samples ground truth about restaurants."""
+        """Samples ground truth about restaurants.
+
+        :param n:
+            The number of samples.
+
+        :param rng:
+            A random number generator.
+
+        :return:
+            A tuple with four vectors, each one representing either one of the three input features or the output
+            feature of the retaurants dataset.
+        """
         avg_ratings = rng.uniform(1.0, 5.0, n)
         num_reviews = np.round(np.exp(rng.uniform(0.0, np.log(200), n)))
         dollar_ratings = rng.choice(['D', 'DD', 'DDD', 'DDDD'], n)
@@ -44,7 +75,20 @@ class RestaurantsManager(AbstractManager):
 
     @staticmethod
     def sample_dataset(n: int, rng: Rng, testing_set: bool = True) -> pd.DataFrame:
-        """Sample data points from the restaurants."""
+        """Sample data points from the restaurants.
+
+        :param n:
+            The number of restaurant samples.
+
+        :param rng:
+            A random number generator.
+
+        :param testing_set:
+            Whether or not the restaurants must be sampled according to the test set distribution.
+
+        :return:
+            A `pandas.DataFrame` containing the three input features and the output one.
+        """
         (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = RestaurantsManager.sample_restaurants(n, rng)
         # testing has a more uniform distribution over all restaurants
         # while training/validation datasets have more views on popular restaurants
@@ -59,10 +103,30 @@ class RestaurantsManager(AbstractManager):
             'clicked': rng.binomial(n=1, p=np.repeat(ctr_labels, num_views))
         }).astype({'clicked': int})
 
+    # noinspection DuplicatedCode
     @staticmethod
     def plot_conclusions(models, figsize: Figsize = (10, 10), tight_layout: TightLayout = True,
                          res: int = 100, orient_columns: bool = True, show: bool = True):
-        """Plots the conclusions by comparing different models."""
+        """Plots the conclusions by comparing different models.
+
+        :param models:
+            A list of model objects having the 'predict(x)' method.
+
+        :param figsize:
+            The figsize parameter passed to `matplotlib.pyplot.show()`.
+
+        :param tight_layout:
+            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+
+        :param res:
+            The evaluation grid resolution.
+
+        :param orient_columns:
+            Whether to compare the models by column or by row.
+
+        :param show:
+            Whether or not to show the final plot.
+        """
         avg_ratings, num_reviews = np.meshgrid(np.linspace(1, 5, num=res), np.linspace(0, 200, num=res))
         rows, cols = (4, len(models)) if orient_columns else (len(models), 4)
         _, axes = plt.subplots(rows, cols, sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
@@ -84,7 +148,15 @@ class RestaurantsManager(AbstractManager):
 
     @staticmethod
     def process_data(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
-        """Processes the dataframe by applying one-hot encoding and computing the ground truths if needed."""
+        """Processes the dataframe by applying one-hot encoding and computing the ground truths if needed.
+
+        :param dataset:
+            A `pandas.DataFrame` for restaurants dataset.
+
+        :return:
+            A tuple containing the same dataset with one-hot encoding for categorical value in the first position, and
+            a `pandas.Series` containing the ground truths in the second position.
+        """
         for rating in ['DDDD', 'DDD', 'DD', 'D']:
             dataset.insert(2, rating, dataset['dollar_rating'] == rating)
         dataset = dataset.drop('dollar_rating', axis=1)
@@ -94,9 +166,13 @@ class RestaurantsManager(AbstractManager):
         else:
             return dataset, RestaurantsManager.predict(dataset)
 
-    # noinspection PyMissingOrEmptyDocstring
     @staticmethod
     def load_data() -> AbstractManager.Data:
+        """Loads the dataset.
+
+        :returns:
+            A dictionary of dataframes representing the train and test sets, respectively.
+        """
         rng = np.random.default_rng(seed=0)
         splits = {
             'train': RestaurantsManager.process_data(RestaurantsManager.sample_dataset(1000, rng, testing_set=False)),
@@ -106,6 +182,24 @@ class RestaurantsManager(AbstractManager):
 
     def __init__(self, full_grid: bool = False, grid_augmented: int = 10,
                  grid_ground: Optional[int] = None, x_scaling: str = 'std'):
+        """
+        :param full_grid:
+            Whether or not to evaluate the results on an explicit full grid. This option is possible only if
+            full_features is set to false, since there is no way to create an explicit grid on the full set of features.
+
+        :param grid_augmented:
+            Number of augmented features for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param grid_ground:
+            Number of ground samples for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param x_scaling:
+            Scaling methods for the input data.
+        """
+
+        self.ground_truth = None
+        """The vector of ground truths for the explicit grid, if present."""
+
         if full_grid:
             ar, nr, dr = np.meshgrid(np.linspace(1, 5, num=40), np.linspace(0, 200, num=40), ['D', 'DD', 'DDD', 'DDDD'])
             grid, self.ground_truth = self.process_data(pd.DataFrame.from_dict({
@@ -132,11 +226,29 @@ class RestaurantsManager(AbstractManager):
             grid=grid
         )
 
-    # noinspection PyMissingOrEmptyDocstring
     def compute_monotonicities(self,
                                samples: AbstractManager.Samples,
                                references: AbstractManager.Samples,
                                eps: float = 1e-5) -> MonotonicitiesMatrix:
+        """Routine to compute restaurants dataset monotonicities involving categorical pairwise monotonicities
+        regarding the 'dollar_rating' attribute.
+
+        Indeed, categorical monotonicities in this domain are so that we can expect category 'DD' to have a greater
+        click-through rate with respect to category 'D' and to category 'DDDD' as well, all else being equal.
+
+        :param samples:
+            The data samples.
+
+        :param references:
+            The reference samples.
+
+        :param eps:
+            The slack value under which a violation is considered to be acceptable.
+
+        :returns:
+            A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled
+            with -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
+        """
         def _categorical_monotonicities(diffs):
             mono = 1 * (diffs == 1) - 1 * (diffs == -1)  # DD (2) > D    (1) -> DD - D = 1, D - DD = -1
             mono += 1 * (diffs == -6) - 1 * (diffs == 6)  # DD (2) > DDDD (8) -> DD - DDDD = -6, DDDD - DD = 6
@@ -178,20 +290,20 @@ class RestaurantsManager(AbstractManager):
             dollar_rating: (num_augmented, lambda s: to_categorical(rng.integers(4, size=s), num_classes=4))
         }
 
-    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, ax = plt.subplots(len(kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        _, ax = plt.subplots(len(additional_kwargs), 3, sharex='col', figsize=figsize, tight_layout=tight_layout)
         ax = ax.reshape((-1, 3))
-        for i, (title, (x, y)) in enumerate(kwargs.items()):
+        for i, (title, (x, y)) in enumerate(additional_kwargs.items()):
             sns.kdeplot(x=x['avg_rating'], hue=y, ax=ax[i, 0]).set(ylabel=title.capitalize())
             sns.kdeplot(x=x['num_reviews'], hue=y, ax=ax[i, 1])
             sns.countplot(x=x[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1), hue=y, ax=ax[i, 2])
 
-    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
         _, axes = plt.subplots(1, 3, sharex='col', sharey='row', figsize=figsize, tight_layout=tight_layout)
         aug['dollar_rating'] = aug[['D', 'DD', 'DDD', 'DDDD']].idxmax(axis=1)
         for ax, feature in zip(axes, ['avg_rating', 'num_reviews', 'dollar_rating']):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
-    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
         self.plot_conclusions(models={'Estimated CTR': model, 'Real CTR': RestaurantsManager}, figsize=figsize,
-                              tight_layout=tight_layout, res=kwargs.pop('res'), orient_columns=False, show=False)
+                              tight_layout=tight_layout, res=additional_kwargs.pop('res'), orient_columns=False, show=False)

@@ -10,10 +10,12 @@ from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
 from moving_targets.util.typing import Matrix, Vector, Iteration
 
-EPS = 1e-9  # used in lower/upper bounds to avoid infeasibility due to numeric errors
+EPS: float = 1e-9
+"""Floating point value used in lower/upper bounds to avoid infeasibility due to numeric errors."""
 
 
 def _abs(model: Model, x: Var, lb: Optional[float] = None, ub: Optional[float] = None) -> Var:
+    """Gurobi custom `abs_fn` function."""
     lb = -float('inf') if lb is None else lb
     ub = float('inf') if ub is None else ub
     abs_ub = max(abs(lb), abs(ub))
@@ -25,6 +27,7 @@ def _abs(model: Model, x: Var, lb: Optional[float] = None, ub: Optional[float] =
 
 
 def _log(model: Model, x: Var, lb: Optional[float] = None, ub: Optional[float] = None) -> Var:
+    """Gurobi custom `log_fn` function."""
     lb = 0 if lb is None else lb
     ub = float('inf') if ub is None else ub
     log_lb = -float('inf') if lb == 0 else np.log(lb)
@@ -37,22 +40,52 @@ def _log(model: Model, x: Var, lb: Optional[float] = None, ub: Optional[float] =
 
 
 class GurobiMaster(Master, ABC):
-    """Master interface to Gurobi solver.
-
-    Args:
-        verbose: whether or not to print information during the optimization process.
-        **solver_args: parameters of the solver to be set via the `model.SetParam()` function.
-    """
+    """Master interface to Gurobi solver."""
 
     losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x), abs_fn=_abs, log_fn=_log)
+    """The `LossesHandler` object for this backend solver."""
 
     def __init__(self, alpha: float = 1., beta: float = 1., verbose: bool = False, **solver_args):
-        super(GurobiMaster, self).__init__(alpha=alpha, beta=beta)
-        self.solver_args: Dict[str, Any] = solver_args
-        self.verbose: bool = verbose
+        """
+        :param alpha:
+            The non-negative real number which is used to calibrate the two losses in the alpha step.
 
-    # noinspection PyMissingOrEmptyDocstring
+        :param beta:
+            The non-negative real number which is used to constraint the p_loss in the beta step.
+
+        :param verbose:
+            Whether or not to print information during the optimization process.
+
+        :param solver_args:
+            Parameters of the solver to be set via the `model.SetParam()` function.
+        """
+        super(GurobiMaster, self).__init__(alpha=alpha, beta=beta)
+
+        self.solver_args: Dict[str, Any] = solver_args
+        """Parameters of the solver to be set via the `model.SetParam()` function."""
+
+        self.verbose: bool = verbose
+        """Whether or not to print information during the optimization process."""
+
     def adjust_targets(self, macs, x: Matrix, y: Vector, iteration: Iteration) -> Any:
+        """Leverages the other object methods (build_model, y_loss, p_loss, beta_step)
+        in order to build the Gurobi model  and return the adjusted targets.
+
+        :param macs:
+            Reference to the `MACS` object encapsulating the master.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number.
+
+        :returns:
+            The output of the `self.return_solutions()` method.
+        """
         # build model and get losses
         with Env(empty=True) as env:
             if not self.verbose:
@@ -67,10 +100,10 @@ class GurobiMaster(Master, ABC):
                 p_loss = self.p_loss(macs, model, model_info, x, y, iteration)
                 model.update()
                 if self.beta_step(macs, model, model_info, x, y, iteration):
-                    model.addConstr(p_loss <= self.beta, name='loss')
+                    model.addConstr(p_loss <= self._beta, name='loss')
                     model.setObjective(y_loss, GRB.MINIMIZE)
                 else:
-                    model.setObjective(y_loss + (1.0 / self.alpha) * p_loss, GRB.MINIMIZE)
+                    model.setObjective(y_loss + (1.0 / self._alpha) * p_loss, GRB.MINIMIZE)
                 # run the optimization procedure (if the time limit expires, tries to reach at least one solution)
                 model.optimize()
                 if model.Status == GRB.TIME_LIMIT:

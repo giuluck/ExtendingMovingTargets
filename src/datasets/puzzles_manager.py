@@ -18,12 +18,35 @@ class PuzzlesManager(AbstractManager):
     """Data Manager for the Puzzles Dataset."""
 
     Bound = Dict[str, Tuple[int, int]]
+    """Type for summary plot bounds. It is a dictionary that associates to each monotonic feature a tuple of integers
+    representing the min/max y bounds of that feature."""
 
-    # noinspection PyMissingOrEmptyDocstring
     @staticmethod
     def load_data(filepath: str, full_features: bool, extrapolation: bool) -> AbstractManager.Data:
+        """Loads the dataset.
+
+        :param filepath:
+            The dataset filepath.
+
+        :param full_features:
+            If True considers all the dataset features, otherwise considers only the monotonic ones.
+
+        :param extrapolation:
+            Whether to consider a test set with border samples or with random samples (interpolation).
+
+        :returns:
+            A dictionary of dataframes representing the train and test sets, respectively.
+        """
         def _process(series: pd.Series) -> pd.Series:
-            # apart from these three columns, converts string into list and takes the average value
+            """Converts the each string entry of a series into the respective list and takes the average value.
+
+            :param series:
+                An input column of the puzzles dataset.
+
+            :return:
+                A series of average values for each list entry.
+            """
+            # apart from these three columns,
             if series.name in ['label', 'split', 'num_reviews']:
                 return series
             else:
@@ -44,7 +67,39 @@ class PuzzlesManager(AbstractManager):
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, extrapolation: bool = False,
                  grid_augmented: int = 35, grid_ground: Optional[int] = None, x_scaling: Methods = 'std',
                  y_scaling: Methods = 'norm', bound: Optional[Bound] = None):
+        """
+        :param filepath:
+            The cars dataset filepath.
+
+        :param full_features:
+            Whether or not to use all the input features.
+
+        :param full_grid:
+            Whether or not to evaluate the results on an explicit full grid. This option is possible only if
+            full_features is set to false, since there is no way to create an explicit grid on the full set of features.
+
+        :param extrapolation:
+            Whether or not to test on extrapolation instead of interpolation.
+
+        :param grid_augmented:
+            Number of augmented features for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param grid_ground:
+            Number of ground samples for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param x_scaling:
+            Scaling methods for the input data.
+
+        :param y_scaling:
+            Scaling methods for the output data.
+
+        :param bound:
+            The y bounds for the summary plot.
+        """
+
         self.bound = {'word_count': (0, 230), 'star_rating': (0, 5), 'num_reviews': (0, 70)} if bound is None else bound
+        """A dictionary that associates to each monotonic feature its bounds for the summary plot."""
+
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
@@ -89,17 +144,17 @@ class PuzzlesManager(AbstractManager):
             'num_reviews': (num_augmented[0], lambda s: rng.uniform(b['num_reviews'][0], b['num_reviews'][1], size=s))
         }
 
-    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
         dfs, info = [], []
-        for key, (x, y) in kwargs.items():
+        for key, (x, y) in additional_kwargs.items():
             df = pd.concat((x, y), axis=1)
             df['Key'] = key.capitalize()
             dfs.append(df)
         w, h = figsize
         sns.pairplot(data=pd.concat(dfs), hue='Key', plot_kws={'alpha': 0.7}, height=h / 4, aspect=w / h)
 
-    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        res = kwargs.pop('res')
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        res = additional_kwargs.pop('res')
         fig, axes = plt.subplots(1, 3, sharey='all', tight_layout=tight_layout, figsize=figsize)
         wc, sr, nr = np.meshgrid(
             np.linspace(self.bound['word_count'][0], self.bound['word_count'][1], res),

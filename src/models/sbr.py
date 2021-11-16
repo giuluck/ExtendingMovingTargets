@@ -1,6 +1,6 @@
 """Semantic-Based Regularized MLP Model."""
 
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Tuple, List, Dict
 
 import numpy as np
 import pandas as pd
@@ -13,38 +13,54 @@ from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2
 
 from moving_targets.util.typing import Matrix, Vector
 from src.models.mlp import MLP
+from src.util.preprocessing import Scalers
 
 
 def hard_tanh(x, factor=10 ** 6):
     """Approximated sign function using the hyperbolic tangent.
 
-    Args:
-        x: the input vector.
-        factor: the vector scaling factor.
+    :param x:
+        The input vector.
 
-    Returns:
+    :param factor:
+        The scaling factor.
+
+    :returns:
         An approximated sign function.
     """
     return k.tanh(factor * x)
 
 
 class SBRBatchGenerator(Sequence):
-    """A Batch Generator to be used in Keras model's training.
-
-    Args:
-        x: the matrix/dataframe of augmented training samples.
-        y: the vector of augmented training labels.
-        ground_indices: the ground index of each augmented sample.
-        monotonicities: the monotonicity of each augmented sample wrt its ground index.
-        batch_size: the batch size.
-    """
+    """A Batch Generator to be used in Keras model's training."""
 
     def __init__(self, x: Matrix, y: Vector, ground_indices: pd.Series, monotonicities: pd.Series, batch_size: int):
+        """
+        :param x:
+            The matrix/dataframe of augmented training samples.
+
+        :param y:
+            The vector of augmented training labels.
+
+        :param ground_indices:
+            The ground index of each augmented sample.
+
+        :param monotonicities:
+            The monotonicity of each augmented sample wrt its ground index.
+
+        :param batch_size: the batch size.
+        """
         super(SBRBatchGenerator, self).__init__()
         # compute number of samples in each group
         counts = np.array(ground_indices.value_counts())
         assert np.allclose(counts, counts[0]), "All the ground samples must have the same number of augmented ones."
-        self.num_samples = counts[0]
+
+        self.num_samples: int = counts[0]
+        """The number of samples in each batch."""
+
+        self.batches = None
+        """The inner list of collected batches."""
+
         # get a copy of the whole data (and map indices from random range into range [0, num_grounds]
         data = x.copy()
         data['label'] = y.copy()
@@ -55,13 +71,27 @@ class SBRBatchGenerator(Sequence):
         data = data.sort_values(['index', 'label'], ascending=[True, False], ignore_index=True).astype('float32')
         shuffle = np.random.permutation(data['index'].unique())
         data['batch'] = data['index'].map({i: m for i, m in enumerate(shuffle)}) // batch_size
+
         # store list of batches by grouping dataframe by batches
         self.batches = [b.drop(['batch', 'index'], axis=1).reset_index(drop=True) for _, b in data.groupby('batch')]
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Necessary method for the Batch Generator.
+
+        :returns:
+            The number of batches.
+        """
         return len(self.batches)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Necessary method for the Batch Generator.
+
+        :param index:
+            The batch index.
+
+        :returns:
+            The index-th batch in the form of (<training_data>, (<ground_truths>, <monotonicities>)).
+        """
         # x = first n columns, labels = second to last column, monotonicities = last column
         batch = self.batches[index]
         num_features = len(batch.columns)
@@ -70,32 +100,85 @@ class SBRBatchGenerator(Sequence):
 
 
 class SBR(MLP):
-    """A Semantic-Based Regularized MLP architecture for monotonicity shape constraints built with Keras.
+    """A Semantic-Based Regularized MLP architecture for monotonicity shape constraints built with Keras."""
 
-    Args:
-        alpha: the alpha value for balancing compiled and regularized loss. If None, this is iteratively modified in
-               order to be effective at most via Lagrangian dual techniques.
-        regularizer_act: the regularizer activation function.
-        **kwargs: super-class arguments.
-    """
+    def __init__(self,
+                 output_act: Optional[str] = None,
+                 h_units: Optional[List[int]] = None,
+                 scalers: Scalers = None,
+                 input_dim: Optional[int] = None,
+                 alpha: Union[None, float, OptimizerV2] = None,
+                 regularizer_act: Optional[Callable] = None):
+        super(SBR, self).__init__(output_act=output_act, h_units=h_units, scalers=scalers, input_dim=input_dim)
+        """
+        :param output_act:
+            The output activation function.
+        
+        :param h_units:
+            The hidden units.
+        
+        :param scalers:
+            The x/y scalers to scale input and output data.
+        
+        :param input_dim:
+            The input dimension.
+        
+        :param alpha:
+            The alpha value for balancing compiled and regularized loss.
+            
+            If None, this is iteratively modified in order to be effective at most via Lagrangian dual techniques.
+        
+        :param regularizer_act:
+            The regularizer activation function.
+        """
+        self.alpha = None
+        """The alpha value for balancing compiled and regularized loss."""
 
-    def __init__(self, alpha: Union[None, float, OptimizerV2] = None, regularizer_act: Optional[Callable] = None, **kw):
-        super(SBR, self).__init__(**kw)
+        self.alpha_optimizer = None
+        """The optimizer to iteratively modify alpha in order to be effective at most via Lagrangian dual techniques."""
+
+        self.regularizer_act = regularizer_act
+        """The regularizer activation function."""
+
+        self._alpha_tracker = Mean(name='alpha')
+        """The tracker of alpha values during the training process."""
+
+        self._tot_loss_tracker = Mean(name='tot_loss')
+        """The tracker of total loss values during the training process."""
+
+        self._def_loss_tracker = Mean(name='def_loss')
+        """The tracker of default loss values during the training process."""
+
+        self._reg_loss_tracker = Mean(name='reg_loss')
+        """The tracker of regularizer loss values during the training process."""
+
+        self._test_loss_tracker = Mean(name='test_loss')
+        """The tracker of test loss values during the training process."""
+
+        # we use a tf.Variable for alpha in order to retrieve nn_vars in an easier way as trainable_variables[:-1]
         if isinstance(alpha, float):
-            # we use a tf.Variable as well in order to retrieve nn_vars in an easier way as trainable_variables[:-1]
             self.alpha = tf.Variable(alpha, name='alpha')
             self.alpha_optimizer = None
         else:
             self.alpha = tf.Variable(0., name='alpha')
             self.alpha_optimizer = Adam(learning_rate=1.0) if alpha is None else alpha
-        self.regularizer_act = regularizer_act
-        self.alpha_tracker = Mean(name='alpha')
-        self.tot_loss_tracker = Mean(name='tot_loss')
-        self.def_loss_tracker = Mean(name='def_loss')
-        self.reg_loss_tracker = Mean(name='reg_loss')
-        self.test_loss_tracker = Mean(name='test_loss')
 
-    def _custom_loss(self, x, y, sign=1):
+    def _custom_loss(self, x: tf.Tensor, y: Tuple[tf.Tensor, tf.Tensor], sign: int = 1) -> Tuple[float, float, float]:
+        """Computes the custom losses.
+
+        :param x:
+            The input data.
+
+        :param y:
+            The tuple (<ground_truths>, <monotonicities>).
+
+        :param sign:
+            Whether to minimize the loss (1) or to maximize it (-1) depending on the training step.
+
+        :returns:
+            A tuple of the form (<total_loss>, <default_loss>, <regularizer_loss>), where the total loss is computed as:
+            <total_loss> = <sign> * (<default_loss> + <alpha> * <regularizer_loss>)
+        """
         labels, monotonicities = y
         pred = self(x, training=True)
         pred = tf.reshape(pred, tf.shape(labels))
@@ -114,8 +197,15 @@ class SBR(MLP):
         # final losses
         return sign * (def_loss + self.alpha * reg_loss), def_loss, reg_loss
 
-    # noinspection PyMissingOrEmptyDocstring
-    def train_step(self, d):
+    def train_step(self, d: Tuple[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]) -> Dict[str, float]:
+        """Overrides keras `train_step` method.
+
+        :param d:
+            The batch, having the form (<training_data>, (<ground_truths>, <monotonicities>)).
+
+        :returns:
+            A dictionary containing the values of <alpha>, <total_loss>, <default_loss>, and <regularization_loss>.
+        """
         # unpack training data
         x, y = d
         nn_vars = self.trainable_variables[:-1]
@@ -132,39 +222,90 @@ class SBR(MLP):
             grads = tape.gradient(tot_loss, alpha_var)
             self.alpha_optimizer.apply_gradients(zip(grads, alpha_var))
         # loss tracking
-        self.alpha_tracker.update_state(self.alpha)
-        self.tot_loss_tracker.update_state(abs(tot_loss))
-        self.def_loss_tracker.update_state(def_loss)
-        self.reg_loss_tracker.update_state(reg_loss)
+        self._alpha_tracker.update_state(self.alpha)
+        self._tot_loss_tracker.update_state(abs(tot_loss))
+        self._def_loss_tracker.update_state(def_loss)
+        self._reg_loss_tracker.update_state(reg_loss)
         return {
-            'alpha': self.alpha_tracker.result(),
-            'tot_loss': self.tot_loss_tracker.result(),
-            'def_loss': self.def_loss_tracker.result(),
-            'reg_loss': self.reg_loss_tracker.result()
+            'alpha': self._alpha_tracker.result(),
+            'tot_loss': self._tot_loss_tracker.result(),
+            'def_loss': self._def_loss_tracker.result(),
+            'reg_loss': self._reg_loss_tracker.result()
         }
 
-    def test_step(self, d):
+    def test_step(self, d: Tuple[tf.Tensor, tf.Tensor]) -> Dict[str, float]:
+        """Overrides keras `test_step` method.
+
+        :param d:
+            The batch, having the form (<input_data>, <ground_truths>).
+
+        :returns:
+            A dictionary containing the values of <test_loss>.
+        """
         x, labels = d
         loss = self.compiled_loss(labels, self(x, training=False))
-        self.test_loss_tracker.update_state(loss)
+        self._test_loss_tracker.update_state(loss)
         return {
-            'loss': self.test_loss_tracker.result()
+            'loss': self._test_loss_tracker.result()
         }
 
 
 class UnivariateSBR(SBR):
-    """A Semantic-Based Regularized MLP architecture for monotonic univariate functions built with Keras.
+    """A Semantic-Based Regularized MLP architecture for monotonic univariate functions built with Keras."""
 
-    Args:
-        direction: the monotonicity direction.
-        **kwargs: super-class arguments.
-    """
+    def __init__(self,
+                 output_act: Optional[str] = None,
+                 h_units: Optional[List[int]] = None,
+                 scalers: Scalers = None,
+                 input_dim: Optional[int] = None,
+                 alpha: Union[None, float, OptimizerV2] = None,
+                 regularizer_act: Optional[Callable] = None,
+                 direction: int = 1):
+        """
+        :param output_act:
+            The output activation function.
 
-    def __init__(self, direction: int = 1, **kwargs):
-        super(UnivariateSBR, self).__init__(**kwargs)
+        :param h_units:
+            The hidden units.
+
+        :param scalers:
+            The x/y scalers to scale input and output data.
+
+        :param input_dim:
+            The input dimension.
+
+        :param alpha:
+            The alpha value for balancing compiled and regularized loss.
+
+            If None, this is iteratively modified in order to be effective at most via Lagrangian dual techniques.
+
+        :param regularizer_act:
+            The regularizer activation function.
+
+        :param direction:
+            The monotonicity direction.
+        """
+        super(UnivariateSBR, self).__init__(output_act=output_act, h_units=h_units, scalers=scalers,
+                                            input_dim=input_dim, alpha=alpha, regularizer_act=regularizer_act)
         self.direction = direction
+        """The monotonicity direction."""
 
-    def _custom_loss(self, x, y, sign=1):
+    def _custom_loss(self, x: tf.Tensor, y: Tuple[tf.Tensor, tf.Tensor], sign: int = 1) -> Tuple[float, float, float]:
+        """Computes the custom losses.
+
+        :param x:
+            The input data.
+
+        :param y:
+            The tuple (<ground_truths>, <monotonicities>).
+
+        :param sign:
+            Whether to minimize the loss (1) or to maximize it (-1) depending on the training step.
+
+        :returns:
+            A tuple of the form (<total_loss>, <default_loss>, <regularizer_loss>), where the total loss is computed as:
+            <total_loss> = <sign> * (<default_loss> + <alpha> * <regularizer_loss>)
+        """
         x = tf.cast(x, tf.float32)
         mask = tf.math.logical_not(tf.math.is_nan(y))
         pred = self(x, training=True)

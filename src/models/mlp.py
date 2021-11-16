@@ -10,41 +10,64 @@ from src.util.preprocessing import Scaler, Scalers
 
 
 class MLP(Model):
-    """A Multi-Layer Perceptron architecture built with Keras.
-
-    Args:
-        output_act: the output activation function.
-        h_units: the hidden units.
-        scalers: the x/y scalers to scale input and output data.
-        input_dim: the input dimension.
-    """
+    """A Multi-Layer Perceptron architecture built with Keras."""
 
     def __init__(self,
                  output_act: Optional[str] = None,
                  h_units: Optional[List[int]] = None,
                  scalers: Scalers = None,
                  input_dim: Optional[int] = None):
+        """
+        :param output_act:
+            The output activation function.
+
+        :param h_units:
+            The hidden units.
+
+        :param scalers:
+            The x/y scalers to scale input and output data.
+
+        :param input_dim:
+            The input dimension.
+        """
         super(MLP, self).__init__()
-        # scalers
+
         self.x_scaler: Optional[Scaler] = scalers
+        """The input data `Scaler`."""
+
         self.y_scaler: Optional[Scaler] = None
+        """The output data `Scaler`."""
+
+        self.lrs: List[Dense] = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]
+        """The list of `tensorflow.keras.layers.Dense` layers."""
+
+        # handle scalers
         if scalers is None:
             self.x_scaler, self.y_scaler = None, None
         elif isinstance(scalers, tuple):
             self.x_scaler, self.y_scaler = scalers
-        # layers
-        self.lrs: List[Dense] = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]
+
+        # handle output layer and tensorflow variables (weights) initialization in case input dimension is explicit
         self.lrs = self.lrs + [Dense(1, activation=output_act)]
-        # handles tensorflow variables (weights) initialization in case input dimension is explicit
         if input_dim is not None:
             self(tf.zeros((1, input_dim)))
 
-    # noinspection PyMissingOrEmptyDocstring
     def get_config(self):
+        """Overrides Keras method."""
         pass
 
-    # noinspection PyMissingOrEmptyDocstring
     def call(self, inputs, training=None, mask=None):
+        """Overrides Keras method.
+
+        :param inputs:
+            The neural network inputs.
+
+        :param training:
+            Overrides Keras parameter.
+
+        :param mask:
+            Overrides Keras parameter.
+        """
         x = inputs if self.x_scaler is None else self.x_scaler.transform(inputs)
         for layer in self.lrs:
             x = layer(x)

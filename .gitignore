@@ -1,7 +1,10 @@
-.idea
-.ipynb_checkpoints
 *.log
+__pycache__
+.idea
 temp
 venv
 wandb
-__pycache__
+docs/build
+/docs/source/*
+!/docs/source/conf.py
+!/docs/source/index.rst

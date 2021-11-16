@@ -1,4 +1,4 @@
-"""Moving Target's Test Script."""
+"""Moving Targets Test Script."""
 import numpy as np
 
 from experimental.utils import DatasetFactory

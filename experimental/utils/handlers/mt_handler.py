@@ -46,7 +46,7 @@ class MTHandler(AbstractHandler):
                  lrn_early_stop: Optional[EarlyStopping] = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4),
                  lrn_warm_start: bool = False,
                  mst_master_kind: Optional[str] = None,
-                 mst_backend: str = 'gurobi',
+                 mst_backend: str = 'cplex',
                  mst_loss_fn: str = 'default',
                  mst_alpha: float = 1.0,
                  mst_beta: Optional[float] = None,
@@ -164,7 +164,7 @@ class MTHandler(AbstractHandler):
             # handle wandb callback
             for c in callbacks:
                 if isinstance(c, WandBLogger):
-                    c.config['fold'] = i
+                    c._config['fold'] = i
             # fit model
             model, history = self._fit(fold=fold, iterations=iterations, metrics=True,
                                        callbacks=callbacks, verbose=model_verbosity)

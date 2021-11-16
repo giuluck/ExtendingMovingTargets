@@ -13,7 +13,12 @@ from moving_targets.learners import LogisticRegression
 from moving_targets.masters import BalancedCounts
 from moving_targets.metrics import Accuracy, ClassFrequenciesStd
 
+RES_FOLDER: str = '../../res/'
+"""The resource folder where the datasets are placed."""
+
 SEED: int = 0
+"""The chosen random seed."""
+
 DATASETS: Dict[str, Dict[str, str]] = {
     'iris': dict(
         name='iris',
@@ -31,6 +36,9 @@ DATASETS: Dict[str, Dict[str, str]] = {
         class_column='quality',
     )
 }
+"""Dictionary of (<dataset name>; <dataset info>), where <dataset info> is a dictionary of parameters for
+`pandas.read_csv()` method."""
+
 RESULTS: Dict[str, Dict[str, float]] = {
     'iris-pretraining-false': dict(
         train_acc=0.9464285714285714,
@@ -105,67 +113,99 @@ RESULTS: Dict[str, Dict[str, float]] = {
         val_std=0.02431815458359045
     )
 }
+"""Dictionary of (<dataset name>-<initial step>-<use probabilities>; <results info>), where <results info> is a
+dictionary containing the train/val accuracy and constraint violation after one Moving Targets iteration as in the
+original Moving Targets repository."""
 
 
 class TestBalancedCounts(unittest.TestCase):
-    def _test(self, dataset, init_step, use_prob):
-        np.random.seed(SEED)
-        # load data
-        ds = DATASETS[dataset]
-        df = pd.read_csv(f"../../res/{ds['name']}.csv", sep=ds['separator']).sample(frac=1)
-        x = df.drop(ds['class_column'], axis=1)
-        y = df[ds['class_column']].astype('category').cat.codes.values
-        num_classes = len(np.unique(y))
-        # train/val split and scaling
-        x_train, x_val, y_train, y_val = train_test_split(x, y)
-        scaler = MinMaxScaler()
-        x_train = scaler.fit_transform(x_train)
-        x_val = scaler.transform(x_val)
-        # define model pieces
-        metrics = [Accuracy(name='acc'), ClassFrequenciesStd(classes=num_classes, name='std')]
-        learner = LogisticRegression()
-        master = BalancedCounts(n_classes=num_classes)
-        model = MACS(learner, master, init_step=init_step, metrics=metrics)
-        model.fit(x_train, y_train, iterations=3, verbose=False)
-        # test results
-        exp_res = RESULTS[f'{dataset}-{init_step}-{str(use_prob).lower()}']
-        act_res = dict(train=model.evaluate(x_train, y_train), val=model.evaluate(x_val, y_val))
-        for split, act in act_res.items():
-            for metric, val in act.items():
-                self.assertAlmostEqual(exp_res[f'{split}_{metric}'], val)
+    """Tests the correctness of the algorithm by comparing its results to those of the original Moving Targets
+    repository, which are used to check the consistency of any method refactoring."""
+    
+    def _test(self, dataset: str, init_step: str, use_prob: bool):
+        """Performs the tests.
+
+        :param dataset:
+            The name of the dataset `.csv` file.
+
+        :param init_step:
+            The initial Moving Targets step, either 'pretraining' or 'projection'.
+
+        :param use_prob:
+            Whether or not to use class probabilities in the master loss.
+        """
+        try:
+            np.random.seed(SEED)
+            # load data
+            ds = DATASETS[dataset]
+            df = pd.read_csv(f"{RES_FOLDER}{ds['name']}.csv", sep=ds['separator']).sample(frac=1)
+            x = df.drop(ds['class_column'], axis=1)
+            y = df[ds['class_column']].astype('category').cat.codes.values
+            num_classes = len(np.unique(y))
+            # train/val split and scaling
+            x_train, x_val, y_train, y_val = train_test_split(x, y)
+            scaler = MinMaxScaler()
+            x_train = scaler.fit_transform(x_train)
+            x_val = scaler.transform(x_val)
+            # define model pieces
+            metrics = [Accuracy(name='acc'), ClassFrequenciesStd(classes=num_classes, name='std')]
+            learner = LogisticRegression()
+            master = BalancedCounts(n_classes=num_classes)
+            model = MACS(learner, master, init_step=init_step, metrics=metrics)
+            model.fit(x_train, y_train, iterations=3, verbose=False)
+            # test results
+            exp_res = RESULTS[f'{dataset}-{init_step}-{str(use_prob).lower()}']
+            act_res = dict(train=model.evaluate(x_train, y_train), val=model.evaluate(x_val, y_val))
+            for split, act in act_res.items():
+                for metric, val in act.items():
+                    self.assertAlmostEqual(exp_res[f'{split}_{metric}'], val)
+        except Exception as exception:
+            self.fail(exception)
 
     def test_iris_pretraining_no_prob(self):
+        """Dataset = 'iris'; Initial Step = 'pretraining'; Use Probabilities = False."""
         self._test('iris', 'pretraining', False)
 
     def test_iris_pretraining_use_prob(self):
+        """Dataset = 'iris'; Initial Step = 'pretraining'; Use Probabilities = True."""
         self._test('iris', 'pretraining', True)
 
     def test_iris_projection_no_prob(self):
+        """Dataset = 'iris'; Initial Step = 'pretraining'; Use Probabilities = False."""
         self._test('iris', 'projection', False)
 
     def test_iris_projection_use_prob(self):
+        """Dataset = 'iris'; Initial Step = 'projection'; Use Probabilities = True."""
         self._test('iris', 'projection', True)
 
     def test_redwine_pretraining_no_prob(self):
+        """Dataset = 'redwine'; Initial Step = 'pretraining'; Use Probabilities = False."""
         self._test('redwine', 'pretraining', False)
 
     def test_redwine_pretraining_use_prob(self):
+        """Dataset = 'redwine'; Initial Step = 'pretraining'; Use Probabilities = True."""
         self._test('redwine', 'pretraining', True)
 
     def test_redwine_projection_no_prob(self):
+        """Dataset = 'redwine'; Initial Step = 'projection'; Use Probabilities = False."""
         self._test('redwine', 'projection', False)
 
     def test_redwine_projection_use_prob(self):
+        """Dataset = 'redwine'; Initial Step = 'projection'; Use Probabilities = True."""
         self._test('redwine', 'projection', True)
 
     def test_whitewine_pretraining_no_prob(self):
+        """Dataset = 'whitewine'; Initial Step = 'pretraining'; Use Probabilities = False."""
         self._test('whitewine', 'pretraining', False)
 
     def test_whitewine_pretraining_use_prob(self):
+        """Dataset = 'whitewine'; Initial Step = 'pretraining'; Use Probabilities = True."""
         self._test('whitewine', 'pretraining', True)
 
     def test_whitewine_projection_no_prob(self):
+        """Dataset = 'whitewine'; Initial Step = 'projection'; Use Probabilities = False."""
         self._test('whitewine', 'projection', False)
 
     def test_whitewine_projection_use_prob(self):
+        """Dataset = 'whitewine'; Initial Step = 'projection'; Use Probabilities = True."""
         self._test('whitewine', 'projection', True)

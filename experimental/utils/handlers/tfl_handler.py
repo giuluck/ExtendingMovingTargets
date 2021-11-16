@@ -80,7 +80,7 @@ class TFLHandler(AbstractHandler):
         # HANDLE FEATURE CONFIGURATIONS
         if config == 'categorical_restaurants':
             def pre_processing(x, y):
-                x, y = x_scaler.transform(x), y_scaler.transform(y)
+                x, y = x_scaler.transform(x), None if y is None else y_scaler.transform(y)
                 drs = x[['D', 'DD', 'DDD', 'DDDD']].values.argmax(axis=1) + 1
                 x['dollar_rating'] = ['D' * dr for dr in drs]
                 x = x[['num_reviews', 'avg_rating', 'dollar_rating']]
@@ -97,7 +97,7 @@ class TFLHandler(AbstractHandler):
             ]
         elif config == 'numeric':
             def pre_processing(x, y):
-                x, y = x_scaler.transform(x), y_scaler.transform(y)
+                x, y = x_scaler.transform(x), None if y is None else y_scaler.transform(y)
                 # retrieve categorical features (formatted as "<category_name>: <category_value>")
                 categories = {}
                 for c in x.columns:

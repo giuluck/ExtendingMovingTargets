@@ -1,4 +1,4 @@
-"""__init__.py file for moving_targets.masters package."""
+"""Interfaces and classes for Moving Targets Masters."""
 
 from moving_targets.masters.balanced_counts import BalancedCounts
 from moving_targets.masters.cplex_master import CplexMaster

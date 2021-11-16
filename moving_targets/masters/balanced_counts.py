@@ -1,5 +1,5 @@
 """Master implementation for the Balance Counts problem."""
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 
@@ -8,26 +8,75 @@ from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
 class BalancedCounts(CplexMaster):
-    """Cplex Master for the Balanced Counts problem in which output classes are constrained to be equally distributed.
+    """Master for the Balanced Counts problem in which output classes are constrained to be equally distributed."""
 
-    Args:
-        n_classes: the number of output classes.
-        use_prob: whether to use the learner's probabilities or the learner's output classes directly in the p_loss.
-        clip_value: the clipping value for probabilities, in case they are used.
-        slack: the slack value, expressed in terms of ratio wrt the other classes, to allow some output class to have a
-               few labelled samples more than the other classes.
-        **kwargs: super-class arguments.
-    """
+    def __init__(self, n_classes: int, use_prob: bool = True, clip_value: float = 1e-2, slack: float = 1.05,
+                 alpha: float = 1., beta: float = 1., time_limit: Optional[float] = None):
+        """
+        :param alpha:
+            The non-negative real number which is used to calibrate the two losses in the alpha step.
 
-    def __init__(self, n_classes: int, use_prob: bool = True, clip_value: float = 1e-2, slack: float = 1.05, **kwargs):
-        super(BalancedCounts, self).__init__(**kwargs)
+        :param beta:
+            The non-negative real number which is used to constraint the p_loss in the beta step.
+
+        :param time_limit:
+            The maximal time for which the master can run during each iteration.
+
+        :param n_classes:
+            The number of output classes.
+
+        :param use_prob:
+            Whether to use the learner's probabilities or the learner's output classes directly in the p_loss.
+
+        :param clip_value:
+            The clipping value for probabilities, in case they are used.
+
+        :param slack:
+            The slack value, expressed in terms of ratio wrt the other classes, to allow some output class to have a
+            few labelled samples more than the other classes.
+        """
+        super(BalancedCounts, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
+
         self.num_classes: int = n_classes
-        self.use_prob: bool = use_prob
-        self.clip_value: float = clip_value
-        self.slack = slack
+        """The number of output classes."""
 
-    # noinspection PyMissingOrEmptyDocstring
+        self.use_prob: bool = use_prob
+        """Whether to use the learner's probabilities or the learner's output classes directly in the p_loss."""
+
+        self.clip_value: float = clip_value
+        """The clipping value for probabilities, in case they are used."""
+
+        self.slack: float = slack
+        """The slack value, expressed in terms of ratio wrt the other classes, to allow some output class to have a
+        few labelled samples more than the other classes."""
+
     def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> Any:
+        """Creates the model variables depending on whether or not the learner was already fitted and whether or not to
+        use class probabilities to compute the loss. Then, it adds the constraints based on these variables.
+
+        :param macs:
+            Reference to the `MACS` object encapsulating the master.
+        
+        :param model:
+            The inner optimization model.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number (unused).
+
+        :returns:
+            A tuple containing:
+
+            1. the list of model variables;
+            2. the vector of learner predictions;
+            3. the vector of learner probabilities;
+            4. the maximal number of elements for each class in order to achieve balance.
+        """
         # if the model has not been fitted yet (i.e., the initial macs step is 'projection') we use the original labels
         # otherwise we use either the predicted classes or the predicted probabilities
         if not macs.fitted:
@@ -59,19 +108,87 @@ class BalancedCounts(CplexMaster):
         # return model info
         return variables, pred, prob, max_count
 
-    # noinspection PyMissingOrEmptyDocstring
     def beta_step(self, macs, model, model_info: object, x: Matrix, y: Vector, iteration: Iteration) -> bool:
+        """Uses the model predictions and the expected maximal number of labels for each class to check if the
+        balancing constraint is already satisfied; if so, returns True (beta step), otherwise returns False.
+
+        :param macs:
+            Reference to the `MACS` object encapsulating the master.
+
+        :param model:
+            The inner optimization model.
+
+        :param model_info:
+            The tuple returned by the 'build_model' function.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number.
+
+        :returns:
+            A boolean value that decides whether or not to use the beta step during the current iteration.
+        """
         _, pred, _, max_count = model_info
         _, pred_classes_counts = np.unique(pred, return_counts=True)
         return np.all(pred_classes_counts <= max_count)
 
-    # noinspection PyMissingOrEmptyDocstring
     def y_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
+        """Computes the categorical hamming distance between the model variables and the real targets (y).
+
+        :param macs:
+            Reference to the `MACS` object encapsulating the master.
+
+        :param model:
+            The inner optimization model.
+
+        :param model_info:
+            The tuple returned by the 'build_model' function.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number.
+
+        returns:
+            A real number representing the categorical hamming distance.
+        """
         variables, _, _, _ = model_info
         return CplexMaster.losses.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
 
-    # noinspection PyMissingOrEmptyDocstring
     def p_loss(self, macs, model, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
+        """Computes either the categorical hamming distance or the categorical crossentropy loss (depending on whether
+        or not to consider output probabilities) between the model variables and the learner's predictions.
+
+        :param macs:
+            Reference to the `MACS` object encapsulating the master.
+
+        :param model:
+            The inner optimization model.
+
+        :param model_info:
+            The tuple returned by the 'build_model' function.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number.
+
+        :returns:
+            A real number representing the categorical hamming distance/crossentropy loss.
+        """
         variables, pred, prob, _ = model_info
         if prob is None:
             return CplexMaster.losses.categorical_hamming(
@@ -86,8 +203,30 @@ class BalancedCounts(CplexMaster):
                 model_variables=variables
             )
 
-    # noinspection PyMissingOrEmptyDocstring
     def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
+        """Builds a numpy array from the solutions obtained from the Cplex model, the returns it.
+
+        :param macs:
+            Reference to the `MACS` object encapsulating the master.
+
+        :param solution:
+            The object containing information about the solution of the problem.
+
+        :param model_info:
+            The information returned by the 'build_model' function.
+
+        :param x:
+            The matrix/dataframe of training samples.
+
+        :param y:
+            The vector of training labels.
+
+        :param iteration:
+            The current `MACS` iteration, usually a number.
+
+        :returns:
+            The vector of adjusted targets returned by the optimization model.
+        """
         variables, _, _, _ = model_info
         y_adj = [sum(c * solution.get_value(variables[i, c]) for c in range(self.num_classes)) for i in range(len(y))]
         y_adj = np.array([int(v) for v in y_adj])

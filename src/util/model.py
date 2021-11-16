@@ -8,24 +8,39 @@ from moving_targets.metrics import MonotonicViolation
 from moving_targets.util.typing import Data, Matrix, MonotonicitiesList
 
 
-def metrics_summary(model, metric, metric_name: str = None, post_process: Callable = None, return_type: str = 'str',
-                    **kwargs: Data) -> Union[str, Dict[str, float]]:
+def metrics_summary(model,
+                    metric, metric_name: str = None,
+                    post_process: Callable = None,
+                    return_type: str = 'str',
+                    **data_splits: Data) -> Union[str, Dict[str, float]]:
     """Computes the metrics over a custom set of validation data, then builds a summary.
 
-    Args:
-        model: a model object having the 'predict(x)' method.
-        metric: a function which can compute a metric over a pair of two vectors, the true and the predicted one.
-        metric_name: a custom metric name. If None, the original metric name is used instead.
-        post_process: a post-processing function for the predictions, if needed.
-        return_type: either 'str' to return the string, or 'dict' to return the dictionary.
-        **kwargs: a dictionary of named `Data` arguments.
+    :param model:
+        A model object having the 'predict(x)' method.
 
-    Returns:
+    :param metric:
+        A function which can compute a metric over a pair of two vectors, the true and the predicted one.
+
+    :param metric_name:
+        A custom metric name. If None, the original metric name is used instead.
+
+    :param post_process:
+        Either None (identity function) or an explicit post-processing function f(p) for the predictions, which may be
+        used, e.g., to convert the probabilities into output classes for certain metrics.
+
+    :param return_type:
+        Either 'str' to return the string, or 'dict' to return the dictionary.
+
+    :param data_splits:
+        A dictionary of named `Data` arguments, where the name of the argument represents the data split and the value
+        is a tuple (<input_data>, <ground_truths>), e.g., "train=(x, y)".
+
+    :returns:
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
     summary = {}
     metric_name = metric.__name__ if metric_name is None else metric_name
-    for title, (x, y) in kwargs.items():
+    for title, (x, y) in data_splits.items():
         p = model.predict(x) if post_process is None else post_process(model.predict(x))
         summary[title] = metric(y, p.astype(np.float64))
     if return_type in ['dict', 'dictionary']:
@@ -42,13 +57,19 @@ def violations_summary(model,
                        return_type: str = 'str') -> Union[str, Dict[str, float]]:
     """Computes the violations over a custom set of validation data, then builds a summary.
 
-    Args:
-        model: a model object having the 'predict(x)' method.
-        inputs: the matrix/dataframe representing the input space.
-        monotonicities: the list of monotonicities.
-        return_type: either 'str' to return the string, or 'dict' to return the dictionary.
+    :param model:
+        A model object having the 'predict(x)' method.
 
-    Returns:
+    :param inputs:
+        The matrix/dataframe representing the input space.
+
+    :param monotonicities:
+        The list of monotonicities, in the form of [(<higher_index>, <lower_index>), ...].
+
+    :param return_type:
+        Either 'str' to return the string, or 'dict' to return the dictionary.
+
+    :returns:
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
     p = model.predict(inputs).astype(np.float64)

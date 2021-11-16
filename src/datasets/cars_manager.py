@@ -18,26 +18,40 @@ class CarsManager(AbstractManager):
     """Data Manager for the Cars Dataset."""
 
     FEATURES: Dict[str, FeatureInfo] = {
-        'Sales in thousands': FeatureInfo(kind='float', alias='sales'),
-        'Price in thousands': FeatureInfo(kind='float', alias='price'),
-        'Engine size': FeatureInfo(kind='float', alias='engine_size'),
-        'Horsepower': FeatureInfo(kind='float', alias='horsepower'),
-        'Wheelbase': FeatureInfo(kind='float', alias='wheelbase'),
-        'Width': FeatureInfo(kind='float', alias='width'),
-        'Length': FeatureInfo(kind='float', alias='length'),
-        'Curb weight': FeatureInfo(kind='float', alias='curb_weight'),
-        'Fuel capacity': FeatureInfo(kind='float', alias='fuel_capacity'),
-        'Fuel efficiency': FeatureInfo(kind='float', alias='fuel_efficiency'),
-        'Manufacturer': FeatureInfo(kind='category', alias='manufacturer'),
-        'Vehicle type': FeatureInfo(kind='category', alias='vehicle')
+        'Sales in thousands': FeatureInfo(dtype='float', alias='sales'),
+        'Price in thousands': FeatureInfo(dtype='float', alias='price'),
+        'Engine size': FeatureInfo(dtype='float', alias='engine_size'),
+        'Horsepower': FeatureInfo(dtype='float', alias='horsepower'),
+        'Wheelbase': FeatureInfo(dtype='float', alias='wheelbase'),
+        'Width': FeatureInfo(dtype='float', alias='width'),
+        'Length': FeatureInfo(dtype='float', alias='length'),
+        'Curb weight': FeatureInfo(dtype='float', alias='curb_weight'),
+        'Fuel capacity': FeatureInfo(dtype='float', alias='fuel_capacity'),
+        'Fuel efficiency': FeatureInfo(dtype='float', alias='fuel_efficiency'),
+        'Manufacturer': FeatureInfo(dtype='category', alias='manufacturer'),
+        'Vehicle type': FeatureInfo(dtype='category', alias='vehicle')
         # "4-year resale value" is ignored because it is a numeric feature with 36 nan values out of 157
         # "Model" is ignored because it is a categorical feature with 156 unique values out of 157
         # "Latest Launch" is ignored because it ranges in a small period thus it is likely not to be predictive
     }
+    """The cars dataset features."""
 
-    # noinspection PyMissingOrEmptyDocstring
     @staticmethod
     def load_data(filepath: str, full_features: bool, extrapolation: bool) -> AbstractManager.Data:
+        """Loads the dataset.
+
+        :param filepath:
+            The dataset filepath.
+
+        :param full_features:
+            If True considers all the dataset features, otherwise considers only the monotonic ones.
+
+        :param extrapolation:
+            Whether to consider a test set with border samples or with random samples (interpolation).
+
+        :returns:
+            A dictionary of dataframes representing the train and test sets, respectively.
+        """
         df = pd.read_csv(filepath).replace({'.': np.nan})
         df = clean_dataframe(df, CarsManager.FEATURES)
         if full_features:
@@ -51,12 +65,44 @@ class CarsManager(AbstractManager):
     def __init__(self, filepath: str, full_features: bool = False, full_grid: bool = False, extrapolation: bool = False,
                  grid_augmented: int = 150, grid_ground: Optional[int] = None, x_scaling: Method = 'std',
                  y_scaling: Method = 'norm', bound: Tuple[float, float] = (0, 100)):
+        """
+        :param filepath:
+            The cars dataset filepath.
+
+        :param full_features:
+            Whether or not to use all the input features.
+
+        :param full_grid:
+            Whether or not to evaluate the results on an explicit full grid. This option is possible only if
+            full_features is set to false, since there is no way to create an explicit grid on the full set of features.
+
+        :param extrapolation:
+            Whether or not to test on extrapolation instead of interpolation.
+
+        :param grid_augmented:
+            Number of augmented features for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param grid_ground:
+            Number of ground samples for grid_kwargs. This will not have any effect if an explicit grid is passed.
+
+        :param x_scaling:
+            Scaling methods for the input data.
+
+        :param y_scaling:
+            Scaling methods for the output data.
+
+        :param bound:
+            The y bounds for the summary plot.
+        """
+
         self.bound: Tuple[float, float] = bound
+        """The y bounds for the summary plot."""
+
         # in case of full features, standardize floating features only (no skipped and no categorical features)
         grid = None
         if full_features:
             assert full_grid is False, "'full_grid' is not supported with 'full_features'"
-            x_scaling = {v.alias or k: x_scaling for k, v in CarsManager.FEATURES.items() if v.kind == 'float'}
+            x_scaling = {v.alias or k: x_scaling for k, v in CarsManager.FEATURES.items() if v.dtype == 'float'}
         elif full_grid:
             grid = pd.DataFrame.from_dict({'price': np.linspace(self.bound[0], self.bound[1], 700)})
             x_scaling = {'price': x_scaling}
@@ -83,20 +129,21 @@ class CarsManager(AbstractManager):
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented = 15) -> SamplingFunctions:
         return {'price': (num_augmented, lambda s: rng.uniform(self.bound[0], self.bound[1], size=s))}
 
-    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        _, axes = plt.subplots(1, len(kwargs), sharex='all', sharey='all', figsize=figsize, tight_layout=tight_layout)
-        for ax, (title, (x, y)) in zip(axes, kwargs.items()):
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        _, axes = plt.subplots(1, len(additional_kwargs), sharex='all', sharey='all',
+                               figsize=figsize, tight_layout=tight_layout)
+        for ax, (title, (x, y)) in zip(axes, additional_kwargs.items()):
             sns.scatterplot(x=x['price'], y=y, ax=ax).set(xlabel='price', ylabel='sales', title=title.capitalize())
 
-    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
         plt.figure(figsize=figsize)
         sns.histplot(data=aug, x='price', hue='Augmented')
 
-    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
-        res = kwargs.pop('res')
-        ylim = kwargs.pop('ylim')
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        res = additional_kwargs.pop('res')
+        ylim = additional_kwargs.pop('ylim')
         plt.figure(figsize=figsize)
-        for title, (x, y) in kwargs.items():
+        for title, (x, y) in additional_kwargs.items():
             sns.scatterplot(x=x['price'], y=y, alpha=0.25, sizes=0.25, label=title.capitalize())
         x = pd.DataFrame(np.linspace(self.bound[0], self.bound[1], res), columns=['price'])
         y = model.predict(x).flatten()

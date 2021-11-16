@@ -1,6 +1,6 @@
 """Data Manager."""
 
-from typing import List, Callable, Tuple, Dict, Union, Optional as Opt
+from typing import List, Callable, Tuple, Dict, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,54 +15,48 @@ from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, Tigh
 
 
 class AbstractManager:
-    """Abstract dataset handler.
-
-    Args:
-        x_scaling: x scaling methods.
-        y_scaling: y scaling method.
-        directions: dictionary containing the name of the x features and the respective expected monotonicity.
-        label: name of the y feature.
-        loss: evaluation loss.
-        metric: evaluation metric.
-        data_kwargs: plot data arguments.
-        augmented_kwargs: plot augmented arguments.
-        summary_kwargs: plot summary arguments.
-        grid_kwargs: grid augmentation arguments, ignored if is not None.
-        grid: either an explicit grid or None.
-        loss_name: name of the evaluation loss.
-        metric_name: name of the evaluation metric.
-        post_process: post-processing routine for the evaluation metric.
-        **kwargs: any additional argument to be passed to the `load_data()` function.
-    """
+    """Abstract dataset manager."""
 
     Data = Dict[str, pd.DataFrame]
+    """Dictionary type that associates to each split name the respective dataframe."""
+
     DataInfo = Union[Tuple[Dataset, Scalers], List[Tuple[Dataset, Scalers]]]
+    """Either a tuple of `Dataset` and `Scalers` or a list of them."""
+
     Samples = Union[pd.DataFrame, pd.Series]
+    """Either a `pandas.DataFrame` or a `pandas.Series`."""
 
     @staticmethod
-    def get_kwargs(default: Dict, **kwargs) -> Dict:
+    def get_plt_kwargs(default: Dict, figsize: Figsize = None, tight_layout: TightLayout = None, **plt_kwargs) -> Dict:
         """Updates the default parameter dictionary.
 
-        Args:
-            default: the default dictionary.
-            **kwargs: additional arguments.
+        :param default:
+            The default dictionary.
 
-        Returns:
+        :param figsize:
+            `plt.figure()` argument.
+
+        :param tight_layout:
+            `plt.figure()` argument.
+
+        :param plt_kwargs:
+            Additional `plt.figure()` arguments.
+
+        :returns:
             An updated dictionary, with 'figsize' and 'tight_layout' parameters included and set to None.
         """
-        output = dict(figsize=None, tight_layout=None)
-        output.update(default)
-        output.update(kwargs)
+        output = default.copy()
+        output.update(figsize=figsize, tight_layout=tight_layout, **plt_kwargs)
         return output
 
     @staticmethod
-    def load_data(**kwargs) -> Data:
+    def load_data(**data_kwargs) -> Data:
         """Loads the dataset.
 
-        Args:
-            **kwargs: any argument used in the function.
+        :param data_kwargs:
+            Any dataset-dependent argument that may be necessary in the implementation of this method.
 
-        Returns:
+        :returns:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         raise NotImplementedError("please implement static method 'load_data()'")
@@ -78,28 +72,111 @@ class AbstractManager:
                  data_kwargs: Dict,
                  augmented_kwargs: Dict,
                  summary_kwargs: Dict,
-                 grid_kwargs: Opt[Dict] = None,
-                 grid: Opt[pd.DataFrame] = None,
-                 loss_name: Opt[str] = None,
-                 metric_name: Opt[str] = None,
+                 grid_kwargs: Optional[Dict] = None,
+                 grid: Optional[pd.DataFrame] = None,
+                 loss_name: Optional[str] = None,
+                 metric_name: Optional[str] = None,
                  post_process: Callable = None,
-                 **kwargs):
-        train, test = self.load_data(**kwargs).values()
+                 **load_data_kwargs):
+        """
+        :param directions:
+            Dictionary containing the name of the x features and the respective expected monotonicity.
+
+        :param stratify:
+            Whether or not to stratify the dataset when splitting.
+
+        :param x_scaling:
+            X scaling methods.
+
+        :param y_scaling:
+            Y scaling method.
+
+        :param label:
+            Name of the y feature.
+
+        :param loss:
+            The evaluation loss.
+
+        :param metric:
+            The evaluation metric.
+
+        :param data_kwargs:
+            Default `self.plot_data()` arguments.
+
+        :param augmented_kwargs:
+            Default `self.plot_augmented()` arguments.
+
+        :param summary_kwargs:
+            Default `self.plot_summary()` arguments.
+
+        :param grid_kwargs:
+            Default `self.get_augmented_data()` arguments, ignored if an explicit grid is passed.
+
+        :param grid:
+            Either an explicit grid for the metric evaluation or None. If None, the grid is obtained by augmenting
+            (with the parameters in `grid_kwargs`) the test set which is then used to compute the level of constraint
+            satisfaction and the other metrics.
+
+        :param loss_name:
+            The name of the evaluation loss.
+
+        :param metric_name:
+            The name of the evaluation metric.
+
+        :param post_process:
+            Either None (identity function) or an explicit post-processing function f(p) for the predictions, which may
+            be used, e.g., to convert the probabilities into output classes for certain metrics.
+
+        :param load_data_kwargs:
+            Any dataset-dependent argument to be passed to the static `load_data()` function.
+        """
+        train, test = self.load_data(**load_data_kwargs).values()
         self.train_data: Tuple[pd.DataFrame, pd.Series] = (train.drop(columns=label), train[label])
+        """The training data in the form of a tuple (xtr, ytr)."""
+
         self.test_data: Tuple[pd.DataFrame, pd.Series] = (test.drop(columns=label), test[label])
+        """The test data in the form of a tuple (xts, yts)."""
+
         self.directions: Dict[str] = directions
-        self.stratify: Opt[Vector] = self.train_data[1] if stratify else None
+        """Dictionary containing the name of the x features and the respective expected monotonicity."""
+
+        self.stratify: Optional[Vector] = self.train_data[1] if stratify else None
+        """Whether or not to stratify the dataset when splitting."""
+
         self.x_scaling: Methods = x_scaling
+        """X scaling methods."""
+
         self.y_scaling: Methods = y_scaling
+        """Y scaling method."""
+
         self.label: str = label
+        """Name of the y feature."""
+
         self.loss: Callable = loss
-        self.loss_name: Opt[str] = loss_name
+        """The evaluation loss."""
+
+        self.loss_name: Optional[str] = loss_name
+        """The name of the evaluation loss."""
+
         self.metric: Callable = metric
-        self.metric_name: Opt[str] = metric_name
+        """The evaluation metric."""
+
+        self.metric_name: Optional[str] = metric_name
+        """The name of the evaluation metric."""
+
         self.post_process: Callable = post_process
-        self.data_kwargs: Opt[Dict] = data_kwargs
-        self.augmented_kwargs: Opt[Dict] = augmented_kwargs
-        self.summary_kwargs: Opt[Dict] = summary_kwargs
+        """Either None (identity function) or an explicit post-processing function f(p) for the predictions, which may
+        be used, e.g., to convert the probabilities into output classes for certain metrics."""
+
+        self.data_kwargs: Optional[Dict] = data_kwargs
+        """Default `self.plot_data()` arguments."""
+
+        self.augmented_kwargs: Optional[Dict] = augmented_kwargs
+        """Default `self.plot_augmented()` arguments."""
+
+        self.summary_kwargs: Optional[Dict] = summary_kwargs
+        """Default `self.plot_summary()` arguments."""
+
         # if an explicit grid is passed we use that, otherwise we build a grid by augmenting the test data, then
         # monotonicities are computed withing groups in case of test data or on all samples in case of explicit grid
         if grid is None:
@@ -108,7 +185,10 @@ class AbstractManager:
             kind = 'group'
         else:
             kind = 'all'
+
         self.grid: pd.DataFrame = grid.drop(columns=['ground_index', 'monotonicity'], errors='ignore')
+        """The grid for the constraint metrics evaluation."""
+
         self.monotonicities: MonotonicitiesList = get_monotonicities_list(
             data=grid,
             label=None,
@@ -116,49 +196,134 @@ class AbstractManager:
             errors='ignore',
             compute_monotonicities=self.compute_monotonicities
         )
+        """The list of expected monotonicities related to the grid."""
 
     def _get_sampling_functions(self, rng: Rng, num_augmented: Augmented) -> SamplingFunctions:
+        """Builds the dataset-dependent sampling functions.
+
+        :param rng:
+            A random number generator.
+
+        :param num_augmented:
+            The number of augmented samples.
+
+        :returns:
+            The dictionary of sampling functions.
+        """
         raise NotImplementedError("please implement method '_get_sampling_functions'")
 
-    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        """Plotting routine for the original dataset.
+
+        :param figsize:
+            The figsize parameter passed to `matplotlib.pyplot.show()`.
+
+        :param tight_layout:
+            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+
+        :param additional_kwargs:
+            Any other implementation-dependent parameter.
+        """
         raise NotImplementedError("please implement method '_data_plot'")
 
-    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _augmented_plot(self, aug: pd.DataFrame, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        """Plotting routine for the augmented dataset.
+
+        :param aug:
+            The augmented DataFrame.
+
+        :param figsize:
+            The figsize parameter passed to `matplotlib.pyplot.show()`.
+
+        :param tight_layout:
+            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+
+        :param additional_kwargs:
+            Any other implementation-dependent parameter.
+        """
         _, axes = plt.subplots(1, len(self.directions), sharey='all', figsize=figsize, tight_layout=tight_layout)
         for ax, feature in zip(axes, list(self.directions.keys())):
             sns.histplot(data=aug, x=feature, hue='Augmented', ax=ax)
 
-    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **kwargs):
+    def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
+        """Summary plotting routine.
+
+        :param model:
+            A model object having the 'predict(x)' method.
+
+        :param figsize:
+            The figsize parameter passed to `matplotlib.pyplot.show()`.
+
+        :param tight_layout:
+            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+
+        :param additional_kwargs:
+            Any other implementation-dependent parameter.
+        """
         raise NotImplementedError("please implement method '_summary_plot'")
 
     def compute_monotonicities(self, samples: Samples, references: Samples, eps: float = 1e-5) -> MonotonicitiesMatrix:
-        """Routine to compute the monotonicities."""
+        """Routine to compute the monotonicities.
+
+        :param samples:
+            The data samples.
+
+        :param references:
+            The reference samples.
+
+        :param eps:
+            The slack value under which a violation is considered to be acceptable.
+
+        :returns:
+            A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled
+            with -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
+        """
         directions = np.array([self.directions.get(c) or 0 for c in samples.columns])
         return compute_numeric_monotonicities(samples.values, references.values, directions=directions, eps=eps)
 
     def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Scaler, Scaler]:
-        """Returns the dataset scalers."""
+        """Returns the dataset scalers.
+
+        :param x:
+            The input data.
+
+        :param y:
+            The output data.
+
+        :returns:
+            A pair of scalers, one for the input and one for the output data, respectively.
+        """
         x_scaler = None if self.x_scaling is None else Scaler(self.x_scaling).fit(x)
         y_scaler = None if self.y_scaling is None else Scaler(self.y_scaling).fit(y)
         return x_scaler, y_scaler
 
-    def get_folds(self, num_folds: Opt[int] = None, **kwargs) -> DataInfo:
+    def get_folds(self, num_folds: Optional[int] = None, **crossval_kwargs) -> DataInfo:
         """Gets the data split in folds.
 
         With num_folds = None directly returns a tuple with train/test splits and scalers.
         With num_folds = 1 returns a list with a single tuple with train/val/test splits and scalers.
         With num_folds > 1 returns a list of tuples with train/val/test splits and their respective scalers.
+
+        :param num_folds:
+            The number of folds for k-fold cross-validation.
+
+        :param crossval_kwargs:
+            Arguments passed either to `split_dataset()` or `cross_validate()` method, depending on the number of folds.
+
+        :return:
+            Either a tuple of `Dataset` and `Scalers` or a list of them, depending on the number of folds.
         """
         if num_folds is None:
             splits = dict(train=self.train_data, test=self.test_data)
             return splits, self.get_scalers(*self.train_data)
         elif num_folds > 0:
             if num_folds == 1:
-                fold = split_dataset(*self.train_data, test_size=0.2, val_size=0.0, stratify=self.stratify, **kwargs)
+                fold = split_dataset(*self.train_data, test_size=0.2, val_size=0.0,
+                                     stratify=self.stratify, **crossval_kwargs)
                 fold['validation'] = fold.pop('test')
                 folds = [fold]
             else:
-                folds = cross_validate(*self.train_data, num_folds=num_folds, stratify=self.stratify, **kwargs)
+                folds = cross_validate(*self.train_data, num_folds=num_folds, stratify=self.stratify, **crossval_kwargs)
             return [({**fold, 'test': self.test_data}, self.get_scalers(*fold['train'])) for fold in folds]
         else:
             raise ValueError(f"{num_folds} is not an accepted value for 'num_folds'")
@@ -166,12 +331,37 @@ class AbstractManager:
     def get_augmented_data(self,
                            x: pd.DataFrame,
                            y: pd.Series,
-                           num_augmented: Opt[Augmented] = None,
+                           num_augmented: Optional[Augmented] = None,
                            num_random: int = 0,
-                           num_ground: Opt[int] = None,
+                           num_ground: Optional[int] = None,
                            monotonicities: bool = True,
                            seed: int = 0) -> Tuple[AugmentedData, Scalers]:
-        """Builds the augmented dataset."""
+        """Builds the augmented dataset.
+
+        :param x:
+            The input data.
+
+        :param y:
+            The output labels.
+
+        :param num_augmented:
+            The number of augmented samples.
+
+        :param num_random:
+            The number of unlabelled random samples added to the original dataset.
+
+        :param num_ground:
+            The number of samples taken from the original dataset (the remaining ones are ignored).
+
+        :param monotonicities:
+            Whether or not to compute monotonicities between same-group samples.
+
+        :param seed:
+            The random seed.
+
+        :return:
+            A tuple containing the augmentation dataset and the respective x/y scalers.
+        """
         rng = np.random.default_rng(seed=seed)
         x, y = x.reset_index(drop=True), y.reset_index(drop=True)
         # handle input samples reduction
@@ -197,35 +387,53 @@ class AbstractManager:
         mask = ~np.isnan(y_aug[self.label])
         return (x_aug, y_aug), self.get_scalers(x=x_aug, y=y_aug[self.label][mask])
 
-    def plot_data(self, **kwargs):
-        """Plots the given data."""
+    def plot_data(self, **data_kwargs):
+        """Plots the given data.
+
+        :param data_kwargs:
+            Custom arguments passed to the internal `_data_plot()` method.
+        """
         # print general info about data
-        info = [f'{len(x)} {title} samples' for title, (x, _) in kwargs.items()]
+        info = [f'{len(x)} {title} samples' for title, (x, _) in data_kwargs.items()]
         print(', '.join(info))
         # plot data
-        kwargs = self.get_kwargs(default=self.data_kwargs, **kwargs)
-        self._data_plot(**kwargs)
+        data_kwargs = self.get_plt_kwargs(default=self.data_kwargs, **data_kwargs)
+        self._data_plot(**data_kwargs)
         plt.show()
 
-    def plot_augmented(self, x: Matrix, y: Vector, **kwargs):
-        """Plots the given augmented data."""
+    def plot_augmented(self, x: Matrix, y: Vector, **augmented_kwargs):
+        """Plots the given augmented data.
+
+        :param x:
+            The augmented input data.
+
+        :param y:
+            The augmented output labels.
+
+        :param augmented_kwargs:
+            Custom arguments passed to the internal `_augmented_plot()` method.
+        """
         # retrieve augmented data
         aug = x.copy()
         aug['Augmented'] = np.isnan(y[self.label])
         # plot augmented data
-        kwargs = self.get_kwargs(default=self.augmented_kwargs, **kwargs)
-        self._augmented_plot(aug=aug, **kwargs)
+        augmented_kwargs = self.get_plt_kwargs(default=self.augmented_kwargs, **augmented_kwargs)
+        self._augmented_plot(aug=aug, **augmented_kwargs)
         plt.show()
 
     def losses_summary(self, model, return_type: str = 'str', **kwargs) -> Union[str, Dict[str, float]]:
         """Computes the losses over a custom set of validation data, then builds a summary.
 
-        Args:
-            model: a model object having the 'predict(x)' method.
-            return_type: either 'str' to return the string, or 'dict' to return the dictionary.
-            **kwargs: a dictionary of named `Data` arguments.
+        :param model:
+            A model object having the 'predict(x)' method.
 
-        Returns:
+        :param return_type:
+            Either 'str' to return the string, or 'dict' to return the dictionary.
+
+        :param kwargs:
+            A dictionary of named `Data` arguments.
+
+        :returns:
             Either a dictionary for the metric values or a string representing the evaluation summary.
         """
         return metrics_summary(
@@ -240,12 +448,16 @@ class AbstractManager:
     def metrics_summary(self, model, return_type: str = 'str', **kwargs) -> Union[str, Dict[str, float]]:
         """Computes the metrics over a custom set of validation data, then builds a summary.
 
-        Args:
-            model: a model object having the 'predict(x)' method.
-            return_type: either 'str' to return the string, or 'dict' to return the dictionary.
-            **kwargs: a dictionary of named `Data` arguments.
+        :param model:
+            A model object having the 'predict(x)' method.
 
-        Returns:
+        :param return_type:
+            Either 'str' to return the string, or 'dict' to return the dictionary.
+
+        :param kwargs:
+            A dictionary of named `Data` arguments.
+
+        :returns:
             Either a dictionary for the metric values or a string representing the evaluation summary.
         """
         return metrics_summary(
@@ -260,11 +472,13 @@ class AbstractManager:
     def violations_summary(self, model, return_type: str = 'str') -> Union[str, Dict[str, float]]:
         """Computes the violations over a custom set of validation data, then builds a summary.
 
-        Args:
-            model: a model object having the 'predict(x)' method.
-            return_type: either 'str' to return the string, or 'dict' to return the dictionary.
+        :param model:
+            A model object having the 'predict(x)' method.
 
-        Returns:
+        :param return_type:
+            Either 'str' to return the string, or 'dict' to return the dictionary.
+
+        :returns:
             Either a dictionary for the metric values or a string representing the evaluation summary.
         """
         return violations_summary(
@@ -274,14 +488,27 @@ class AbstractManager:
             return_type=return_type
         )
 
-    def evaluation_summary(self, model, do_plot: bool = True, model_name: Opt[str] = None, **kwargs):
-        """Evaluates the model."""
+    def evaluation_summary(self, model, do_plot: bool = True, model_name: Optional[str] = None, **kwargs):
+        """Evaluates the model.
+
+        :param model:
+            A model object having the 'predict(x)' method.
+
+        :param do_plot:
+            Whether or not to plot the results.
+
+        :param model_name:
+            The (optional) name of the model, to be printed in the plot.
+
+        :param kwargs:
+            Custom arguments passed to the internal `_summary_plot()` method.
+        """
         # compute metrics on kwargs
         print(self.losses_summary(model=model, return_type='str', **kwargs))
         print(self.metrics_summary(model=model, return_type='str', **kwargs))
         print(self.violations_summary(model=model, return_type='str'))
         # plot summary
-        kwargs = self.get_kwargs(default=self.summary_kwargs, **kwargs)
+        kwargs = self.get_plt_kwargs(default=self.summary_kwargs, **kwargs)
         if do_plot:
             self._summary_plot(model=model, **kwargs)
             if model_name:
