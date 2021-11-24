@@ -5,7 +5,8 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from experimental.utils import AnalysisCallback, DistanceAnalysis, CarsAdjustments, DatasetFactory
+from experimental.utils import AnalysisCallback, DistanceAnalysis, CarsAdjustments
+from experimental.utils.factories import DatasetFactory
 from moving_targets.util.typing import Dataset, Iteration
 from src.datasets import PuzzlesManager
 
@@ -18,17 +19,20 @@ FIG_SIZE = (15, 10)
 
 # noinspection PyMissingOrEmptyDocstring
 class ExportAnalysis(AnalysisCallback):
-    def __init__(self, config_name: str = 'image', **kwargs):
+    def __init__(self, config_name: str = 'image', **plt_kwargs):
         super(ExportAnalysis, self).__init__()
         self.config_name = config_name
 
     def on_process_end(self, macs, val_data: Optional[Dataset], **additional_kwargs):
         self.data = self.data.sort_values('price')
         plt.figure(tight_layout=True, figsize=FIG_SIZE)
-        self.plot_function(1)
+        self._plot_function(1)
         plt.xlabel('')
         plt.ylabel('')
         plt.savefig(f'../temp/{self.config_name}.png', format='png')
+
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+        return
 
 
 # noinspection PyMissingOrEmptyDocstring
@@ -37,7 +41,7 @@ class ExportDistance(DistanceAnalysis, ExportAnalysis):
         super(ExportDistance, self).__init__()
         self.config_name = config_name
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         x = np.arange(len(self.data))
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         for i in x:
@@ -55,7 +59,7 @@ class ExportCars(CarsAdjustments, ExportAnalysis):
         super(ExportCars, self).__init__()
         self.config_name = config_name
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, POINT_WIDTH), ALPHA

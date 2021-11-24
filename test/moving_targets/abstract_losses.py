@@ -19,7 +19,7 @@ NUM_TESTS: int = 10
 """The number of tests carried out for the same loss."""
 
 PLACES: int = 3
-"""The number of digits passed to the `unittest.TestCase.assertAlmostEqual()` method."""
+"""The number of digits passed to the `assertAlmostEqual()` method."""
 
 k.set_epsilon(1e-15)
 
@@ -31,7 +31,7 @@ class TestLosses:
     def _tested_loss() -> str:
         """Retrieves the name of the tested loss from the stack trace.
 
-        :returns:
+        :return:
             The name of the loss.
         """
         return inspect.stack()[2][3].replace('test_', '').replace('_weights', '')
@@ -45,7 +45,7 @@ class TestLosses:
             A loss name in ['sae', 'sse', 'binary hamming', 'categorical hamming', 'reversed binary crossentropy',
             'reversed categorical crossentropy', 'symmetric binary crossentropy', 'symmetric categorical crossentropy'].
 
-        :returns:
+        :return:
             A custom loss obtained either from scikit learn losses or from tensorflow primitives, e.g., SAE (sum of
             squared errors) is obtained as MAE(y, p) * NUM_KEY.
         """
@@ -65,7 +65,7 @@ class TestLosses:
             :param loss_fn:
                 The kind of crossentropy (reversed or symmetric), handled via a callable function.
 
-            :returns:
+            :return:
                 A numpy scalar representing the loss value.
             """
             y = tf.cast(y, tf.float32)
@@ -91,7 +91,7 @@ class TestLosses:
     def _losses(self) -> LossesHandler:
         """The solver's losses.
 
-        :returns:
+        :return:
             Cvxpy's `LossesHandler` object.
         """
         raise NotImplementedError(f"Please implement method '_losses'")

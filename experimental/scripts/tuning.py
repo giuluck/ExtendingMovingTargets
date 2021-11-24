@@ -9,7 +9,7 @@ import time
 import shutil
 from typing import List, Dict
 
-from experimental.utils import DatasetFactory
+from experimental.utils.factories import DatasetFactory
 from moving_targets.callbacks import WandBLogger
 from src.util.dictionaries import cartesian_product
 

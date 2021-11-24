@@ -87,7 +87,7 @@ class RestaurantsManager(AbstractManager):
             Whether or not the restaurants must be sampled according to the test set distribution.
 
         :return:
-            A `pandas.DataFrame` containing the three input features and the output one.
+            A `DataFrame` containing the three input features and the output one.
         """
         (avg_ratings, num_reviews, dollar_ratings, ctr_labels) = RestaurantsManager.sample_restaurants(n, rng)
         # testing has a more uniform distribution over all restaurants
@@ -113,10 +113,10 @@ class RestaurantsManager(AbstractManager):
             A list of model objects having the 'predict(x)' method.
 
         :param figsize:
-            The figsize parameter passed to `matplotlib.pyplot.show()`.
+            The figsize parameter passed to `plt()`.
 
         :param tight_layout:
-            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+            The tight_layout parameter passed to `plt()`.
 
         :param res:
             The evaluation grid resolution.
@@ -151,11 +151,11 @@ class RestaurantsManager(AbstractManager):
         """Processes the dataframe by applying one-hot encoding and computing the ground truths if needed.
 
         :param dataset:
-            A `pandas.DataFrame` for restaurants dataset.
+            A `DataFrame` for restaurants dataset.
 
         :return:
             A tuple containing the same dataset with one-hot encoding for categorical value in the first position, and
-            a `pandas.Series` containing the ground truths in the second position.
+            a `Series` containing the ground truths in the second position.
         """
         for rating in ['DDDD', 'DDD', 'DD', 'D']:
             dataset.insert(2, rating, dataset['dollar_rating'] == rating)
@@ -170,7 +170,7 @@ class RestaurantsManager(AbstractManager):
     def load_data() -> AbstractManager.Data:
         """Loads the dataset.
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         rng = np.random.default_rng(seed=0)
@@ -245,7 +245,7 @@ class RestaurantsManager(AbstractManager):
         :param eps:
             The slack value under which a violation is considered to be acceptable.
 
-        :returns:
+        :return:
             A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled
             with -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
         """

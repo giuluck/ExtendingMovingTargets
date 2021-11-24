@@ -24,29 +24,24 @@ class AbstractManager:
     """Either a tuple of `Dataset` and `Scalers` or a list of them."""
 
     Samples = Union[pd.DataFrame, pd.Series]
-    """Either a `pandas.DataFrame` or a `pandas.Series`."""
+    """Either a `DataFrame` or a `Series`."""
 
     @staticmethod
-    def get_plt_kwargs(default: Dict, figsize: Figsize = None, tight_layout: TightLayout = None, **plt_kwargs) -> Dict:
+    def get_plt_kwargs(default_kwargs: Dict, **additional_kwargs) -> Dict:
         """Updates the default parameter dictionary.
 
-        :param default:
-            The default dictionary.
+        :param default_kwargs:
+            The default dictionary of `plt()` arguments.
 
-        :param figsize:
-            `plt.figure()` argument.
+        :param additional_kwargs:
+            Additional `plt()` arguments.
 
-        :param tight_layout:
-            `plt.figure()` argument.
-
-        :param plt_kwargs:
-            Additional `plt.figure()` arguments.
-
-        :returns:
-            An updated dictionary, with 'figsize' and 'tight_layout' parameters included and set to None.
+        :return:
+            An updated dictionary, with 'figsize' and 'tight_layout' parameters included and set to None if not present.
         """
-        output = default.copy()
-        output.update(figsize=figsize, tight_layout=tight_layout, **plt_kwargs)
+        output = dict(figsize=None, tight_layout=None)
+        output.update(**default_kwargs)
+        output.update(**additional_kwargs)
         return output
 
     @staticmethod
@@ -56,10 +51,10 @@ class AbstractManager:
         :param data_kwargs:
             Any dataset-dependent argument that may be necessary in the implementation of this method.
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
-        raise NotImplementedError("please implement static method 'load_data()'")
+        raise NotImplementedError("please implement static method 'load_data'")
 
     def __init__(self,
                  directions: Dict[str, int],
@@ -207,7 +202,7 @@ class AbstractManager:
         :param num_augmented:
             The number of augmented samples.
 
-        :returns:
+        :return:
             The dictionary of sampling functions.
         """
         raise NotImplementedError("please implement method '_get_sampling_functions'")
@@ -216,10 +211,10 @@ class AbstractManager:
         """Plotting routine for the original dataset.
 
         :param figsize:
-            The figsize parameter passed to `matplotlib.pyplot.show()`.
+            The figsize parameter passed to `plt()`.
 
         :param tight_layout:
-            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+            The tight_layout parameter passed to `plt()`.
 
         :param additional_kwargs:
             Any other implementation-dependent parameter.
@@ -233,10 +228,10 @@ class AbstractManager:
             The augmented DataFrame.
 
         :param figsize:
-            The figsize parameter passed to `matplotlib.pyplot.show()`.
+            The figsize parameter passed to `plt()`.
 
         :param tight_layout:
-            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+            The tight_layout parameter passed to `plt()`.
 
         :param additional_kwargs:
             Any other implementation-dependent parameter.
@@ -252,10 +247,10 @@ class AbstractManager:
             A model object having the 'predict(x)' method.
 
         :param figsize:
-            The figsize parameter passed to `matplotlib.pyplot.show()`.
+            The figsize parameter passed to `plt()`.
 
         :param tight_layout:
-            The tight_layout parameter passed to `matplotlib.pyplot.show()`.
+            The tight_layout parameter passed to `plt()`.
 
         :param additional_kwargs:
             Any other implementation-dependent parameter.
@@ -274,7 +269,7 @@ class AbstractManager:
         :param eps:
             The slack value under which a violation is considered to be acceptable.
 
-        :returns:
+        :return:
             A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled
             with -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
         """
@@ -290,7 +285,7 @@ class AbstractManager:
         :param y:
             The output data.
 
-        :returns:
+        :return:
             A pair of scalers, one for the input and one for the output data, respectively.
         """
         x_scaler = None if self.x_scaling is None else Scaler(self.x_scaling).fit(x)
@@ -397,7 +392,7 @@ class AbstractManager:
         info = [f'{len(x)} {title} samples' for title, (x, _) in data_kwargs.items()]
         print(', '.join(info))
         # plot data
-        data_kwargs = self.get_plt_kwargs(default=self.data_kwargs, **data_kwargs)
+        data_kwargs = AbstractManager.get_plt_kwargs(default_kwargs=self.data_kwargs, **data_kwargs)
         self._data_plot(**data_kwargs)
         plt.show()
 
@@ -417,7 +412,7 @@ class AbstractManager:
         aug = x.copy()
         aug['Augmented'] = np.isnan(y[self.label])
         # plot augmented data
-        augmented_kwargs = self.get_plt_kwargs(default=self.augmented_kwargs, **augmented_kwargs)
+        augmented_kwargs = AbstractManager.get_plt_kwargs(default_kwargs=self.augmented_kwargs, **augmented_kwargs)
         self._augmented_plot(aug=aug, **augmented_kwargs)
         plt.show()
 
@@ -433,7 +428,7 @@ class AbstractManager:
         :param kwargs:
             A dictionary of named `Data` arguments.
 
-        :returns:
+        :return:
             Either a dictionary for the metric values or a string representing the evaluation summary.
         """
         return metrics_summary(
@@ -457,7 +452,7 @@ class AbstractManager:
         :param kwargs:
             A dictionary of named `Data` arguments.
 
-        :returns:
+        :return:
             Either a dictionary for the metric values or a string representing the evaluation summary.
         """
         return metrics_summary(
@@ -478,7 +473,7 @@ class AbstractManager:
         :param return_type:
             Either 'str' to return the string, or 'dict' to return the dictionary.
 
-        :returns:
+        :return:
             Either a dictionary for the metric values or a string representing the evaluation summary.
         """
         return violations_summary(
@@ -508,7 +503,7 @@ class AbstractManager:
         print(self.metrics_summary(model=model, return_type='str', **kwargs))
         print(self.violations_summary(model=model, return_type='str'))
         # plot summary
-        kwargs = self.get_plt_kwargs(default=self.summary_kwargs, **kwargs)
+        kwargs = AbstractManager.get_plt_kwargs(default_kwargs=self.summary_kwargs, **kwargs)
         if do_plot:
             self._summary_plot(model=model, **kwargs)
             if model_name:

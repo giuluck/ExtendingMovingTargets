@@ -28,7 +28,7 @@ class SyntheticManager(AbstractManager):
         :param b:
             Either a single floating point value or a vector of floating point values representing the second feature.
 
-        :returns:
+        :return:
             Either a single floating point value or a vector of floating point values representing the function output.
         """
         a = a ** 3
@@ -51,7 +51,7 @@ class SyntheticManager(AbstractManager):
         :param testing_set:
             Whether or not to use test set sampling distributions when sampling the input features.
 
-        :returns:
+        :return:
             A tuple (x, y) containing the input data and the output labels.
         """
         a = rng.uniform(low=-1, high=1, size=n) if testing_set else rng.normal(scale=0.3, size=n).clip(min=-1, max=1)
@@ -70,7 +70,7 @@ class SyntheticManager(AbstractManager):
         :param extrapolation:
             Whether to consider a test set with border samples or with random samples (interpolation).
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         rng = np.random.default_rng(seed=0)

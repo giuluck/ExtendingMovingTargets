@@ -39,11 +39,11 @@ class WandBLogger(Logger):
         self._run_name: str = run_name
         """The Weights&Biases run name."""
 
-        self._config: Dict = wandb_kwargs
+        self.config: Dict = wandb_kwargs
         """The Weights&Biases run configuration."""
 
     def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        wandb.init(project=self._project, entity=self._entity, name=self._run_name, config=self._config)
+        wandb.init(project=self._project, entity=self._entity, name=self._run_name, config=self.config)
 
     def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                          **additional_kwargs):

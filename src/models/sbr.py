@@ -25,7 +25,7 @@ def hard_tanh(x, factor=10 ** 6):
     :param factor:
         The scaling factor.
 
-    :returns:
+    :return:
         An approximated sign function.
     """
     return k.tanh(factor * x)
@@ -78,7 +78,7 @@ class SBRBatchGenerator(Sequence):
     def __len__(self) -> int:
         """Necessary method for the Batch Generator.
 
-        :returns:
+        :return:
             The number of batches.
         """
         return len(self.batches)
@@ -89,7 +89,7 @@ class SBRBatchGenerator(Sequence):
         :param index:
             The batch index.
 
-        :returns:
+        :return:
             The index-th batch in the form of (<training_data>, (<ground_truths>, <monotonicities>)).
         """
         # x = first n columns, labels = second to last column, monotonicities = last column
@@ -175,7 +175,7 @@ class SBR(MLP):
         :param sign:
             Whether to minimize the loss (1) or to maximize it (-1) depending on the training step.
 
-        :returns:
+        :return:
             A tuple of the form (<total_loss>, <default_loss>, <regularizer_loss>), where the total loss is computed as:
             <total_loss> = <sign> * (<default_loss> + <alpha> * <regularizer_loss>)
         """
@@ -203,7 +203,7 @@ class SBR(MLP):
         :param d:
             The batch, having the form (<training_data>, (<ground_truths>, <monotonicities>)).
 
-        :returns:
+        :return:
             A dictionary containing the values of <alpha>, <total_loss>, <default_loss>, and <regularization_loss>.
         """
         # unpack training data
@@ -239,7 +239,7 @@ class SBR(MLP):
         :param d:
             The batch, having the form (<input_data>, <ground_truths>).
 
-        :returns:
+        :return:
             A dictionary containing the values of <test_loss>.
         """
         x, labels = d
@@ -302,7 +302,7 @@ class UnivariateSBR(SBR):
         :param sign:
             Whether to minimize the loss (1) or to maximize it (-1) depending on the training step.
 
-        :returns:
+        :return:
             A tuple of the form (<total_loss>, <default_loss>, <regularizer_loss>), where the total loss is computed as:
             <total_loss> = <sign> * (<default_loss> + <alpha> * <regularizer_loss>)
         """

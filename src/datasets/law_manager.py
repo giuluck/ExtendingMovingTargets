@@ -46,7 +46,7 @@ class LawManager(AbstractManager):
         :param train_fraction:
             The amount of total samples to be considered for training.
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         df = pd.read_csv(filepath)

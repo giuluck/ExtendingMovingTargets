@@ -27,7 +27,7 @@ class Metric:
         :param p:
             The vector of predictions.
 
-        :returns:
+        :return:
             The metric value.
         """
         pass

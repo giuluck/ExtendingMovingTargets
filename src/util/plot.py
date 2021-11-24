@@ -26,10 +26,10 @@ class ColorFader:
             - 'input', which clips the input values if they are outside the bounds.
             - 'output', which clips the output values if they are outside the bounds.
 
-        :raises `AssertionError`:
+        :raise `AssertionError`:
             If the passed number of colours is not a power of two.
 
-        :raises `AssertionError`:
+        :raise `AssertionError`:
             If 'error' is not in ['raise', 'input', 'output'].
         """
         assert np.log2(len(colours)) % 1 == 0, "Please provide a number of colors which is a power of two"
@@ -61,13 +61,13 @@ class ColorFader:
         :param vector:
             The vector of values to be interpolated.
 
-        :returns:
+        :return:
             An RGB colour.
 
-        :raises `AssertionError`:
+        :raise `AssertionError`:
             If the passed number of values has not the correct dimensions, i.e., log2(corners).
 
-        :raises `ValueError`:
+        :raise `ValueError`:
             If a value is out of bounds and error is set to 'raise'.
         """
         # handle user input

@@ -56,11 +56,11 @@ class FileLogger(Logger):
         self._logged_once: bool = False
         """An internal variable used to write the initial line separator."""
 
+    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         # reset file content for overwriting
         if self.filepath is not None:
-            open(filepath, 'w').close()
+            open(self.filepath, 'w').close()
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         self._write_on_file('START PROCESS', 'on_process_start')
 
     def on_process_end(self, macs, val_data: Optional[Dataset], **additional_kwargs):

@@ -11,7 +11,7 @@ if __name__ == '__main__':
             os.remove(f'./source/{filename}')
 
     # generate documentation .rst with sphinx-apidoc for each module
-    for module in ['moving_targets', 'src', 'test']:
+    for module in ['experimental', 'moving_targets', 'src', 'test']:
         os.system(f'sphinx-apidoc -e -T -M -d 8 -o .\\source ..\\{module}')
 
     # make html

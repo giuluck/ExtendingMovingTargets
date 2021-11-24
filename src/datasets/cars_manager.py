@@ -49,7 +49,7 @@ class CarsManager(AbstractManager):
         :param extrapolation:
             Whether to consider a test set with border samples or with random samples (interpolation).
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         df = pd.read_csv(filepath).replace({'.': np.nan})

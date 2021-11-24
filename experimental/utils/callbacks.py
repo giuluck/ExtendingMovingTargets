@@ -1,6 +1,6 @@
 """Moving Targets Callbacks."""
 
-from typing import List, Any, Dict, Union, Optional, Tuple
+from typing import List, Dict, Union, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,24 +14,62 @@ from src.datasets import RestaurantsManager, SyntheticManager
 from src.util.plot import ColorFader
 
 YInfo = Union[Vector, DataFrame]
+"""Data type for the output class or output info."""
 
 
-# noinspection PyMissingOrEmptyDocstring
 class AnalysisCallback(Callback):
+    """Template callback for results analysis and plotting."""
+
     PRETRAINING = 'PT'
+    """Pretraining iteration name."""
+
     MARKERS = dict(aug='o', label='X')
+    """Plot markers (a point for augmented data, a cross for original data)."""
 
     def __init__(self, num_columns: int = 5, sorting_attribute: object = None, file_signature: str = None,
-                 do_plot: bool = True, **kwargs):
+                 do_plot: bool = True, **plt_kwargs):
+        """
+        :param num_columns:
+            The number of columns of the subplot.
+
+        :param sorting_attribute:
+            Whether or not to sort attributes in a lexicographic order.
+
+        :param file_signature:
+            The filename and path where to store the output data, or None in case no output is required.
+
+            The filename must have no extension, as two different files will be stored (a .csv and a .txt file).
+
+        :param do_plot:
+            Whether or not to show the final plot.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
         super(AnalysisCallback, self).__init__()
+
         self.num_columns: int = num_columns
+        """The number of columns of the subplot."""
+
         self.sorting_attribute: object = sorting_attribute
+        """Whether or not to sort attributes in a lexicographic order."""
+
         self.file_signature: str = file_signature
+        """The filename and path where to store the output data, or None in case no output is required."""
+
         self.do_plot: bool = do_plot
-        self.plt_kwargs: Dict = {'figsize': (20, 10), 'tight_layout': True}
-        self.plt_kwargs.update(kwargs)
+        """Whether or not to show the final plot."""
+
         self.data: Optional[pd.DataFrame] = None
-        self.iterations: List[Any] = []
+        """The dataframe of logged values which will be eventually plotted or stored in the output files."""
+
+        self.iterations: List[Iteration] = []
+        """A list of ordered iteration names."""
+
+        self.plt_kwargs: Dict = {'figsize': (20, 10), 'tight_layout': True}
+        """Default arguments for `plt()` function."""
+
+        self.plt_kwargs.update(plt_kwargs)
 
     def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
@@ -70,21 +108,44 @@ class AnalysisCallback(Callback):
             ax = None
             for idx, it in enumerate(self.iterations):
                 ax = plt.subplot(num_rows, self.num_columns, idx + 1, sharex=ax, sharey=ax)
-                title = self.plot_function(it)
+                title = self._plot_function(it)
                 ax.set(xlabel='', ylabel='')
                 ax.set_title(f'{it})' if title is None else title)
             plt.show()
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
-        pass
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+        """Inner template method to build the plotting strategy.
+
+        :param iteration:
+            The iteration to plot.
+
+        :return:
+            An (optional) title of the subplot.
+        """
+        raise NotImplementedError("Please implement method '_plot_function'")
 
 
-# noinspection PyMissingOrEmptyDocstring
 class DistanceAnalysis(AnalysisCallback):
-    def __init__(self, ground_only: bool = True, num_columns=1, **kwargs):
-        super(DistanceAnalysis, self).__init__(num_columns=num_columns, **kwargs)
+    """Investigates the distance between ground truths, predictions, and the adjusted targets during iterations."""
+
+    def __init__(self, ground_only: bool = True, num_columns=1, **plt_kwargs):
+        """
+        :param ground_only:
+            Whether to consider ground data points only or augmented data points as well.
+
+        :param num_columns:
+            The number of columns of the subplot.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(DistanceAnalysis, self).__init__(num_columns=num_columns, **plt_kwargs)
+
         self.ground_only: bool = ground_only
+        """Whether to consider ground data points only or augmented data points as well."""
+
         self.y: Optional[str] = None
+        """The name of the output feature."""
 
     def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         self.y = y.name
@@ -103,7 +164,7 @@ class DistanceAnalysis(AnalysisCallback):
             self.data = self.data[self.data['mask'] == 'label']
         super(DistanceAnalysis, self).on_process_end(macs, val_data)
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         x = np.arange(len(self.data))
         y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         style = self.data['mask']
@@ -119,10 +180,18 @@ class DistanceAnalysis(AnalysisCallback):
         return f'{iteration}) pred. distance = {avg_pred_distance:.4f}, label distance = {avg_label_distance:.4f}'
 
 
-# noinspection PyMissingOrEmptyDocstring
 class BoundsAnalysis(AnalysisCallback):
-    def __init__(self, num_columns: int = 1, **kwargs):
-        super(BoundsAnalysis, self).__init__(num_columns=num_columns, **kwargs)
+    """Investigates the lower and upper bounds for each data point during the master step."""
+
+    def __init__(self, num_columns: int = 1, **plt_kwargs):
+        """
+        :param num_columns:
+            The number of columns of the subplot.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(BoundsAnalysis, self).__init__(num_columns=num_columns, **plt_kwargs)
 
     def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **additional_kwargs)
@@ -146,7 +215,7 @@ class BoundsAnalysis(AnalysisCallback):
         self.data[f'{label} lb {iteration}'] = self.data['lower'].map(lambda i: v[i].max() if len(i) > 0 else None)
         self.data[f'{label} ub {iteration}'] = self.data['higher'].map(lambda i: v[i].min() if len(i) > 0 else None)
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         x = np.arange(len(self.data))
         avg_bound = {}
         for label, color in dict(adj='blue', pred='red').items():
@@ -160,15 +229,28 @@ class BoundsAnalysis(AnalysisCallback):
         return f'{iteration}) ' + ', '.join([f'{k} bound = {v:.2f}' for k, v in avg_bound.items()])
 
 
-# noinspection PyMissingOrEmptyDocstring
 class CarsAdjustments(AnalysisCallback):
-    max_size = 50
-    alpha = 0.4
+    """Investigates Moving Targets adjustments during iterations in cars dataset."""
 
-    def __init__(self, plot_kind: str = 'scatter', **kwargs):
-        super(CarsAdjustments, self).__init__(**kwargs)
+    max_size = 50
+    """Max size of markers."""
+
+    alpha = 0.4
+    """Alpha channel value."""
+
+    def __init__(self, plot_kind: str = 'scatter', **plt_kwargs):
+        """
+        :param plot_kind:
+            Either 'line' for a line output prediction, or 'scatter' for scatter output predictions.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(CarsAdjustments, self).__init__(**plt_kwargs)
         assert plot_kind in ['line', 'scatter'], f"'{plot_kind}' is not a valid plot kind"
+
         self.plot_kind: str = plot_kind
+        """Either 'line' for a line output prediction, or 'scatter' for scatter output predictions."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
@@ -180,7 +262,7 @@ class CarsAdjustments(AnalysisCallback):
         self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
                                                              np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha
@@ -199,15 +281,25 @@ class CarsAdjustments(AnalysisCallback):
         return f'{iteration}) adj. mse = {np.square((adj - y).fillna(0)).mean():.4f}'
 
 
-# noinspection PyMissingOrEmptyDocstring
 class DefaultAdjustments(AnalysisCallback):
-    max_size = 30
-    alpha = 0.8
+    """Investigates Moving Targets adjustments during iterations in default dataset."""
 
-    def __init__(self, **kwargs):
-        super(DefaultAdjustments, self).__init__(**kwargs)
+    max_size = 30
+    """Max size of markers."""
+
+    alpha = 0.8
+    """Alpha channel value."""
+
+    def __init__(self, **plt_kwargs):
+        """
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(DefaultAdjustments, self).__init__(**plt_kwargs)
         married, payment = np.meshgrid([0, 1], np.arange(-2, 9))
+
         self.grid = pd.DataFrame.from_dict({'married': married.flatten(), 'payment': payment.flatten()})
+        """The explicit grid used to plot the outputs."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
@@ -220,7 +312,7 @@ class DefaultAdjustments(AnalysisCallback):
         self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
                                                              np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         y, adj = self.data['default'], self.data[f'adj {iteration}']
         label = 'default' if iteration == AnalysisCallback.PRETRAINING else f'adj {iteration}'
         data = self.data.astype({'married': int}).rename(columns={label: 'y', f'sw {iteration}': 'sw'})
@@ -234,16 +326,35 @@ class DefaultAdjustments(AnalysisCallback):
         return f'{iteration}) avg. flips = {np.abs(adj[~np.isnan(y)] - y[~np.isnan(y)]).mean():.4f}'
 
 
-# noinspection PyMissingOrEmptyDocstring
 class LawAdjustments(AnalysisCallback):
-    max_size = 40
+    """Investigates Moving Targets adjustments during iterations in law dataset."""
 
-    def __init__(self, res: int = 100, data_points: bool = True, **kwargs):
-        super(LawAdjustments, self).__init__(**kwargs)
+    max_size = 40
+    """Max size of markers."""
+
+    def __init__(self, res: int = 100, data_points: bool = True, **plt_kwargs):
+        """
+        :param res:
+            The meshgrid resolution.
+
+        :param data_points:
+            Whether or not to plot data points over the mesh plot.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+
+        super(LawAdjustments, self).__init__(**plt_kwargs)
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
+
         self.grid: pd.DataFrame = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
+        """The explicit grid used to plot the outputs."""
+
         self.res: int = res
+        """The meshgrid resolution."""
+
         self.data_points: bool = data_points
+        """Whether or not to plot data points over the mesh plot."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
@@ -258,7 +369,7 @@ class LawAdjustments(AnalysisCallback):
         self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
                                                              np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         # plot 3D response
         lsat = self.grid['lsat'].values.reshape(self.res, self.res)
         ugpa = self.grid['ugpa'].values.reshape(self.res, self.res)
@@ -272,44 +383,78 @@ class LawAdjustments(AnalysisCallback):
         return
 
 
-# noinspection PyMissingOrEmptyDocstring
 class LawResponse(AnalysisCallback):
-    def __init__(self, feature: str, res: int = 100, **kwargs):
-        super(LawResponse, self).__init__(**kwargs)
+    """Investigates marginal feature responses during iterations in law dataset."""
+
+    def __init__(self, feature: str, res: int = 100, **plt_kwargs):
+        """
+        :param feature:
+            The feature for which to plot the response, either 'lsat' or 'ugpa'.
+
+        :param res:
+            The meshgrid resolution.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(LawResponse, self).__init__(**plt_kwargs)
         assert feature in ['lsat', 'ugpa'], f"'{feature}' is not a valid feature"
         lsat, ugpa = np.meshgrid(np.linspace(0, 50, res), np.linspace(0, 4, res))
+
         self.grid: pd.DataFrame = pd.DataFrame.from_dict({'lsat': lsat.flatten(), 'ugpa': ugpa.flatten()})
+        """The explicit grid used to plot the outputs."""
+
         self.fader: ColorFader = ColorFader('red', 'blue', bounds=[0, 4] if feature == 'lsat' else [0, 50])
+        """The `ColorFader` object to show the responses."""
+
         self.features: Tuple[str, str] = ('lsat', 'ugpa') if feature == 'lsat' else ('ugpa', 'lsat')
+        """A tuple containing the two monotonic features, where the first one is the investigated feature while the
+        second one is used for grouping."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
         input_grid = self.grid[['lsat', 'ugpa']]
         self.grid[f'pred {iteration}'] = macs.predict(input_grid)
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         feat, group_feat = self.features
         for group_val, group in self.grid.groupby([group_feat]):
             sns.lineplot(data=group, x=feat, y=f'pred {iteration}', color=self.fader(group_val), alpha=0.6)
         return f'{iteration}) {feat.upper()}'
 
 
-# noinspection PyMissingOrEmptyDocstring
 class PuzzlesResponse(AnalysisCallback):
-    features = ['word_count', 'star_rating', 'num_reviews']
+    """Investigates marginal feature responses during iterations in puzzles dataset."""
 
-    def __init__(self, feature: str, res: int = 5, **kwargs):
-        super(PuzzlesResponse, self).__init__(**kwargs)
+    features = ['word_count', 'star_rating', 'num_reviews']
+    """Puzzles dataset monotonic features."""
+
+    def __init__(self, feature: str, res: int = 5, **plt_kwargs):
+        """
+        :param feature:
+            The feature for which to plot the response, either 'word_count', 'star_rating', or 'num_reviews'.
+
+        :param res:
+            The meshgrid resolution.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(PuzzlesResponse, self).__init__(**plt_kwargs)
         assert feature in self.features, f"'{feature}' is not a valid feature"
         grid = np.meshgrid(np.linspace(0, 230, res), np.linspace(0, 5, res), np.linspace(0, 70, res))
+
         self.grid: pd.DataFrame = pd.DataFrame.from_dict({k: v.flatten() for k, v in zip(self.features, grid)})
+        """The explicit grid used to plot the outputs."""
+
         self.feature: str = feature
+        """The feature for which to plot the response, either 'word_count', 'star_rating', or 'num_reviews'."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
         self.grid[f'pred {iteration}'] = macs.predict(self.grid[self.features])
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         fi, fj = [f for f in self.features if f != self.feature]
         li, ui = self.grid[fi].min(), self.grid[fi].max()
         lj, uj = self.grid[fj].min(), self.grid[fj].max()
@@ -320,23 +465,48 @@ class PuzzlesResponse(AnalysisCallback):
         return f'{iteration}) {self.feature.replace("_", " ").upper()}'
 
 
-# noinspection PyMissingOrEmptyDocstring
 class RestaurantsAdjustment(AnalysisCallback):
-    dollar_ratings = ['D', 'DD', 'DDD', 'DDDD']
-    max_size = 40
+    """Investigates Moving Targets adjustments during iterations in restaurants dataset."""
 
-    def __init__(self, rating: str, res: int = 100, data_points: bool = True, **kwargs):
-        super(RestaurantsAdjustment, self).__init__(**kwargs)
+    dollar_ratings = ['D', 'DD', 'DDD', 'DDDD']
+    """The four possible categories of dollar ratings."""
+
+    max_size = 40
+    """Max size of markers."""
+
+    def __init__(self, rating: str, res: int = 100, data_points: bool = True, **plt_kwargs):
+        """
+        :param rating:
+            The dollar rating to investigate.
+
+        :param res:
+            The meshgrid resolution.
+
+        :param data_points:
+            Whether or not to plot data points over the mesh plot.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(RestaurantsAdjustment, self).__init__(**plt_kwargs)
         assert rating in self.dollar_ratings, f"'{rating}' is not a valid dollar rating"
         ar, nr = np.meshgrid(np.linspace(1, 5, res), np.linspace(0, 200, res))
+
         self.grid: pd.DataFrame = RestaurantsManager.process_data(pd.DataFrame.from_dict({
             'avg_rating': ar.flatten(),
             'num_reviews': nr.flatten(),
             'dollar_rating': [rating] * len(ar.flatten())
         }))[0]
+        """The explicit grid used to plot the outputs."""
+
         self.res: int = res
+        """The meshgrid resolution."""
+
         self.rating: str = rating
+        """The dollar rating to investigate."""
+
         self.data_points: bool = data_points
+        """Whether or not to plot data points over the mesh plot."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
@@ -351,7 +521,7 @@ class RestaurantsAdjustment(AnalysisCallback):
         self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
                                                              np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         # plot 3D response
         ctr = self.grid[f'pred {iteration}'].values.reshape(self.res, self.res)
         avg_ratings = self.grid['avg_rating'].values.reshape(self.res, self.res)
@@ -365,10 +535,14 @@ class RestaurantsAdjustment(AnalysisCallback):
         return f'{iteration}) {self.rating}'
 
 
-# noinspection PyMissingOrEmptyDocstring
 class SyntheticAdjustments2D(AnalysisCallback):
+    """Investigates Moving Targets adjustments (on the monotonic feature) during iterations in synthetic dataset."""
+
     max_size = 30
+    """Max size of markers."""
+
     alpha = 0.4
+    """Alpha channel value."""
 
     def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data, **additional_kwargs)
@@ -386,8 +560,16 @@ class SyntheticAdjustments2D(AnalysisCallback):
         self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
                                                              np.where(self.data['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         def synthetic_inverse(column):
+            """Computes the value of the expected value of the 'a' feature given the output label.
+
+            :param column:
+                The output column (it can be the ground truth, a prediction, ...).
+
+            :return:
+                The expected value of the 'a' feature given the output label.
+            """
             b = np.sin(np.pi * (self.data['b'] - 0.01)) ** 2 + 1
             return (self.data[column] - b) * b
 
@@ -405,16 +587,34 @@ class SyntheticAdjustments2D(AnalysisCallback):
         return
 
 
-# noinspection PyMissingOrEmptyDocstring
 class SyntheticAdjustments3D(AnalysisCallback):
-    max_size = 40
+    """Investigates Moving Targets adjustments (on both the features) during iterations in synthetic dataset."""
 
-    def __init__(self, res: int = 100, data_points: bool = True, **kwargs):
-        super(SyntheticAdjustments3D, self).__init__(**kwargs)
+    max_size = 40
+    """Max size of markers."""
+
+    def __init__(self, res: int = 100, data_points: bool = True, **plt_kwargs):
+        """
+        :param res:
+            The meshgrid resolution.
+
+        :param data_points:
+            Whether or not to plot data points over the mesh plot.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(SyntheticAdjustments3D, self).__init__(**plt_kwargs)
         assert self.sorting_attribute is None, 'sorting_attribute must be None'
+
         self.res: int = res
+        """The meshgrid resolution."""
+
         self.data_points: bool = data_points
+        """Whether or not to plot data points over the mesh plot."""
+
         self.val: Optional[pd.DataFrame] = None
+        """The data values to be plotted."""
 
     def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
         super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data, **additional_kwargs)
@@ -434,7 +634,7 @@ class SyntheticAdjustments3D(AnalysisCallback):
         self.val[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
                                                             np.where(self.val['mask'] == 'label', 1, 0))
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         # plot 3D response
         ga = self.data['a'].values.reshape(self.res, self.res)
         gb = self.data['b'].values.reshape(self.res, self.res)
@@ -449,20 +649,32 @@ class SyntheticAdjustments3D(AnalysisCallback):
         return
 
 
-# noinspection PyMissingOrEmptyDocstring
 class SyntheticResponse(AnalysisCallback):
-    def __init__(self, res: int = 10, **kwargs):
-        super(SyntheticResponse, self).__init__(**kwargs)
+    """Investigates marginal feature responses during iterations in synthetic dataset."""
+
+    def __init__(self, res: int = 10, **plt_kwargs):
+        """
+        :param res:
+            The meshgrid resolution.
+
+        :param plt_kwargs:
+            Additional arguments for `plt()` function.
+        """
+        super(SyntheticResponse, self).__init__(**plt_kwargs)
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
+
         self.grid = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
+        """The explicit grid used to plot the outputs."""
+
         self.fader = ColorFader('red', 'blue', bounds=[-1, 1])
+        """The `ColorFader` object to show the responses."""
 
     def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
                         **additional_kwargs):
         input_grid = self.grid[['a', 'b']]
         self.grid[f'pred {iteration}'] = macs.predict(input_grid)
 
-    def plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Iteration) -> Optional[str]:
         for idx, group in self.grid.groupby('b'):
             label = f'b = {idx:.0f}' if idx in [-1, 1] else None
             sns.lineplot(data=group, x='a', y=f'pred {iteration}', color=self.fader(idx), alpha=0.4, label=label)

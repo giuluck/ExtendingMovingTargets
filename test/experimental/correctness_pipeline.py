@@ -1,7 +1,10 @@
 """Pipelines Correctness Tests (manual inspection of plots needed)."""
+import unittest
 from typing import Optional, Dict
 
-from test.experimental.abstract_pipeline import TestPipelines
+from test.experimental.abstract_pipeline import TestPipelines, EXPECTED_TESTS
+
+unittest.TestLoader.sortTestMethodsUsing = lambda self, t1, t2: EXPECTED_TESTS.index(t1) - EXPECTED_TESTS.index(t2)
 
 
 class TestCorrectness(TestPipelines):
@@ -32,8 +35,8 @@ class TestCorrectness(TestPipelines):
         # Runs tests for partial features (which are the only one supporting plots), i.e.:
         # > basic pair of tests for each dataset: explicit full grid and grid created with data augmentation
         tests_args = [dict(full_grid=True), dict(full_grid=False, grid_ground=self._grid_ground())]
-        # > 'synthetic' and 'restaurants' datasets do not accept 'full_features' parameter, the others do
-        if dataset not in ['synthetic', 'restaurants']:
+        # > 'synthetic', 'restaurants' and 'univariate' datasets do not accept 'full_features' parameter, the others do
+        if dataset not in ['synthetic', 'restaurants', 'cars univariate']:
             tests_args = [dict(full_features=False, **data_args) for data_args in tests_args]
         # at the end, run all tests
         for data_args in tests_args:

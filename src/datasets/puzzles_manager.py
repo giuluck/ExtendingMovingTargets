@@ -34,7 +34,7 @@ class PuzzlesManager(AbstractManager):
         :param extrapolation:
             Whether to consider a test set with border samples or with random samples (interpolation).
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         def _process(series: pd.Series) -> pd.Series:

@@ -15,7 +15,7 @@ class TestCvxpyLosses(TestLosses, unittest.TestCase):
     def _losses(self) -> LossesHandler:
         """The solver's losses.
 
-        :returns:
+        :return:
             Cvxpy's `LossesHandler` object.
         """
         return CvxpyMaster.losses

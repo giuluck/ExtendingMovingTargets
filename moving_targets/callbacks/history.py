@@ -42,10 +42,10 @@ class History(Logger):
             Number of columns in the final subplot.
 
         :param show:
-            Whether or not to call `matplotlib.pyplot.show()`.
+            Whether or not to call `plt()`.
 
         :param plt_kwargs:
-            Additional plot arguments to be passed to `matplotlib.pyplot.figure()`.
+            Additional plot arguments to be passed to `figure()`.
         """
         if not isinstance(self._history, pd.DataFrame):
             logging.warning('Process did not end correctly, therefore no dataframe can be plotted')

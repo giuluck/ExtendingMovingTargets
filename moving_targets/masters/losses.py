@@ -41,7 +41,7 @@ class SumLoss:
         :param sample_weight:
             The sample weights associated to each sample.
 
-        :returns:
+        :return:
             A real number representing the final loss.
         """
         # use uniform weights if none are passed, otherwise normalize the weights so that they sum to len(samples)
@@ -83,7 +83,7 @@ class MeanLoss(SumLoss):
         :param sample_weight:
             The sample weights associated to each sample.
 
-        :returns:
+        :return:
             A real number representing the final loss.
         """
         return super(MeanLoss, self).__call__(
@@ -123,7 +123,7 @@ class IntMeanLoss(MeanLoss):
         :param sample_weight:
             The sample weights associated to each sample.
 
-        :returns:
+        :return:
             A real number representing the final loss.
         """
         int_numeric_variables: Vector = np.array(numeric_variables).astype(int)
@@ -172,7 +172,7 @@ class ClippedMeanLoss(MeanLoss):
         :param sample_weight:
             The sample weights associated to each sample.
 
-        :returns:
+        :return:
             A real number representing the final loss.
         """
         numeric_variables = np.clip(numeric_variables.astype(float), a_min=self._clip_value, a_max=1 - self._clip_value)
@@ -280,7 +280,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the absolute error loss as created by the solver.
         """
         lb = numeric_variable - model_variable.ub
@@ -300,7 +300,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the squared error loss as created by the solver.
         """
         return (numeric_variable - model_variable) ** 2
@@ -317,7 +317,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the binary hamming distance as created by the solver.
         """
         # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
@@ -336,7 +336,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the binary crossentropy loss as created by the solver.
         """
         # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
@@ -358,7 +358,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the reversed binary crossentropy loss as created by the solver.
         """
         # do not leverage _reversed_categorical_crossentropy to avoid Gurobi error "LinExpr has no attribute 'lb'"
@@ -379,7 +379,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the symmetric binary crossentropy loss as created by the solver.
         """
         bce = self._binary_crossentropy(model, numeric_variable, model_variable)
@@ -399,7 +399,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the categorical hamming distance as created by the solver.
         """
         return 1 - model_variable[numeric_variable]
@@ -416,7 +416,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the categorical crossentropy loss as created by the solver.
         """
         return self._sum_fn(model, -model_variable * np.log(numeric_variable))
@@ -433,7 +433,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the reversed categorical crossentropy loss as created by the solver.
         """
 
@@ -455,7 +455,7 @@ class LossesHandler:
         :param model_variable:
             The solver variables.
 
-        :returns:
+        :return:
             The expression of the symmetric categorical crossentropy loss as created by the solver.
         """
         cce = self._categorical_crossentropy(model, numeric_variable, model_variable)

@@ -62,7 +62,7 @@ class CvxpyMaster(Master, ABC):
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             The output of the `self.return_solutions()` method.
         """
         # build model and get losses

@@ -36,7 +36,7 @@ class RegressionMetric(Metric):
         :param p:
             The vector of predictions.
 
-        :returns:
+        :return:
             The metric value.
         """
         return self.metric_function(y, p)

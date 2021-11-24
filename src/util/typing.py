@@ -32,10 +32,10 @@ It can be either a single `Method`, a list of them, or a dictionary where each m
 """
 
 Figsize = Optional[Tuple[int, int]]
-"""The figsize used in `matplotlib.pyplot.show()` method."""
+"""The figsize used in `plt()` method."""
 
 TightLayout = Optional[bool]
-"""The tight_layout used in `matplotlib.pyplot.show()` method."""
+"""The tight_layout used in `plt()` method."""
 
 Rng = Any
 """Random Number Generator type."""

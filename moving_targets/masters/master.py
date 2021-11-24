@@ -15,8 +15,8 @@ class Master:
         :param beta:
             The non-negative real number which is used to constraint the p_loss in the beta step.
 
-        :raises:
-            `AssertionError` if alpha or beta are negative.
+        :raise `AssertionError`:
+            If alpha or beta are negative.
         """
         super(Master, self).__init__()
         assert alpha >= 0, f"'alpha' should be a non-negative number, but it is {alpha}"
@@ -46,7 +46,7 @@ class Master:
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             Any object containing information that may be useful in other methods.
         """
         raise NotImplementedError("Please implement method 'build_model'")
@@ -72,7 +72,7 @@ class Master:
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             Whether to use or not the beta step during the current iteration.
         """
         return False
@@ -98,7 +98,7 @@ class Master:
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             A real number representing the y_loss.
         """
         return 0.0
@@ -124,7 +124,7 @@ class Master:
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             A real number representing the p_loss.
         """
         return 0.0
@@ -150,7 +150,7 @@ class Master:
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             Either a simple vector of adjusted targets or a tuple containing the vector and a dictionary of kwargs.
         """
         raise NotImplementedError("Please implement method 'return_solutions'")
@@ -171,7 +171,7 @@ class Master:
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             The vector of adjusted targets, potentially with some additional information.
         """
         raise NotImplementedError("Please implement method 'adjust_targets'")

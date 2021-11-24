@@ -28,7 +28,7 @@ class ScikitLearner(Learner):
         :param x:
             The input samples.
 
-        :returns:
+        :return:
             The predicted labels.
         """
         return self.model.predict(x)
@@ -47,7 +47,7 @@ class ScikitClassifier(ScikitLearner):
         :param x:
             The input samples.
 
-        :returns:
+        :return:
             The predicted probabilities.
         """
         return self.model.predict_proba(x)

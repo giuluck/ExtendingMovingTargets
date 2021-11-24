@@ -5,7 +5,7 @@ import os
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from experimental.utils import DatasetFactory
+from experimental.utils.factories import DatasetFactory
 
 if __name__ == '__main__':
     datasets = DatasetFactory()

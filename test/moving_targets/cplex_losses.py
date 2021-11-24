@@ -15,7 +15,7 @@ class TestCplexLosses(TestLosses, unittest.TestCase):
     def _losses(self):
         """The solver's losses.
 
-        :returns:
+        :return:
             Cplex's `LossesHandler` object.
         """
         return CplexMaster.losses

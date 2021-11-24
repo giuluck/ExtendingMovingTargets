@@ -69,7 +69,7 @@ class BalancedCounts(CplexMaster):
         :param iteration:
             The current `MACS` iteration, usually a number (unused).
 
-        :returns:
+        :return:
             A tuple containing:
 
             1. the list of model variables;
@@ -130,7 +130,7 @@ class BalancedCounts(CplexMaster):
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             A boolean value that decides whether or not to use the beta step during the current iteration.
         """
         _, pred, _, max_count = model_info
@@ -186,7 +186,7 @@ class BalancedCounts(CplexMaster):
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             A real number representing the categorical hamming distance/crossentropy loss.
         """
         variables, pred, prob, _ = model_info
@@ -224,7 +224,7 @@ class BalancedCounts(CplexMaster):
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             The vector of adjusted targets returned by the optimization model.
         """
         variables, _, _, _ = model_info

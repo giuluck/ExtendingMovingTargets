@@ -25,7 +25,7 @@ class TestCustomScalers(unittest.TestCase):
             The scaling method, either 'norm' or 'std'.
 
         :param kwargs:
-            Additional parameters to be passed to `pandas.read_csv()` method.
+            Additional parameters to be passed to `read_csv()` method.
         """
         try:
             # load dataframe

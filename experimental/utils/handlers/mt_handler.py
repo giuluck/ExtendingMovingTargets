@@ -16,8 +16,9 @@ from src.util.dictionaries import merge_dictionaries
 from src.util.typing import Augmented
 
 
-# noinspection PyMissingOrEmptyDocstring
 class MTHandler(AbstractHandler):
+    """Moving Targets Model Handler."""
+
     def __init__(self,
                  manager: AbstractManager,
                  model: Optional[str] = None,
@@ -57,6 +58,133 @@ class MTHandler(AbstractHandler):
                  plt_figsize=(20, 10),
                  plt_num_columns=4,
                  **mst_kwargs):
+        """
+        :param manager:
+            The dataset manager.
+
+        :param loss:
+            The neural network loss function.
+
+        :param model:
+            The machine learning model name.
+
+        :param dataset:
+            The dataset name.
+
+        :param wandb_name:
+            The Weights&Biases run name. If None, no Weights&Biases instance is created.
+
+        :param wandb_project:
+            The Weights&Biases project name. If wandb_name is None, this is ignored.
+
+        :param wandb_entity:
+            The Weights&Biases entity name. If wandb_name is None, this is ignored.
+
+        :param wandb_config:
+            The Weights&Biases configuration function which is in charge of returning the configuration dictionary.
+
+        :param seed:
+            The random seed.
+
+        :param aug_num_augmented:
+            The number of augmented samples.
+
+        :param aug_num_random:
+            The number of unlabelled random samples added to the original dataset.
+
+        :param aug_num_ground:
+            The number of samples taken from the original dataset (the remaining ones are ignored).
+
+        :param mnt_kind:
+            The monotonicity computation modality:
+
+            - 'ground', which computes the monotonicity within each subgroup respectively to the ground index only.
+            - 'group', which computes the monotonicity within each subgroup between each pair in the subgroup.
+            - 'all', which computes the monotonicity between each pair in the whole dataset (very slow).
+
+        :param mnt_errors:
+            Error strategy when dropping columns due to monotonicity computation.
+
+        :param mt_iterations:
+            The number of Moving Targets iterations.
+
+        :param mt_init_step:
+            The Moving Targets initial step, either 'pretraining' or 'projection'.
+
+        :param mt_metrics:
+            A list of `Metric` instances to evaluate the final MT solution.
+
+        :param mt_verbose:
+            Either a boolean or an int representing the verbosity value, such that:
+
+            - `0` or `False` create no logger;
+            - `1` creates a simple console logger with elapsed time only;
+            - `2` or `True` create a more complete console logger with cached data at the end of each iterations.
+
+        :param lrn_loss:
+            The learner loss function.
+
+        :param lrn_optimizer:
+            The learner optimizer.
+
+        :param lrn_output_act:
+        The learner output activation.
+
+        :param lrn_h_units:
+        The list of learner hidden units.
+
+        :param lrn_epochs:
+        The number of learner's training epochs.
+
+        :param lrn_batch_size:
+        The batch size for the learner's training.
+
+        :param lrn_verbose:
+        Whether or not to print information during the learner's training.
+
+        :param lrn_early_stop:
+            An (optional) `EarlyStopping` object for the learner.
+
+        :param lrn_warm_start:
+            Whether or not to restart the learner's weight after each moving_targets iteration.
+
+        :param mst_master_kind:
+            The Moving Targets' master kind, either 'regression' or 'classification'.
+
+        :param mst_backend:
+            The backend solver for the master problem.
+
+        :param mst_loss_fn:
+            The master's loss function.
+
+        :param mst_alpha:
+            The non-negative real number which is used to calibrate the two losses in the master's alpha step.
+
+        :param mst_beta:
+            The non-negative real number which is used to constraint the p_loss in the master's beta step.
+
+        :param mst_learner_weights:
+            The master's learner weights policy, either 'all' or 'infeasible'.
+
+        :param mst_learner_omega:
+            Real number that decides the weight of augmented samples during the learning step.
+
+        :param mst_master_omega:
+            Real number that decides the weight of augmented samples during the master step.
+
+        :param mst_eps:
+            The slack value under which a violation is considered to be acceptable in the master step.
+
+        :param plt_figsize:
+            The figsize parameter passed to `plt()`.
+
+        :param plt_num_columns:
+            The number of columns of the subplot.
+
+        :param mst_kwargs:
+            Any other specific argument to be passed to the super class (i.e., `CplexMaster`, `GurobiMaster`, or
+            `CvxpyMaster` depending on the chosen backend).
+        """
         super(MTHandler, self).__init__(manager=manager,
                                         model=model,
                                         dataset=dataset,
@@ -65,19 +193,36 @@ class MTHandler(AbstractHandler):
                                         wandb_entity=wandb_entity,
                                         wandb_config=wandb_config,
                                         seed=seed)
+        self.master_class = None
+        """The Moving Targets' master kind, either 'regression' or 'classification'."""
+
         if mst_master_kind in ['cls', 'classification']:
             self.master_class: Type[MTMaster] = MTClassificationMaster
         elif mst_master_kind in ['reg', 'regression']:
             self.master_class: Type[MTMaster] = MTRegressionMaster
         else:
             raise ValueError(f"'{mst_master_kind}' is not a valid master kind")
+
         self.iterations: int = mt_iterations
+        """The number of Moving Targets iterations."""
+
         self.init_step: str = mt_init_step
+        """The Moving Targets initial step, either 'pretraining' or 'projection'."""
+
         self.metrics: Optional[List[Metric]] = [] if mt_metrics is None else mt_metrics
+        """A list of `Metric` instances to evaluate the final Moving Targets solution."""
+
         self.verbose: Union[bool, int] = mt_verbose
-        self.aug_args: Dict = dict(num_random=aug_num_random, num_ground=aug_num_ground,
+        """Either a boolean or an int representing the verbosity value."""
+
+        self.aug_args: Dict = dict(num_random=aug_num_random,
+                                   num_ground=aug_num_ground,
                                    num_augmented=aug_num_augmented)
+        """Arguments to be passed to the method `AbstractManager.get_augmented_data()`."""
+
         self.mono_args: Dict = dict(kind=mnt_kind, errors=mnt_errors)
+        """Arguments to be passed to the method `get_monotonicities_list()`."""
+
         self.learner_args: Dict = dict(
             loss=lrn_loss,
             optimizer=lrn_optimizer,
@@ -89,8 +234,11 @@ class MTHandler(AbstractHandler):
             callbacks=[] if lrn_early_stop is None else [lrn_early_stop],
             warm_start=lrn_warm_start
         )
+        """Arguments to be passed to the `MTLearner` constructor."""
+
         if mst_loss_fn != 'default':
             mst_kwargs['loss_fn'] = mst_loss_fn
+
         self.master_args: Dict = dict(
             backend=mst_backend,
             alpha=mst_alpha,
@@ -101,7 +249,10 @@ class MTHandler(AbstractHandler):
             eps=mst_eps,
             **mst_kwargs
         )
+        """Arguments to be passed to the `MTMaster` constructor."""
+
         self.plot_args: Dict = dict(figsize=plt_figsize, num_columns=plt_num_columns)
+        """Arguments passed to the method `History.plot()`."""
 
     def _fit(self, fold: Fold, iterations: int, metrics: bool, callbacks: List[Callback],
              verbose: Union[bool, int]) -> Tuple[MT, History]:
@@ -147,6 +298,32 @@ class MTHandler(AbstractHandler):
                    callbacks: Optional[List[Callback]] = None,
                    plot_args: Dict = None,
                    summary_args: Dict = None):
+        """Builds a more controllable Moving Targets experiment with custom callbacks and plots.
+
+        :param iterations:
+            Custom number of Moving Targets' iterations that overwrites the default operation if not None.
+
+        :param num_folds:
+            The number of folds. If None, train/test split only is performed.
+
+        :param folds_index:
+            The list of folds index to be validated. If None, all of them are validated.
+
+        :param fold_verbosity:
+            How much information about the k-fold cross-validation process to print.
+
+        :param model_verbosity:
+            How much information about the Moving Targets process to print.
+
+        :param callbacks:
+            List of `Callback` object for the Moving Targets process.
+
+        :param plot_args:
+            Arguments passed to the method `History.plot()`.
+
+        :param summary_args:
+            The dictionary of arguments for the evaluation summary.
+        """
         callbacks = [] if callbacks is None else callbacks
         iterations = self.iterations if iterations is None else iterations
         fold_verbosity = False if num_folds is None or num_folds == 1 else fold_verbosity
@@ -164,7 +341,7 @@ class MTHandler(AbstractHandler):
             # handle wandb callback
             for c in callbacks:
                 if isinstance(c, WandBLogger):
-                    c._config['fold'] = i
+                    c.config['fold'] = i
             # fit model
             model, history = self._fit(fold=fold, iterations=iterations, metrics=True,
                                        callbacks=callbacks, verbose=model_verbosity)

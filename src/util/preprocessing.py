@@ -46,7 +46,7 @@ class Scaler:
         :param data:
             The matrix/dataframe of samples.
 
-        :returns:
+        :return:
             The scaler itself.
         """
         # handle non-pandas data
@@ -91,7 +91,7 @@ class Scaler:
         :param data:
             The matrix/dataframe of samples.
 
-        :returns:
+        :return:
             The scaled data.
         """
         return (data - self._translation) / self._scaling
@@ -102,7 +102,7 @@ class Scaler:
         :param data:
             The matrix/dataframe of samples.
 
-        :returns:
+        :return:
             The scaled data.
         """
         return self.fit(data).transform(data)
@@ -113,7 +113,7 @@ class Scaler:
         :param data:
             The previously scaled matrix/dataframe of samples.
 
-        :returns:
+        :return:
             The original data.
         """
         return (data * self._scaling) + self._translation
@@ -125,7 +125,7 @@ class Scaler:
         :param num_features:
             The number of features.
 
-        :returns:
+        :return:
             A blank scaler.
         """
         return Scaler(methods=None).fit(data=[[0.] * num_features])
@@ -139,7 +139,7 @@ SplitArgs = Union[Matrix, Vector]
 """Either a `Matrix` or a `Vector` that needs to be split into train/test."""
 
 ValidationArgs = Union[pd.DataFrame, pd.Series]
-"""Either a `pandas.DataFrame` or a `pandas.Series` that needs to be split for cross-validation."""
+"""Either a `DataFrame` or a `Series` that needs to be split for cross-validation."""
 
 
 def split_dataset(*dataset: SplitArgs,
@@ -172,7 +172,7 @@ def split_dataset(*dataset: SplitArgs,
     :param stratify:
         If not None, data is split in a stratified fashion, using this as the class labels.
 
-    :returns:
+    :return:
         A dictionary of datasets.
     """
     val_size = test_size if val_size is None else val_size
@@ -231,7 +231,7 @@ def cross_validate(*dataset: ValidationArgs,
     :param stratify:
         Either None (no stratification) or the vector of labels.
 
-    :returns:
+    :return:
         A list of dictionaries of datasets.
     """
     kf = KFold if stratify is None else StratifiedKFold

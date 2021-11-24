@@ -121,7 +121,7 @@ class MTLearner(Learner):
         :param x:
             The matrix/dataframe of input samples.
 
-        :returns:
+        :return:
             The vector of predicted labels.
         """
         return self.model.predict(x).flatten()
@@ -179,13 +179,13 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         """
         assert eps >= 0, f"'eps' must be non-negative, but value {eps} was passed"
         if backend == 'cplex':
-            super(MTMaster, self).__init__(alpha=alpha, beta=beta, **backend_kwargs)
+            super(MTMaster, self).__init__(alpha=alpha, beta=beta or 0.0, **backend_kwargs)
             losses = CplexMaster.losses
         elif backend == 'gurobi':
-            super(CplexMaster, self).__init__(alpha=alpha, beta=beta, **backend_kwargs)
+            super(CplexMaster, self).__init__(alpha=alpha, beta=beta or 0.0, **backend_kwargs)
             losses = GurobiMaster.losses
         elif backend == 'cvxpy':
-            super(GurobiMaster, self).__init__(alpha=alpha, beta=beta, **backend_kwargs)
+            super(GurobiMaster, self).__init__(alpha=alpha, beta=beta or 0.0, **backend_kwargs)
             losses = CvxpyMaster.losses
         else:
             raise ValueError(f"'{backend}' is not a supported backend.")
@@ -257,7 +257,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param y:
             The vector of training labels.
 
-        :returns:
+        :return:
             A vector of variables as in the solver (i.e., Cplex, Gurobi, Cvxpy).
         """
         raise NotImplementedError("Please implement method 'build_variables'")
@@ -271,7 +271,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param x:
             The matrix/dataframe of training samples.
 
-        :returns:
+        :return:
             The vector of predictions as floating point values.
         """
         return macs.predict(x)
@@ -295,7 +295,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param iteration:
             The current `MACS` iteration, usually a number (unused).
 
-        :returns:
+        :return:
             A tuple containing the vector of solver variables and the learner's predictions (None if not fitted yet).
         """
         self._start_time = time.time()
@@ -322,7 +322,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param compatibility_kwargs:
             Ignored additional arguments maintained for compatibility.
 
-        :returns:
+        :return:
             True if the beta step is allowed and the predictions do not violate any monotonicity, False otherwise.
         """
         _, pred = model_info
@@ -346,7 +346,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param compatibility_kwargs:
             Ignored additional arguments maintained for compatibility.
 
-        :returns:
+        :return:
             The y_loss, computed using the routine function `self.y_loss_fn`.
         """
         mask = ~np.isnan(y)
@@ -369,7 +369,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param compatibility_kwargs:
             Ignored additional arguments maintained for compatibility.
 
-        :returns:
+        :return:
             The y_loss, computed using the routine function `self.p_loss_fn`.
         """
         var, pred = model_info
@@ -391,7 +391,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param compatibility_kwargs:
             Ignored additional arguments maintained for compatibility.
 
-        :returns:
+        :return:
             A tuple containing the adjusted labels and a dictionary of the form {'sample_weights': <sample_weights>}.
         """
         var, pred = model_info
@@ -435,7 +435,7 @@ class MTMaster(CplexMaster, GurobiMaster, CvxpyMaster):
         :param iteration:
             The current `MACS` iteration, usually a number.
 
-        :returns:
+        :return:
             The output of the `self.return_solutions()` method.
         """
         if self.backend == 'cplex':
@@ -532,7 +532,7 @@ class MTRegressionMaster(MTMaster):
         :param y:
             The vector of training labels.
 
-        :returns:
+        :return:
             A vector of variables as in the solver (i.e., Cplex, Gurobi, Cvxpy).
         """
         var = None
@@ -662,7 +662,7 @@ class MTClassificationMaster(MTMaster):
         :param y:
             The vector of training labels.
 
-        :returns:
+        :return:
             A vector of variables as in the solver (i.e., Cplex, Gurobi, Cvxpy).
         """
         var = None
@@ -691,7 +691,7 @@ class MTClassificationMaster(MTMaster):
         :param x:
             The matrix/dataframe of training samples.
 
-        :returns:
+        :return:
             The vector of predictions as floating point values.
         """
         p = macs.predict(x)

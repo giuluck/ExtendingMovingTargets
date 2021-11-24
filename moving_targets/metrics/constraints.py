@@ -36,7 +36,7 @@ class ClassFrequenciesStd(Metric):
         :param p:
             The vector of predictions.
 
-        :returns:
+        :return:
             The metric value.
         """
         # bincount is similar to np.unique(..., return_counts=True) but allows to fix a minimum number of classes
@@ -107,7 +107,7 @@ class MonotonicViolation(Metric):
         :param p:
             The vector of predictions.
 
-        :returns:
+        :return:
             The metric value.
         """
         violations = np.array([0]) if len(self.higher_ind) == 0 else p[self.lower_ind] - p[self.higher_ind]

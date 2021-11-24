@@ -35,7 +35,7 @@ def metrics_summary(model,
         A dictionary of named `Data` arguments, where the name of the argument represents the data split and the value
         is a tuple (<input_data>, <ground_truths>), e.g., "train=(x, y)".
 
-    :returns:
+    :return:
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
     summary = {}
@@ -69,7 +69,7 @@ def violations_summary(model,
     :param return_type:
         Either 'str' to return the string, or 'dict' to return the dictionary.
 
-    :returns:
+    :return:
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
     p = model.predict(inputs).astype(np.float64)

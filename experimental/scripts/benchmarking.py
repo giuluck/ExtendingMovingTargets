@@ -9,7 +9,7 @@ import time
 import shutil
 from typing import Dict, List
 
-from experimental.utils import DatasetFactory
+from experimental.utils.factories import DatasetFactory
 from experimental.utils.handlers import default_config, AbstractHandler
 
 if __name__ == '__main__':
@@ -79,6 +79,7 @@ if __name__ == '__main__':
 
     default_full, _ = DatasetFactory().default(data_args=dict(full_features=True, full_grid=False))
     default_slim, _ = DatasetFactory().default(data_args=dict(full_features=False, full_grid=False))
+    # noinspection DuplicatedCode
     _study([
         default_full.get_mlp(wandb_name='MLP', wandb_project=WANDB_PROJECT, wandb_config=_full_config),
         default_full.get_sbr(wandb_name='SBR', wandb_project=WANDB_PROJECT, wandb_config=_full_config),
@@ -89,6 +90,7 @@ if __name__ == '__main__':
 
     law_full, _ = DatasetFactory().law(data_args=dict(full_features=True, full_grid=False))
     law_slim, _ = DatasetFactory().law(data_args=dict(full_features=False, full_grid=False))
+    # noinspection DuplicatedCode
     _study([
         law_full.get_mlp(wandb_name='MLP', wandb_project=WANDB_PROJECT, wandb_config=_full_config),
         law_full.get_sbr(wandb_name='SBR', wandb_project=WANDB_PROJECT, wandb_config=_full_config),

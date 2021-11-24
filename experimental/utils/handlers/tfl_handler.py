@@ -1,9 +1,9 @@
 """Tensorflow Lattice Handler."""
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional, Callable
 
 import tensorflow_lattice as tfl
 
-from experimental.utils.handlers import AbstractHandler, Fold
+from experimental.utils.handlers import AbstractHandler, Fold, default_config
 from src.datasets import AbstractManager, CarsManager, DefaultManager, LawManager, PuzzlesManager, RestaurantsManager, \
     SyntheticManager
 from src.models import TFL, ColumnInfo
@@ -12,6 +12,8 @@ from src.util.preprocessing import Scaler
 
 # noinspection PyMissingOrEmptyDocstring
 class TFLHandler(AbstractHandler):
+    """Tensorflow Lattice Model Handler."""
+
     DATASETS_INFO: Dict = {
         CarsManager: ('numeric', 'regression'),
         SyntheticManager: ('numeric', 'regression'),
@@ -20,9 +22,22 @@ class TFLHandler(AbstractHandler):
         LawManager: ('numeric', 'binary'),
         RestaurantsManager: ('categorical_restaurants', 'binary')
     }
+    """Dictionary that associates to each dataset the kind of monotonicity and the kind of task."""
 
     @staticmethod
     def get_features(columns: List[str], manager: AbstractManager) -> List[ColumnInfo]:
+        """Extracts the features from a dataset manager.
+
+        :param columns:
+            The input columns of the dataset.
+
+        :param manager:
+            The dataset manager.
+
+        :return:
+            A list of `ColumnInfo` object containing the information about each feature of the dataset and how to deal
+            with its monotonicities and other lattice parameters.
+        """
         expected = list(manager.directions.keys())
         assert set(expected) <= set(columns), f"some of the expected columns {expected} are not present in {columns}"
         # handle categorical features (formatted as "<category_name>: <category_value>")
@@ -56,14 +71,62 @@ class TFLHandler(AbstractHandler):
 
     def __init__(self,
                  manager: AbstractManager,
+                 model: Optional[str] = None,
+                 dataset: Optional[str] = None,
+                 wandb_name: Optional[str] = None,
+                 wandb_project: Optional[str] = 'moving_targets',
+                 wandb_entity: Optional[str] = 'giuluck',
+                 wandb_config: Callable = default_config,
+                 seed: int = 0,
                  optimizer: str = 'Adam',
                  epochs: int = 1000,
-                 batch_size: int = 32,
-                 **kwargs):
-        super(TFLHandler, self).__init__(manager=manager, **kwargs)
+                 batch_size: int = 32):
+        """
+        :param manager:
+            The dataset manager.
+
+        :param model:
+            The machine learning model name.
+
+        :param dataset:
+            The dataset name.
+
+        :param wandb_name:
+            The Weights&Biases run name. If None, no Weights&Biases instance is created.
+
+        :param wandb_project:
+            The Weights&Biases project name. If wandb_name is None, this is ignored.
+
+        :param wandb_entity:
+            The Weights&Biases entity name. If wandb_name is None, this is ignored.
+
+        :param wandb_config:
+            The Weights&Biases configuration function which is in charge of returning the configuration dictionary.
+
+        :param seed:
+            The random seed.
+
+        :param optimizer:
+            The name of the tensorflow lattice optimizer.
+
+        :param epochs:
+            The number of training epochs.
+
+        :param batch_size:
+            The batch size for neural network training.
+        """
+        super(TFLHandler, self).__init__(manager=manager, model=model, dataset=dataset, wandb_name=wandb_name,
+                                         wandb_project=wandb_project, wandb_entity=wandb_entity,
+                                         wandb_config=wandb_config, seed=seed)
+
         self.optimizer: str = optimizer
+        """The name of the tensorflow lattice optimizer."""
+
         self.epochs: int = epochs
+        """The number of training epochs."""
+
         self.batch_size: int = batch_size
+        """The batch size for neural network training."""
 
     def fit(self, fold: Fold) -> Any:
         # RETRIEVE INFO BASED ON DATASET

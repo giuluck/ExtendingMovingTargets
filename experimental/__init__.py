@@ -1,3 +1,3 @@
-"""__init__.py file for experimental package."""
+"""Utilities and scripts to run experiments."""
 
-from experimental import utils
+from experimental import utils, scripts

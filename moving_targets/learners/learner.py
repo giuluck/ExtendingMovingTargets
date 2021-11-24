@@ -36,7 +36,7 @@ class Learner:
         :param x:
             The matrix/dataframe of input samples.
 
-        :returns:
+        :return:
             The vector of predicted labels.
         """
         raise NotImplementedError("Please implement method 'predict'")

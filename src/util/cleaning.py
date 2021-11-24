@@ -33,7 +33,7 @@ def clean_dataframe(df: pd.DataFrame, info: Dict[str, FeatureInfo]) -> pd.DataFr
     :param info:
         The dictionary of metadata associated to each feature (the key of the dictionary).
 
-    :returns:
+    :return:
         The cleansed dataset, with columns ordered as in info.
     """
     df = df[[k for k in info.keys()]]

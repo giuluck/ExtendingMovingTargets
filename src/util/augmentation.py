@@ -33,8 +33,8 @@ def augment_data(x: pd.DataFrame,
         f(<x>, <y>) -> <monotonicities_matrix> that computes pairwise expected monotonicities between two vectors <x>
         and <y> (with size <n> and <m>, respectively) and stores them in a matrix having shape (<n>, <m>).
 
-    :returns:
-        A tuple of augmented inputs/labels. The labels are no more in form of a vector, but rather a `pandas.DataFrame`
+    :return:
+        A tuple of augmented inputs/labels. The labels are no more in form of a vector, but rather a `DataFrame`
         with two additional features: 'ground_index' and 'monotonicity' (wrt the ground index).
     """
     x, y = x.reset_index(drop=True), y.reset_index(drop=True)
@@ -90,7 +90,7 @@ def compute_numeric_monotonicities(samples: np.ndarray,
     :param eps:
         The slack value under which a violation is considered to be acceptable.
 
-    :returns:
+    :return:
         A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled with
         -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
     """
@@ -141,7 +141,7 @@ def get_monotonicities_list(data: pd.DataFrame,
     :param errors:
         Pandas argument that sets the behaviour in case a non present column is being dropped.
 
-    :returns:
+    :return:
         A list of tuples where the first element is the higher index and the second element is the lower one.
     """
     higher_indices, lower_indices = [], []

@@ -42,7 +42,7 @@ class TFL:
         :param input_fn_kwargs:
             Arguments for the method `tf.compat.v1.estimator.inputs.pandas_input_fn()` (e.g., batch size, num_epochs).
 
-        :returns:
+        :return:
             A callable function that processes the input data.
         """
         return tf.compat.v1.estimator.inputs.pandas_input_fn(x=x, y=y, shuffle=False, **input_fn_kwargs)
@@ -164,7 +164,7 @@ class TFL:
             Arguments for the `input_fn` function, which eventually passes them to the method
             `tf.compat.v1.estimator.inputs.pandas_input_fn()` (e.g., batch_size, num_epochs, ...)
 
-        :returns:
+        :return:
             The vector of predictions.
         """
         assert self._model is not None, "model has not been built yet, please call model.build()"

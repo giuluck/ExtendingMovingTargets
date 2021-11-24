@@ -49,7 +49,7 @@ class ClassificationMetric(Metric):
         :param p:
             The vector of predictions.
 
-        :returns:
+        :return:
             The metric value.
         """
         # HANDLE EXPLICIT CLASSES

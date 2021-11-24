@@ -62,7 +62,7 @@ class DefaultManager(AbstractManager):
         :param train_fraction:
             The amount of total samples to be considered for training.
 
-        :returns:
+        :return:
             A dictionary of dataframes representing the train and test sets, respectively.
         """
         df = pd.read_csv(filepath)
@@ -140,7 +140,8 @@ class DefaultManager(AbstractManager):
         return {f'{m}_status': (num_augmented, lambda s: rng.choice(np.arange(-2, 9), size=s)) for m in self.months}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
-        _, axes = plt.subplots(len(additional_kwargs), 1, sharex='col', sharey='col', figsize=figsize, tight_layout=tight_layout)
+        _, axes = plt.subplots(len(additional_kwargs), 1, sharex='col', sharey='col', figsize=figsize,
+                               tight_layout=tight_layout)
         for ax, (title, (x, y)) in zip(axes, additional_kwargs.items()):
             data = pd.concat((x, y), axis=1).astype(int)
             sns.pointplot(data=data, x='sep_status', y='default', hue='marriage', scale=0.8, markers=self.MARKERS,

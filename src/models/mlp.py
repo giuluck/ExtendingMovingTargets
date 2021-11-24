@@ -39,7 +39,7 @@ class MLP(Model):
         """The output data `Scaler`."""
 
         self.lrs: List[Dense] = [] if h_units is None else [Dense(h, activation='relu') for h in h_units]
-        """The list of `tensorflow.keras.layers.Dense` layers."""
+        """The list of `Dense` layers."""
 
         # handle scalers
         if scalers is None:

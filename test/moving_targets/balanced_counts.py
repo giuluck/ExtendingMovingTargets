@@ -37,7 +37,7 @@ DATASETS: Dict[str, Dict[str, str]] = {
     )
 }
 """Dictionary of (<dataset name>; <dataset info>), where <dataset info> is a dictionary of parameters for
-`pandas.read_csv()` method."""
+`read_csv()` method."""
 
 RESULTS: Dict[str, Dict[str, float]] = {
     'iris-pretraining-false': dict(

@@ -4,22 +4,21 @@ from typing import Dict, Tuple, Type, Callable, Optional, List
 
 import numpy as np
 
-from experimental.utils import DatasetFactory
-from experimental.utils.handlers import ClassificationFactory, RegressionFactory, MLPHandler, SBRHandler, \
-    UnivariateSBRHandler, TFLHandler, MTHandler
+from experimental.utils.handlers import MLPHandler, SBRHandler, UnivariateSBRHandler, TFLHandler, MTHandler
+from experimental.utils.factories import DatasetFactory, HandlersFactory
 from src.datasets import CarsManager, SyntheticManager, PuzzlesManager, RestaurantsManager, DefaultManager, LawManager
 
 RES_FOLDER: str = '../../res/'
 """The resource folder where the datasets are placed."""
 
 DATASETS: Dict[str, Tuple[Type, Type]] = {
-    'cars univariate': (RegressionFactory, CarsManager),
-    'cars': (RegressionFactory, CarsManager),
-    'synthetic': (RegressionFactory, SyntheticManager),
-    'puzzles': (RegressionFactory, PuzzlesManager),
-    'restaurants': (ClassificationFactory, RestaurantsManager),
-    'default': (ClassificationFactory, DefaultManager),
-    'law': (ClassificationFactory, LawManager)
+    'cars univariate': (HandlersFactory, CarsManager),
+    'cars': (HandlersFactory, CarsManager),
+    'synthetic': (HandlersFactory, SyntheticManager),
+    'puzzles': (HandlersFactory, PuzzlesManager),
+    'restaurants': (HandlersFactory, RestaurantsManager),
+    'default': (HandlersFactory, DefaultManager),
+    'law': (HandlersFactory, LawManager)
 }
 """A dictionary which links each dataset (str) to a tuple of TypeClasses representing the kind of factory (either
 `RegressionFactory` or `ClassificationFactory`) and the kind of manager (which is dataset-dependent)."""
@@ -42,8 +41,6 @@ EXPECTED_TESTS: List[str] = ['test_expected_tests'] + [
 ]
 """An (ordered) list of the tests that are expected, namely each combination of dataset and model."""
 
-unittest.TestLoader.sortTestMethodsUsing = lambda self, x, y: EXPECTED_TESTS.index(x) - EXPECTED_TESTS.index(y)
-
 
 class TestPipelines(unittest.TestCase):
     """Abstract class used as template method class for the correctness and functioning tests."""
@@ -52,7 +49,7 @@ class TestPipelines(unittest.TestCase):
         """Defines the number of grid samples for each for each attribute to evaluate the functioning of the algorithms.
         If None, no grid evaluation is performed.
 
-        :returns:
+        :return:
             The number of grid samples.
         """
         pass
@@ -66,7 +63,7 @@ class TestPipelines(unittest.TestCase):
         :param dataset:
             The dataset name.
 
-        :returns:
+        :return:
             Either None or a dictionary of model parameters.
         """
         pass
@@ -83,7 +80,7 @@ class TestPipelines(unittest.TestCase):
         :param kwargs:
             Additional information.
 
-        :returns:
+        :return:
             Either None or a dictionary of summary parameters.
         """
         pass

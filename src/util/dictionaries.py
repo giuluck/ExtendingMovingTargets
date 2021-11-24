@@ -13,7 +13,7 @@ def cartesian_product(fixed_parameters: Optional[Dict] = None, **parameters: Lis
     :param parameters:
         A dictionary of variable parameters, which may assume each value indicated in the respective list.
 
-    :returns:
+    :return:
         A list of all the possible configuration of parameters, i.e., the cartesian product.
     """
     fixed_parameters = {} if fixed_parameters is None else fixed_parameters
@@ -39,7 +39,7 @@ def merge_dictionaries(first_dict: Optional[Dict] = None, second_dict: Optional[
     :param second_dict:
         The second dictionary.
 
-    :returns:
+    :return:
         A new dictionary obtained as the combination of the other two.
     """
     first_dict = {} if first_dict is None else first_dict.copy()

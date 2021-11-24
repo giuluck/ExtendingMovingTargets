@@ -1,7 +1,10 @@
 """Pipelines Functioning Tests."""
+import unittest
 from typing import Optional, Dict
 
-from test.experimental.abstract_pipeline import TestPipelines
+from test.experimental.abstract_pipeline import TestPipelines, EXPECTED_TESTS
+
+unittest.TestLoader.sortTestMethodsUsing = lambda self, t1, t2: EXPECTED_TESTS.index(t1) - EXPECTED_TESTS.index(t2)
 
 
 class TestFunctioning(TestPipelines):
@@ -25,8 +28,8 @@ class TestFunctioning(TestPipelines):
         # Runs tests for partial/full features and for augmented/full grid, i.e:
         # > basic pair of tests for each dataset: explicit full grid and grid created with data augmentation
         tests_args = [dict(full_grid=True), dict(full_grid=False, grid_ground=self._grid_ground())]
-        # > 'synthetic' and 'restaurants' datasets do not accept 'full_features' parameter, the others do
-        if dataset not in ['synthetic', 'restaurants']:
+        # > 'synthetic', 'restaurants' and 'univariate' datasets do not accept 'full_features' parameter, the others do
+        if dataset not in ['synthetic', 'restaurants', 'cars univariate']:
             tests_args = [dict(full_features=False, **data_args) for data_args in tests_args]
             # > 'cars univariate' only deals with partial features (i.e., the single attribute)
             # > the others can deal with full features, but full grid is not used due to computational limits

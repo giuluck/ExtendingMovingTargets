@@ -15,7 +15,7 @@ class TestGurobiLosses(TestLosses, unittest.TestCase):
     def _losses(self):
         """The solver's losses.
 
-        :returns:
+        :return:
             Gurobi's `LossesHandler` object.
         """
         return GurobiMaster.losses

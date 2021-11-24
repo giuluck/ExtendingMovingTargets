@@ -94,10 +94,10 @@ class MACS(Logger):
             - `1` creates a simple console logger with elapsed time only;
             - `2` or `True` create a more complete console logger with cached data at the end of each iterations.
 
-        :returns:
+        :return:
             An instance of the `History` object containing the training history.
 
-        :raises `AssertionError`:
+        :raise `AssertionError`:
             If the number of iteration is negative, or is zero and the initial step is 'pretraining'.
         """
         # check user input
@@ -156,10 +156,10 @@ class MACS(Logger):
         :param x:
             The matrix/dataframe of input samples.
 
-        :returns:
+        :return:
             The vector of predicted labels.
 
-        :raises `AssertionError`:
+        :raise `AssertionError`:
             If the learner has not been fitted yet.
         """
         assert self.fitted, 'The model has not been fitted yet, please call method .fit()'
@@ -174,10 +174,10 @@ class MACS(Logger):
         :param y:
             The vector of training labels.
 
-        :returns:
+        :return:
             The dictionary of evaluated metrics.
 
-        :raises `AssertionError`:
+        :raise `AssertionError`:
             If the learner has not been fitted yet.
         """
         p = self.predict(x)
