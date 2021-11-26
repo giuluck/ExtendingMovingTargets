@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 import numpy as np
 
+from moving_targets.learners.learner import Classifier
 from moving_targets.masters.cplex_master import CplexMaster
 from moving_targets.util.typing import Matrix, Vector, Iteration
 
@@ -78,17 +79,15 @@ class BalancedCounts(CplexMaster):
             4. the maximal number of elements for each class in order to achieve balance.
         """
         # if the model has not been fitted yet (i.e., the initial macs step is 'projection') we use the original labels
-        # otherwise we use either the predicted classes or the predicted probabilities
+        # otherwise we use the predicted classes and, optionally, we include the probabilities
         if not macs.fitted:
             prob = None
             pred = y.reshape(-1, )
-        elif self.use_prob is False:
-            prob = None
-            pred = macs.learner.predict(x)
         else:
-            assert hasattr(macs.learner, 'predict_proba'), "Learner must have method 'predict_proba(x)' for use_prob"
-            prob = np.clip(macs.learner.predict_proba(x), a_min=self.clip_value, a_max=1 - self.clip_value)
-            pred = macs.learner.predict(x)
+            prob = np.clip(macs.learner.predict(x), a_min=self.clip_value, a_max=1 - self.clip_value)
+            pred = Classifier.get_classes(prob)
+            if not self.use_prob:
+                prob = None
 
         # define variables and max_count (i.e., upper bound for number of counts for a class)
         num_samples = len(y)

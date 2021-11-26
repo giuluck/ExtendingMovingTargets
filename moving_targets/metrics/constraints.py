@@ -4,6 +4,7 @@ from typing import Optional, Callable
 
 import numpy as np
 
+from moving_targets.learners.learner import Classifier
 from moving_targets.metrics.metric import Metric
 from moving_targets.util.typing import Classes, MonotonicitiesList, Matrix, Vector
 
@@ -39,9 +40,12 @@ class ClassFrequenciesStd(Metric):
         :return:
             The metric value.
         """
+        # handle classes and retrieve labels from probabilities
+        c = [] if self.classes is None else self.classes
+        p = Classifier.get_classes(p)
         # bincount is similar to np.unique(..., return_counts=True) but allows to fix a minimum number of classes
         # in this way, if the predictions are all the same, the counts will be [n, 0, ..., 0] instead of [n]
-        minlength = 1 + max(np.max(self.classes), np.max(y), np.max(p))
+        minlength = 1 + np.max(np.concatenate((c, y, p)).astype(int))
         classes_counts = np.bincount(p, minlength=minlength)
         classes_counts = classes_counts if self.classes is None else classes_counts[self.classes]
         classes_counts = classes_counts / len(p)

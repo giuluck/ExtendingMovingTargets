@@ -1,22 +1,8 @@
 """Type aliases."""
 
-from typing import Union, List, Dict, Callable, Tuple, Optional, Any
+from typing import Union, List, Dict, Tuple, Optional, Any
 
-from moving_targets.util.typing import Matrix, Number
-
-Augmented = Union[int, Tuple[int], List[int], Dict[str, int]]
-"""The number of augmented samples.
-
-It can be a single integer number, a tuple/list of integers, or a dictionary of
-integers indexed via the name of the feature to augment.
-"""
-
-AugmentedData = Tuple[Matrix, Matrix]
-"""A tuple of matrices of kind (<x augmented>, <y augmented>)."""
-
-SamplingFunctions = Dict[str, Tuple[int, Callable]]
-"""A dictionary that assigns to each feature name (str) a tuple (<n>, <fn>), where <n> is the number of augmented
-samples and <fn> is a callable function used for sampling."""
+from moving_targets.util.typing import Number
 
 Method = Union[None, str, Tuple[Number, Number]]
 """Scaling method.

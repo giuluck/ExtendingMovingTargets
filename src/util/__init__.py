@@ -1,3 +1,3 @@
-"""Utilities for Augmentation, Data Cleaning, Preprocessing, Plotting, and others."""
+"""Utilities for Data Cleaning, Preprocessing and others."""
 
-from src.util import augmentation, cleaning, dictionaries, model, plot, preprocessing, typing
+from src.util import cleaning, preprocessing, dictionaries, typing

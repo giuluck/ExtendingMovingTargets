@@ -30,4 +30,4 @@ class Metric:
         :return:
             The metric value.
         """
-        pass
+        raise NotImplementedError("Please implement abstract method '__call__'")

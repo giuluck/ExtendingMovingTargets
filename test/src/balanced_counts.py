@@ -10,8 +10,8 @@ from sklearn.preprocessing import MinMaxScaler
 
 from moving_targets import MACS
 from moving_targets.learners import LogisticRegression
-from moving_targets.masters import BalancedCounts
 from moving_targets.metrics import Accuracy, ClassFrequenciesStd
+from src.masters import BalancedCounts
 
 RES_FOLDER: str = '../../res/'
 """The resource folder where the datasets are placed."""
@@ -65,10 +65,10 @@ RESULTS: Dict[str, Dict[str, float]] = {
         val_std=0.10154242897184408
     ),
     'redwine-pretraining-false': dict(
-        train_acc=0.3336113427856547,
-        train_std=0.038514344281136204,
-        val_acc=0.3025,
-        val_std=0.032328607902118035
+        train_acc=0.371976647206005,
+        train_std=0.08446559019148323,
+        val_acc=0.3525,
+        val_std=0.08048895714458117
     ),
     'redwine-pretraining-true': dict(
         train_acc=0.3336113427856547,
@@ -77,10 +77,10 @@ RESULTS: Dict[str, Dict[str, float]] = {
         val_std=0.032328607902118035
     ),
     'redwine-projection-false': dict(
-        train_acc=0.32777314428690574,
-        train_std=0.03190968466351949,
-        val_acc=0.2675,
-        val_std=0.03684615161572358
+        train_acc=0.35696413678065053,
+        train_std=0.07576726721032541,
+        val_acc=0.3,
+        val_std=0.07104380495315706
     ),
     'redwine-projection-true': dict(
         train_acc=0.32777314428690574,
@@ -89,10 +89,10 @@ RESULTS: Dict[str, Dict[str, float]] = {
         val_std=0.03684615161572358
     ),
     'whitewine-pretraining-false': dict(
-        train_acc=0.2736182956711135,
-        train_std=0.026414227999155503,
-        val_acc=0.26448979591836735,
-        val_std=0.030365967553862658
+        train_acc=0.3041110808603322,
+        train_std=0.06213644199211283,
+        val_acc=0.2889795918367347,
+        val_std=0.05921121305573885
     ),
     'whitewine-pretraining-true': dict(
         train_acc=0.2736182956711135,
@@ -101,10 +101,10 @@ RESULTS: Dict[str, Dict[str, float]] = {
         val_std=0.030365967553862658
     ),
     'whitewine-projection-false': dict(
-        train_acc=0.28178600598965425,
-        train_std=0.02516267335925484,
-        val_acc=0.26612244897959186,
-        val_std=0.02431815458359045
+        train_acc=0.3117342771576368,
+        train_std=0.0641782375010965,
+        val_acc=0.27510204081632655,
+        val_std=0.06259838451427663
     ),
     'whitewine-projection-true': dict(
         train_acc=0.28178600598965425,
@@ -148,9 +148,9 @@ class TestBalancedCounts(unittest.TestCase):
             x_train = scaler.fit_transform(x_train)
             x_val = scaler.transform(x_val)
             # define model pieces
-            metrics = [Accuracy(name='acc'), ClassFrequenciesStd(classes=num_classes, name='std')]
+            metrics = [Accuracy(name='acc'), ClassFrequenciesStd(name='std')]
             learner = LogisticRegression()
-            master = BalancedCounts(n_classes=num_classes)
+            master = BalancedCounts(n_classes=num_classes, use_prob=use_prob)
             model = MACS(learner, master, init_step=init_step, metrics=metrics)
             model.fit(x_train, y_train, iterations=3, verbose=False)
             # test results
@@ -158,7 +158,7 @@ class TestBalancedCounts(unittest.TestCase):
             act_res = dict(train=model.evaluate(x_train, y_train), val=model.evaluate(x_val, y_val))
             for split, act in act_res.items():
                 for metric, val in act.items():
-                    self.assertAlmostEqual(exp_res[f'{split}_{metric}'], val)
+                    self.assertAlmostEqual(exp_res[f'{split}_{metric}'], val, msg=f'{metric} does not match in {split}')
         except Exception as exception:
             self.fail(exception)
 

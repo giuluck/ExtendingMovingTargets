@@ -1,4 +1,6 @@
 """Basic Learner Interface."""
+from abc import ABC
+from typing import Union
 
 from moving_targets.util.typing import Vector, Iteration, Matrix
 
@@ -30,7 +32,7 @@ class Learner:
         """
         raise NotImplementedError("Please implement method 'fit'")
 
-    def predict(self, x: Matrix) -> Vector:
+    def predict(self, x: Matrix) -> Union[Vector, Matrix]:
         """Uses the fitted learner configuration to predict labels from input samples.
 
         :param x:
@@ -40,3 +42,34 @@ class Learner:
             The vector of predicted labels.
         """
         raise NotImplementedError("Please implement method 'predict'")
+
+
+class Classifier(Learner, ABC):
+    """Basic interface for a Moving Targets classifier."""
+
+    @staticmethod
+    def get_classes(prob: Matrix) -> Union[Vector, Matrix]:
+        """Gets the output classes given the output probabilities per class.
+
+        :param prob:
+            The output probabilities of a `Classifier`.
+
+        :return:
+            The respective output classes.
+        """
+        # strategy varies depending on binary vs. multiclass classification
+        if len(prob.shape) == 1 or prob.shape[1] == 1:
+            return prob.round().astype(int)
+        else:
+            return prob.argmax(axis=1)
+
+    def predict_classes(self, x: Matrix) -> Vector:
+        """Predicts the output classes of the given input samples.
+
+        :param x:
+            The input samples.
+
+        :return:
+            The predicted classes.
+        """
+        return Classifier.get_classes(self.predict(x))

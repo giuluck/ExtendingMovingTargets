@@ -1,8 +1,9 @@
 """Sklearn-based Learners."""
+from typing import Union
 
 import sklearn.linear_model as lm
 
-from moving_targets.learners.learner import Learner
+from moving_targets.learners.learner import Learner, Classifier
 from moving_targets.util.typing import Matrix, Vector, Iteration
 
 
@@ -22,7 +23,7 @@ class ScikitLearner(Learner):
     def fit(self, macs, x: Matrix, y: Vector, iteration: Iteration, **additional_kwargs):
         self.model.fit(x, y)
 
-    def predict(self, x: Matrix) -> Vector:
+    def predict(self, x: Matrix) -> Union[Vector, Matrix]:
         """Predicts the labels of the given input samples.
 
         :param x:
@@ -34,22 +35,10 @@ class ScikitLearner(Learner):
         return self.model.predict(x)
 
 
-class ScikitRegressor(ScikitLearner):
-    """Wrapper for a custom Scikit-Learn regression model."""
-
-
-class ScikitClassifier(ScikitLearner):
+class ScikitClassifier(ScikitLearner, Classifier):
     """Wrapper for a custom Scikit-Learn classification model."""
 
-    def predict_proba(self, x: Matrix) -> Vector:
-        """Predicts the probabilities for each class of the given input samples.
-
-        :param x:
-            The input samples.
-
-        :return:
-            The predicted probabilities.
-        """
+    def predict(self, x: Matrix) -> Union[Vector, Matrix]:
         return self.model.predict_proba(x)
 
 

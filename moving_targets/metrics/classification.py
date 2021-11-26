@@ -5,6 +5,7 @@ from typing import Callable, Optional
 import numpy as np
 from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score, log_loss
 
+from moving_targets.learners.learner import Classifier
 from moving_targets.metrics.metric import Metric
 from moving_targets.util.typing import Classes, Matrix, Vector
 
@@ -57,14 +58,8 @@ class ClassificationMetric(Metric):
             mask = np.in1d(y, self.classes)
             y = np.array(y)[mask]
             p = np.array(p)[mask]
-        # HANDLE DISCRETIZATION (BOTH BINARY AND CATEGORICAL)
-        if not self.use_prob:
-            if len(p.shape) == 1 or p.shape[1] == 1:
-                p = p.round().astype(int)
-            else:
-                p = p.argmax(axis=1)
-        # RETURN METRIC VALUE
-        return self.metric_function(y, p)
+        # HANDLE DISCRETIZATION (BOTH BINARY AND CATEGORICAL) AND RETURN METRIC VALUE
+        return self.metric_function(y, p if self.use_prob else Classifier.get_classes(p))
 
 
 class CrossEntropy(ClassificationMetric):
@@ -85,50 +80,80 @@ class CrossEntropy(ClassificationMetric):
             metric_function=lambda y_true, y_pred: log_loss(y_true, y_pred, eps=clip_value),
             classes=classes,
             name=name,
-            use_prob=False
+            use_prob=True
         )
 
 
 class Precision(ClassificationMetric):
     """Precision Score."""
 
-    def __init__(self, classes: Optional[Classes] = None, name: str = 'precision'):
+    def __init__(self, classes: Optional[Classes] = None, average: Optional[str] = 'binary', name: str = 'precision'):
         """
         :param classes:
             The number of classes or a vector of class labels.
 
+        :param average:
+            This parameter is required by scikit learn for multiclass/multilabel targets. It can be one in 'binary',
+            'micro', 'macro', 'weighted', 'samples', or None, in which case the scores for each class are returned
+            without any type of averaging performed on the data.
+
         :param name:
             The name of the metric.
         """
-        super(Precision, self).__init__(metric_function=precision_score, classes=classes, name=name, use_prob=False)
+        super(Precision, self).__init__(
+            metric_function=lambda y_true, y_pred: precision_score(y_true, y_pred, average=average),
+            classes=classes,
+            name=name,
+            use_prob=False
+        )
 
 
 class Recall(ClassificationMetric):
     """Recall Score."""
 
-    def __init__(self, classes: Optional[Classes] = None, name: str = 'recall'):
+    def __init__(self, classes: Optional[Classes] = None, average: Optional[str] = 'binary', name: str = 'recall'):
         """
         :param classes:
             The number of classes or a vector of class labels.
 
+        :param average:
+            This parameter is required by scikit learn for multiclass/multilabel targets. It can be one in 'binary',
+            'micro', 'macro', 'weighted', 'samples', or None, in which case the scores for each class are returned
+            without any type of averaging performed on the data.
+
         :param name:
             The name of the metric.
         """
-        super(Recall, self).__init__(metric_function=recall_score, classes=classes, name=name, use_prob=False)
+        super(Recall, self).__init__(
+            metric_function=lambda y_true, y_pred: recall_score(y_true, y_pred, average=average),
+            classes=classes,
+            name=name,
+            use_prob=False
+        )
 
 
 class F1(ClassificationMetric):
     """F1 Score."""
 
-    def __init__(self, classes: Optional[Classes] = None, name: str = 'f1_score'):
+    def __init__(self, classes: Optional[Classes] = None, average: Optional[str] = 'binary', name: str = 'f1_score'):
         """
         :param classes:
             The number of classes or a vector of class labels.
 
+        :param average:
+            This parameter is required by scikit learn for multiclass/multilabel targets. It can be one in 'binary',
+            'micro', 'macro', 'weighted', 'samples', or None, in which case the scores for each class are returned
+            without any type of averaging performed on the data.
+
         :param name:
             The name of the metric.
         """
-        super(F1, self).__init__(metric_function=f1_score, classes=classes, name=name, use_prob=False)
+        super(F1, self).__init__(
+            metric_function=lambda y_true, y_pred: f1_score(y_true, y_pred, average=average),
+            classes=classes,
+            name=name,
+            use_prob=False
+        )
 
 
 class Accuracy(ClassificationMetric):
