@@ -32,22 +32,6 @@ class AbstractManager:
         """
         raise NotImplementedError("Please implement abstract static method 'load_data'")
 
-    @staticmethod
-    def _onehot_classes(df: pd.DataFrame, label: str) -> pd.DataFrame:
-        """One-hot encodes the label column for multi-class classification.
-
-        :param df:
-            The input dataframe.
-
-        :param label:
-            The label column name.
-
-        :return:
-            The same dataframe with one-hot encoded class labels.
-        """
-        df = df.join(pd.get_dummies(df[label]))
-        return df.drop(columns=[label])
-
     def __init__(self, label: str, stratify: bool, metrics: List[Metric], x_scaling: Methods, y_scaling: Methods,
                  **load_data_kwargs):
         """

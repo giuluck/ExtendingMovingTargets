@@ -1,8 +1,13 @@
 """Moving Targets Test Script."""
+import warnings
+
+from sklearn.exceptions import ConvergenceWarning
 
 from experimental.utils.experiment_factory import ExperimentFactory
 
 if __name__ == '__main__':
-    iterations: int = 10
-    factory, callbacks = ExperimentFactory().whitewine()
-    manager = factory.experiment(iterations=iterations, callbacks=callbacks, plot_args={})
+    warnings.simplefilter("ignore", category=ConvergenceWarning)
+
+    iterations: int = 1
+    factory, callbacks = ExperimentFactory().dota(callbacks=['logger'])
+    manager = factory.experiment(iterations=iterations, callbacks=callbacks, model_verbosity=True, plot_args={})

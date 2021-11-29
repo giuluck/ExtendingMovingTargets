@@ -4,7 +4,7 @@ from typing import Optional, List, Tuple
 
 from experimental.utils.experiment_handler import ExperimentHandler
 from moving_targets.callbacks import Callback, FileLogger
-from src.datasets import IrisManager, WineManager
+from src.datasets import IrisManager, WineManager, ShuttleManager, DotaManager
 
 
 class ExperimentFactory:
@@ -87,4 +87,36 @@ class ExperimentFactory:
         """
         cb, callbacks = self._get_shared_callbacks(callbacks)
         ds = ExperimentHandler(manager=WineManager(filepath=f'{self.res}/whitewine.csv'), n_classes=7, **kwargs)
+        return ds, cb
+
+    def shuttle(self, callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[ExperimentHandler, List[Callback]]:
+        """Builds an experiment handler for the whitewine dataset.
+
+        :param callbacks:
+            List of callbacks aliases.
+
+         :param kwargs:
+            Custom arguments passed to a `ExperimentHandler` instance.
+
+        :return:
+            A tuple containing the `ExperimentHandler` as first item, and a list of `Callback` objects as second one.
+        """
+        cb, callbacks = self._get_shared_callbacks(callbacks)
+        ds = ExperimentHandler(manager=ShuttleManager(filepath=f'{self.res}/shuttle.trn'), n_classes=7, **kwargs)
+        return ds, cb
+
+    def dota(self, callbacks: Optional[List[str]] = None, **kwargs) -> Tuple[ExperimentHandler, List[Callback]]:
+        """Builds an experiment handler for the whitewine dataset.
+
+        :param callbacks:
+            List of callbacks aliases.
+
+         :param kwargs:
+            Custom arguments passed to a `ExperimentHandler` instance.
+
+        :return:
+            A tuple containing the `ExperimentHandler` as first item, and a list of `Callback` objects as second one.
+        """
+        cb, callbacks = self._get_shared_callbacks(callbacks)
+        ds = ExperimentHandler(manager=DotaManager(filepath=f'{self.res}/dota2.csv'), n_classes=2, **kwargs)
         return ds, cb

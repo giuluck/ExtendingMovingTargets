@@ -23,7 +23,9 @@ class Scaler:
 
             - 'std', or 'standardize', standardizes the feature
             - 'norm', or 'normalize', or 'minmax', normalizes the feature from (min, max) into (0, 1)
-            - 'zero', or 'max', or 'zeromax', normalizes the feature from (0, max) into (0, 1)
+            - 'zero', or 'max', or 'zeromax', normalizes the feature from (min, max) into (min / v, max / v), where
+               v = is the maximum among the absolute values of min and max. This is called zeromax because it turns out
+               to be useful when both min and max are greater than zero, thus the interval (0, max) becomes (0, 1).
             - Tuple[Number, Number], normalizes the feature from (t1, t2) into (0, 1)
             - 'onehot', encodes categorical features as a vector
             - None, performs no scaling
@@ -70,7 +72,7 @@ class Scaler:
             is_2d = data.ndim > 1
             is_pandas = False
             data = data if is_2d else data.reshape((-1, 1))
-        return pd.DataFrame(data), (is_2d, is_pandas)
+        return pd.DataFrame(data).astype(np.float64), (is_2d, is_pandas)
 
     @staticmethod
     def _handle_output(data: Matrix, is_2d: bool, is_pandas: bool) -> Union[Vector, Matrix]:
@@ -116,9 +118,9 @@ class Scaler:
         df = data.copy()
         for index, (column, method) in enumerate(methods.items()):
             if method == 'onehot':
-                encoder = OneHotEncoder()
+                encoder = OneHotEncoder(sparse=False)
                 dummies = encoder.fit_transform(df[[column]])
-                dummies = pd.DataFrame(dummies.todense(), index=data.index, columns=encoder.categories_[0], dtype=int)
+                dummies = pd.DataFrame(dummies, index=data.index, columns=encoder.categories_[0], dtype=int)
                 data = pd.concat([data.iloc[:, :index], dummies, data.iloc[:, index + 1:]], axis=1)
                 self._onehot[index] = (encoder, df.columns[index])
 
@@ -138,7 +140,7 @@ class Scaler:
                 self._scaling[idx] = values.max() - values.min()
             elif method in ['zero', 'max', 'zeromax']:
                 self._translation[idx] = 0.0
-                self._scaling[idx] = values.max()
+                self._scaling[idx] = np.abs(values).max()
             elif isinstance(method, tuple):
                 minimum, maximum = method
                 self._translation[idx] = minimum
@@ -166,7 +168,7 @@ class Scaler:
             # put is_2d to True since, even though the data may have been 1d, now it is not anymore
             is_2d = True
             dummies = encoder.transform(data.iloc[:, index:index + 1])
-            dummies = pd.DataFrame(dummies.todense(), index=data.index, columns=encoder.categories_[0], dtype=int)
+            dummies = pd.DataFrame(dummies, index=data.index, columns=encoder.categories_[0], dtype=int)
             data = pd.concat([data.iloc[:, :index], dummies, data.iloc[:, index + 1:]], axis=1)
         data = (data - self._translation) / self._scaling
 
