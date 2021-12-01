@@ -283,9 +283,16 @@ class LossesHandler:
         :return:
             The expression of the absolute error loss as created by the solver.
         """
-        lb = numeric_variable - model_variable.ub
-        ub = numeric_variable - model_variable.lb
-        return self._abs_fn(model, numeric_variable - model_variable, lb=lb, ub=ub)
+        # handles multivariate output by converting single variables into numpy array
+        # - mvs = vector of model variables
+        # - nvs = vector of numeric variables
+        # - avs = vector of absolute variables (linear expression) computed via the inner _abs_fn() function
+        # once the absolute variables are computed, they are summed together
+        # (if the output is univariate, each vector will be constituted of a single sample only)
+        mvs = np.array([model_variable]).reshape((-1,))
+        nvs = np.array([numeric_variable]).reshape((-1,))
+        avs = [self._abs_fn(model, nv - mv, lb=nv - mv.ub, ub=nv - mv.lb) for mv, nv in zip(mvs, nvs)]
+        return self._sum_fn(model, avs)
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _squared_errors(self, model, numeric_variable: Number, model_variable: Any):
@@ -303,7 +310,16 @@ class LossesHandler:
         :return:
             The expression of the squared error loss as created by the solver.
         """
-        return (numeric_variable - model_variable) ** 2
+        # handles multivariate output by converting single variables into numpy array
+        # - mvs = vector of model variables
+        # - nvs = vector of numeric variables
+        # - svs = vector of squared variables (linear expression)
+        # once the squared variables are computed, they are summed together
+        # (if the output is univariate, each vector will be constituted of a single sample only)
+        mvs = np.array([model_variable]).reshape((-1,))
+        nvs = np.array([numeric_variable]).reshape((-1,))
+        svs = [(nv - mv) ** 2 for mv, nv in zip(mvs, nvs)]
+        return self._sum_fn(model, svs)
 
     def _binary_hamming(self, model, numeric_variable: int, model_variable: Any):
         """Computes the binary hamming distance.

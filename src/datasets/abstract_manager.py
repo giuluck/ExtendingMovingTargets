@@ -8,7 +8,7 @@ import pandas as pd
 from moving_targets.metrics import Metric
 from moving_targets.util.typing import Vector, Matrix, Dataset
 from src.util.preprocessing import Scaler, Scalers, split_dataset, cross_validate
-from src.util.typing import Methods
+from src.util.typing import Method
 
 
 class AbstractManager:
@@ -32,14 +32,14 @@ class AbstractManager:
         """
         raise NotImplementedError("Please implement abstract static method 'load_data'")
 
-    def __init__(self, label: str, stratify: bool, metrics: List[Metric], x_scaling: Methods, y_scaling: Methods,
-                 **load_data_kwargs):
+    def __init__(self, label: str, stratify: Union[None, str, List[str]], metrics: List[Metric], x_scaling: Method,
+                 y_scaling: Method, **load_data_kwargs):
         """
         :param label:
             Name of the y feature.
 
         :param stratify:
-            Whether or not to stratify the dataset when splitting.
+            The feature(s) to use for stratification the dataset when splitting. If None, no stratification.
 
         :param metrics:
             List of `Metric` objects containing the evaluation metrics.
@@ -60,22 +60,19 @@ class AbstractManager:
         self.test_data: Tuple[pd.DataFrame, pd.Series] = (test.drop(columns=label), test[label])
         """The test data in the form of a tuple (xts, yts)."""
 
-        self.stratify: Optional[Vector] = self.train_data[1] if stratify else None
-        """Whether or not to stratify the dataset when splitting."""
-
-        self.label: str = label
-        """Name of the y feature."""
+        self.stratify: Union[None, Vector, Matrix] = None if stratify is None else train[stratify]
+        """The train data stratification data, if present."""
 
         self.metrics: List[Metric] = metrics
         """Dictionary containing the evaluation metrics indexed by name."""
 
-        self.x_scaling: Methods = x_scaling
+        self.x_scaling: Method = x_scaling
         """X scaling methods."""
 
-        self.y_scaling: Methods = y_scaling
+        self.y_scaling: Method = y_scaling
         """Y scaling method."""
 
-    def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Scaler, Scaler]:
+    def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Optional[Scaler], Optional[Scaler]]:
         """Returns the dataset scalers.
 
         :param x:
@@ -112,8 +109,8 @@ class AbstractManager:
             return splits, self.get_scalers(*self.train_data)
         elif num_folds > 0:
             if num_folds == 1:
-                fold = split_dataset(*self.train_data, test_size=0.2, val_size=0.0,
-                                     stratify=self.stratify, **crossval_kwargs)
+                fold = split_dataset(*self.train_data, test_size=0.2, val_size=0.0, stratify=self.stratify,
+                                     **crossval_kwargs)
                 fold['validation'] = fold.pop('test')
                 folds = [fold]
             else:

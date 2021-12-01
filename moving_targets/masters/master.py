@@ -1,5 +1,5 @@
 """Basic Master Interface."""
-from typing import Any
+from typing import Any, Optional
 
 from moving_targets.util.typing import Matrix, Vector, Iteration
 
@@ -7,7 +7,7 @@ from moving_targets.util.typing import Matrix, Vector, Iteration
 class Master:
     """Basic interface for a Moving Targets learner."""
     
-    def __init__(self, alpha: float = 1., beta: float = 1.):
+    def __init__(self, alpha: float = 1., beta: Optional[float] = 1.):
         """
         :param alpha:
             The non-negative real number which is used to calibrate the two losses in the alpha step.
@@ -15,18 +15,22 @@ class Master:
         :param beta:
             The non-negative real number which is used to constraint the p_loss in the beta step.
 
+            If None, alpha step only is used.
+
         :raise `AssertionError`:
             If alpha or beta are negative.
         """
         super(Master, self).__init__()
         assert alpha >= 0, f"'alpha' should be a non-negative number, but it is {alpha}"
-        assert beta >= 0, f"'beta' should be a non-negative number, but it is {beta}"
+        assert beta is None or beta >= 0, f"'beta' should be either None or a non-negative number, but it is {beta}"
 
         self._alpha: float = alpha
         """The non-negative real number which is used to calibrate the two losses in the alpha step."""
 
-        self._beta: float = beta
-        """The non-negative real number which is used to constraint the p_loss in the beta step."""
+        self._beta: Optional[float] = beta
+        """The non-negative real number which is used to constraint the p_loss in the beta step.
+            
+        If None, alpha step only is used."""
 
     def build_model(self, macs, model, x: Matrix, y: Vector, iteration: Iteration) -> Any:
         """Creates the model variables and adds the problem constraints.

@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder, MaxAbsScaler
 
-from src.datasets import AbstractManager, IrisManager, WineManager, ShuttleManager, DotaManager
+from src.datasets import AbstractManager, IrisManager, RedwineManager, WhitewineManager, ShuttleManager, DotaManager
 from src.util.preprocessing import Scaler
 
 DATA_MANAGERS: Dict[str, AbstractManager] = {
     'iris': IrisManager(filepath='../../res/iris.csv'),
-    'redwine': WineManager(filepath='../../res/redwine.csv'),
-    'whitewine': WineManager(filepath='../../res/whitewine.csv'),
+    'redwine': RedwineManager(filepath='../../res/redwine.csv'),
+    'whitewine': WhitewineManager(filepath='../../res/whitewine.csv'),
     'shuttle': ShuttleManager(filepath='../../res/shuttle.trn'),
     'dota': DotaManager(filepath='../../res/dota2.csv')
 }
@@ -34,11 +34,15 @@ class TestCustomScalers(unittest.TestCase):
         """
         try:
             x, y = DATA_MANAGERS[filename].train_data
+            x, y = x.reset_index(drop=True), y.reset_index(drop=True)
+            # in order to test custom methods, it creates a scaler for the whole dataframe using the passed method as
+            # custom scaler (for x values) and one-hot encoding for the output labels (named as the y series)
+            custom_scaler = Scaler(default_method=method, **{y.name: 'onehot'})
+            df = pd.concat((x, y), axis=1)
+            df_custom = custom_scaler.fit_transform(df)
+            df_reversed = custom_scaler.inverse_transform(df_custom)
 
-            # build and fit custom scaler for the x values
-            custom_scaler = Scaler(methods=method)
-            x_custom = custom_scaler.fit_transform(x)
-            # build appropriate scikit scalers depending on the method
+            # build appropriate scikit scalers for the input data depending on the method
             if method == 'std':
                 scikit_scaler = StandardScaler()
             elif method == 'norm':
@@ -47,27 +51,26 @@ class TestCustomScalers(unittest.TestCase):
                 scikit_scaler = MaxAbsScaler()
             else:
                 raise ValueError(f"'{method}' is not a valid method")
-            # fit the scikit scaler and check equality between the two transformed dataframes
+            # check equality between the two transformed dataframes
+            x_custom = df_custom[x.columns]
             x_scikit = scikit_scaler.fit_transform(x)
-            msg = str(pd.concat((x_custom.reset_index(drop=True), pd.DataFrame(x_scikit)), axis=1))
+            msg = str(pd.concat((x_custom, pd.DataFrame(x_scikit)), axis=1))
             self.assertTrue(np.allclose(x_scikit, x_custom, atol=0.01), msg=msg)
             # check inverse scaling
-            x_reversed = custom_scaler.inverse_transform(x_custom)
-            msg = str(pd.concat((x.reset_index(drop=True), pd.DataFrame(x_reversed.reset_index(drop=True))), axis=1))
+            x_reversed = df_reversed[x.columns]
+            msg = str(pd.concat((x, pd.DataFrame(x_reversed)), axis=1))
             self.assertTrue(np.allclose(x, x_reversed, atol=0.01), msg=msg)
 
-            # build and fit custom scaler for the y values
-            custom_scaler = Scaler(methods='onehot')
-            y_custom = custom_scaler.fit_transform(y)
             # check name and number of classes
+            y_custom = df_custom.drop(columns=x.columns)
             expected, actual = set(y.unique()), set(y_custom.columns)
             self.assertSetEqual(expected, actual, msg=f'Expected: {expected}, actual: {actual}')
             y_scikit = OneHotEncoder(sparse=False).fit_transform(y.astype(str).values.reshape((-1, 1)))
-            msg = str(pd.concat((y_custom.reset_index(drop=True), pd.DataFrame(y_scikit)), axis=1))
+            msg = str(pd.concat((y_custom, pd.DataFrame(y_scikit)), axis=1))
             self.assertTrue(np.allclose(y_scikit, y_custom), msg=msg)
             # check inverse scaling
-            y_reversed = custom_scaler.inverse_transform(y_custom)
-            msg = str(pd.concat((y.reset_index(drop=True), y_reversed.reset_index(drop=True)), axis=1))
+            y_reversed = df_reversed[y.name]
+            msg = str(pd.concat((y, y_reversed), axis=1))
             self.assertTrue(np.equal(y, y_reversed).all(), msg=msg)
         except Exception as exception:
             self.fail(exception)

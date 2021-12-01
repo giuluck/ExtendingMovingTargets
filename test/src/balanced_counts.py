@@ -141,7 +141,6 @@ class TestBalancedCounts(unittest.TestCase):
             df = pd.read_csv(f"{RES_FOLDER}{ds['name']}.csv", sep=ds['separator']).sample(frac=1)
             x = df.drop(ds['class_column'], axis=1)
             y = df[ds['class_column']].astype('category').cat.codes.values
-            num_classes = len(np.unique(y))
             # train/val split and scaling
             x_train, x_val, y_train, y_val = train_test_split(x, y)
             scaler = MinMaxScaler()
@@ -150,7 +149,7 @@ class TestBalancedCounts(unittest.TestCase):
             # define model pieces
             metrics = [Accuracy(name='acc'), ClassFrequenciesStd(name='std')]
             learner = LogisticRegression()
-            master = BalancedCounts(n_classes=num_classes, use_prob=use_prob)
+            master = BalancedCounts(loss_fn='crossentropy' if use_prob else 'hamming_distance')
             model = MACS(learner, master, init_step=init_step, metrics=metrics)
             model.fit(x_train, y_train, iterations=3, verbose=False)
             # test results

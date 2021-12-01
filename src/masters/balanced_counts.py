@@ -11,8 +11,23 @@ from moving_targets.util.typing import Matrix, Vector, Iteration
 class BalancedCounts(CplexMaster):
     """Master for the Balanced Counts problem in which output classes are constrained to be equally distributed."""
 
-    def __init__(self, n_classes: int, use_prob: bool = True, clip_value: float = 1e-2, slack: float = 1.05,
-                 alpha: float = 1., beta: float = 1., time_limit: Optional[float] = None):
+    losses = {
+        'hd': 'categorical_hamming',
+        'hamming_distance': 'categorical_hamming',
+        'categorical_hamming': 'categorical_hamming',
+        'ce': 'categorical_crossentropy',
+        'cce': 'categorical_crossentropy',
+        'crossentropy': 'categorical_crossentropy',
+        'categorical_crossentropy': 'categorical_crossentropy',
+        'mae': 'mean_absolute_error',
+        'mean_absolute_error': 'mean_absolute_error',
+        'mse': 'mean_squared_error',
+        'mean_squared_error': 'mean_squared_error'
+    }
+    """A dictionary of losses aliases."""
+
+    def __init__(self, num_classes: Optional[int] = None, loss_fn: str = 'hd', clip_value: float = 1e-2,
+                 slack: float = 1.05, alpha: float = 1., beta: float = 1., time_limit: Optional[float] = None):
         """
         :param alpha:
             The non-negative real number which is used to calibrate the two losses in the alpha step.
@@ -23,11 +38,13 @@ class BalancedCounts(CplexMaster):
         :param time_limit:
             The maximal time for which the master can run during each iteration.
 
-        :param n_classes:
-            The number of output classes.
+        :param num_classes:
+            The number of output classes. If None, infers it from the input data.
 
-        :param use_prob:
-            Whether to use the learner's probabilities or the learner's output classes directly in the p_loss.
+        :param loss_fn:
+            The loss function computed between the model variables and the learner predictions.
+
+            Must be one in ['hamming_distance', 'crossentropy', 'mean_squared_error' and 'mean_absolute_error'].
 
         :param clip_value:
             The clipping value for probabilities, in case they are used.
@@ -36,13 +53,14 @@ class BalancedCounts(CplexMaster):
             The slack value, expressed in terms of ratio wrt the other classes, to allow some output class to have a
             few labelled samples more than the other classes.
         """
+        assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
         super(BalancedCounts, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
 
-        self.num_classes: int = n_classes
+        self.num_classes: Optional[int] = num_classes
         """The number of output classes."""
 
-        self.use_prob: bool = use_prob
-        """Whether to use the learner's probabilities or the learner's output classes directly in the p_loss."""
+        self.loss_fn: str = self.losses[loss_fn]
+        """The loss function computed between the model variables and the learner predictions."""
 
         self.clip_value: float = clip_value
         """The clipping value for probabilities, in case they are used."""
@@ -82,26 +100,25 @@ class BalancedCounts(CplexMaster):
         # otherwise we use the predicted classes and, optionally, we include the probabilities
         if not macs.fitted:
             prob = None
-            pred = y.reshape(-1, )
+            pred = y
         else:
             prob = np.clip(macs.learner.predict(x), a_min=self.clip_value, a_max=1 - self.clip_value)
             pred = Classifier.get_classes(prob)
-            if not self.use_prob:
-                prob = None
 
         # define variables and max_count (i.e., upper bound for number of counts for a class)
         num_samples = len(y)
-        max_count = np.ceil(self.slack * num_samples / self.num_classes)
-        variables = model.binary_var_matrix(keys1=num_samples, keys2=self.num_classes, name='y').values()
-        variables = np.array(list(variables)).reshape(num_samples, self.num_classes)
+        num_classes = len(np.unique(y)) if self.num_classes is None else self.num_classes
+        max_count = np.ceil(self.slack * num_samples / num_classes)
+        variables = model.binary_var_matrix(keys1=num_samples, keys2=num_classes, name='y').values()
+        variables = np.array(list(variables)).reshape(num_samples, num_classes)
 
         # constrain the class counts to the maximal value
-        for c in range(self.num_classes):
+        for c in range(num_classes):
             class_count = model.sum([variables[i, c] for i in range(num_samples)])
             model.add_constraint(class_count <= max_count)
         # each sample should be labeled with one class only
         for i in range(num_samples):
-            class_label = model.sum(variables[i, c] for c in range(self.num_classes))
+            class_label = model.sum(variables[i, c] for c in range(num_classes))
             model.add_constraint(class_label == 1)
 
         # return model info
@@ -132,6 +149,8 @@ class BalancedCounts(CplexMaster):
         :return:
             A boolean value that decides whether or not to use the beta step during the current iteration.
         """
+        if self._beta is None:
+            return False
         _, pred, _, max_count = model_info
         _, pred_classes_counts = np.unique(pred, return_counts=True)
         return np.all(pred_classes_counts <= max_count)
@@ -188,18 +207,22 @@ class BalancedCounts(CplexMaster):
         :return:
             A real number representing the categorical hamming distance/crossentropy loss.
         """
-        variables, pred, prob, _ = model_info
-        if prob is None:
+        model_variables, pred, prob, _ = model_info
+        # if no probabilities are available (i.e., macs is not fitted yet due to pretraining) or the chosen loss is
+        # hamming distance (which uses class labels instead of probabilities), we use hamming distance on predictions
+        if prob is None or self.loss_fn == 'categorical_hamming':
             return CplexMaster.losses.categorical_hamming(
                 model=model,
                 numeric_variables=pred,
-                model_variables=variables
+                model_variables=model_variables
             )
         else:
-            return CplexMaster.losses.categorical_crossentropy(
+            # retrieve the loss from the losses handler by name
+            loss_fn = getattr(CplexMaster.losses, self.loss_fn)
+            return loss_fn(
                 model=model,
                 numeric_variables=prob,
-                model_variables=variables
+                model_variables=model_variables
             )
 
     def return_solutions(self, macs, solution, model_info, x: Matrix, y: Vector, iteration: Iteration) -> Any:
@@ -227,6 +250,7 @@ class BalancedCounts(CplexMaster):
             The vector of adjusted targets returned by the optimization model.
         """
         variables, _, _, _ = model_info
-        y_adj = [sum(c * solution.get_value(variables[i, c]) for c in range(self.num_classes)) for i in range(len(y))]
+        num_samples, num_classes = variables.shape
+        y_adj = [sum(c * solution.get_value(variables[i, c]) for c in range(num_classes)) for i in range(num_samples)]
         y_adj = np.array([int(v) for v in y_adj])
         return y_adj

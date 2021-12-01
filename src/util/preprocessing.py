@@ -7,20 +7,17 @@ import pandas as pd
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn.preprocessing import OneHotEncoder
 
-from moving_targets.util.typing import Matrix, Vector
-from src.util.typing import Methods, Extrapolation
+from moving_targets.util.typing import Matrix, Vector, Number
+from src.util.typing import Method, Extrapolation, Methods
 
 
 class Scaler:
-    """Custom scaler that is able to treat each feature separately."""
-
-    def __init__(self, methods: Methods = 'std'):
+    def __init__(self, *methods: Method, default_method: Method = None, **custom_methods: Method):
         """
-        :param methods:
-            Either a string/tuple, a list of strings/tuples, or a dictionary of strings/tuples.
+        :param default_method:
+            The default scaling method which can be either a string or a tuple representing a method.
 
-            Each string/tuple represents a method:
-
+            Admitted methods are:
             - 'std', or 'standardize', standardizes the feature
             - 'norm', or 'normalize', or 'minmax', normalizes the feature from (min, max) into (0, 1)
             - 'zero', or 'max', or 'zeromax', normalizes the feature from (min, max) into (min / v, max / v), where
@@ -30,13 +27,25 @@ class Scaler:
             - 'onehot', encodes categorical features as a vector
             - None, performs no scaling
 
+        :param methods:
+
+
             If a single value is passed, all the features are scaled with the same method.
             If a list or a dictionary is passed, each feature is scaled with the respective method.
         """
         super(Scaler, self).__init__()
+        assert default_method or len(methods) == 0, "if the default method is not None, custom scaling methods for " \
+                                                    "specific features must be passed via keyword (i.e., the " \
+                                                    "'*methods' parameter must be empty)"
+        assert len(custom_methods) == 0 or len(methods) == 0, "if at least one custom scaling method for specific " \
+                                                              "features is passed, no unnamed method must be passed " \
+                                                              "as well (i.e., the '*methods' parameter must be empty)"
 
-        self.methods = methods
-        """The scaling methods."""
+        self.default_method: Method = default_method
+        """The default scaling method."""
+
+        self.methods: Methods = custom_methods if len(methods) == 0 else list(methods)
+        """The custom scaling methods."""
 
         self._is_2d: bool = True
         """Whether or not the input data is 2d."""
@@ -52,6 +61,8 @@ class Scaler:
 
         self._scaling: Optional[np.ndarray] = None
         """The scaling vector."""
+
+    """Custom scaler that is able to treat each feature separately."""
 
     @staticmethod
     def _handle_input(data: Union[Vector, Matrix]) -> Tuple[Matrix, Tuple[bool, bool]]:
@@ -106,13 +117,14 @@ class Scaler:
         # handle input
         data, (self._is_2d, self._is_pandas) = Scaler._handle_input(data=data)
 
-        # handle methods
-        if isinstance(self.methods, dict):
-            methods = self.methods
-        elif isinstance(self.methods, list):
-            methods = {column: method for method, column in zip(self.methods, data.columns)}
+        # handle methods:
+        # > if self.methods is a list, pair the methods with the columns
+        # > otherwise, use the custom methods when passed, or the default method otherwise
+        if isinstance(self.methods, list):
+            assert len(self.methods) == len(data.columns), "previously passed methods do not match data features length"
+            methods = {c: m for m, c in zip(self.methods, data.columns)}
         else:
-            methods = {column: self.methods for column in data.columns}
+            methods = {c: self.methods[c] if c in self.methods else self.default_method for c in data.columns}
 
         # handle one hot encoding
         df = data.copy()
@@ -219,7 +231,7 @@ class Scaler:
         :return:
             A blank scaler.
         """
-        return Scaler(methods=None).fit(data=[[0.] * num_features])
+        return Scaler(default_method=None).fit(data=[[0.] * num_features])
 
 
 Scalers = Union[Optional[Scaler], Tuple[Optional[Scaler], Optional[Scaler]]]
@@ -234,8 +246,8 @@ ValidationArgs = Union[pd.DataFrame, pd.Series]
 
 
 def split_dataset(*dataset: SplitArgs,
-                  test_size: Union[int, float] = 0.2,
-                  val_size: Union[None, int, float] = None,
+                  test_size: Number = 0.2,
+                  val_size: Optional[Number] = None,
                   extrapolation: Extrapolation = None,
                   random_state: int = 0,
                   shuffle: bool = True,
