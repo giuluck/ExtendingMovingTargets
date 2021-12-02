@@ -4,7 +4,7 @@ from typing import Callable, Optional, Any
 
 import numpy as np
 
-from moving_targets.util.typing import Vector, Number
+from moving_targets.util.typing import Number
 
 
 class SumLoss:
@@ -25,8 +25,7 @@ class SumLoss:
         self._sum_fn: Callable = sum_fn
         """Routine function that computes the sum of a vector x using the given model."""
 
-    def __call__(self, model, numeric_variables: Vector, model_variables: Vector,
-                 sample_weight: Optional[Vector] = None) -> float:
+    def __call__(self, model, numeric_variables, model_variables, sample_weight: Optional = None) -> float:
         """Computes the aggregated sum of losses over a paired set of vectors, a true and a predicted one.
 
         :param model:
@@ -67,8 +66,7 @@ class MeanLoss(SumLoss):
         """
         super(MeanLoss, self).__init__(loss_fn=loss_fn, sum_fn=sum_fn)
 
-    def __call__(self, model, numeric_variables: Vector, model_variables: Vector,
-                 sample_weight: Optional[Vector] = None) -> float:
+    def __call__(self, model, numeric_variables, model_variables, sample_weight: Optional = None) -> float:
         """Computes the aggregated sum of losses over a paired set of vectors, a true and a predicted one.
 
         :param model:
@@ -107,8 +105,7 @@ class IntMeanLoss(MeanLoss):
         """
         super(IntMeanLoss, self).__init__(loss_fn=loss_fn, sum_fn=sum_fn)
 
-    def __call__(self, model, numeric_variables: Vector, model_variables: Vector,
-                 sample_weight: Optional[Vector] = None) -> float:
+    def __call__(self, model, numeric_variables, model_variables, sample_weight: Optional = None) -> float:
         """Computes the aggregated sum of losses over a paired set of vectors, a true and a predicted one.
 
         :param model:
@@ -126,7 +123,7 @@ class IntMeanLoss(MeanLoss):
         :return:
             A real number representing the final loss.
         """
-        int_numeric_variables: Vector = np.array(numeric_variables).astype(int)
+        int_numeric_variables = np.array(numeric_variables).astype(int)
         assert np.allclose(numeric_variables, int_numeric_variables), f'cannot use as index values {numeric_variables}'
         return super(IntMeanLoss, self).__call__(
             model=model,
@@ -156,8 +153,7 @@ class ClippedMeanLoss(MeanLoss):
         self._clip_value: float = clip_value
         """Floating point value that indicates the width of the interval."""
 
-    def __call__(self, model, numeric_variables: Vector, model_variables: Vector,
-                 sample_weight: Optional[Vector] = None) -> float:
+    def __call__(self, model, numeric_variables, model_variables, sample_weight: Optional = None) -> float:
         """Computes the aggregated sum of losses over a paired set of vectors, a true and a predicted one.
 
         :param model:
@@ -403,7 +399,7 @@ class LossesHandler:
         return bce + rbce
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
-    def _categorical_hamming(self, model, numeric_variable: int, model_variable: Vector):
+    def _categorical_hamming(self, model, numeric_variable: int, model_variable):
         """Computes the categorical hamming distance.
 
         :param model:
@@ -420,7 +416,7 @@ class LossesHandler:
         """
         return 1 - model_variable[numeric_variable]
 
-    def _categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Vector):
+    def _categorical_crossentropy(self, model, numeric_variable, model_variable):
         """Computes the categorical crossentropy loss.
 
         :param model:
@@ -437,7 +433,7 @@ class LossesHandler:
         """
         return self._sum_fn(model, -model_variable * np.log(numeric_variable))
 
-    def _reversed_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Vector):
+    def _reversed_categorical_crossentropy(self, model, numeric_variable, model_variable):
         """Computes the reversed categorical crossentropy loss using the custom `log_fn` function.
 
         :param model:
@@ -459,7 +455,7 @@ class LossesHandler:
 
         return self._sum_fn(model, [-nv * _log(mv) for nv, mv in zip(numeric_variable, model_variable)])
 
-    def _symmetric_categorical_crossentropy(self, model, numeric_variable: Vector, model_variable: Any):
+    def _symmetric_categorical_crossentropy(self, model, numeric_variable, model_variable: Any):
         """Computes the symmetric categorical crossentropy loss, obtained as the sum of the standard and reversed ones.
 
         :param model:

@@ -51,7 +51,7 @@ if __name__ == '__main__':
         handler = ExperimentHandler(
             manager=manager,
             learner=LogisticRegression(),
-            master=BalancedCounts(alpha=config['alpha'], beta=config['beta'], loss_fn=config['loss_fn']),
+            master=BalancedCounts(loss_fn=config['loss_fn'], alpha=config['alpha'], beta=config['beta']),
             init_step=config['init_step'],
             dataset=config['dataset']
         )

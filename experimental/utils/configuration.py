@@ -6,8 +6,9 @@ from typing import Dict
 import numpy as np
 import tensorflow as tf
 
-from moving_targets.util.typing import Matrix, Dataset, Vector
-from src.datasets import AbstractManager, IrisManager, RedwineManager, WhitewineManager, ShuttleManager, DotaManager
+from moving_targets.util.typing import Dataset
+from src.datasets import AbstractManager, IrisManager, RedwineManager, WhitewineManager, ShuttleManager, DotaManager, \
+    CommunitiesManager, AdultManager
 from src.util.preprocessing import Scalers, Scaler
 
 
@@ -78,6 +79,10 @@ def get_manager(dataset: str, res_folder: str = '../../res', **manager_kwargs) -
         return ShuttleManager(filepath=f'{res_folder}/shuttle.trn', **manager_kwargs)
     elif dataset == 'dota':
         return DotaManager(filepath=f'{res_folder}/dota2.csv', **manager_kwargs)
+    elif dataset == 'adult':
+        return AdultManager(filepath=f'{res_folder}/adult.csv', **manager_kwargs)
+    elif dataset == 'communities':
+        return CommunitiesManager(filepath=f'{res_folder}/communities.csv', **manager_kwargs)
     else:
         raise ValueError(f"Unknown dataset '{dataset}'")
 
@@ -85,7 +90,7 @@ def get_manager(dataset: str, res_folder: str = '../../res', **manager_kwargs) -
 class Fold:
     """Data class containing the information of a fold for k-fold cross-validation."""
 
-    def __init__(self, x: Matrix, y: Vector, scalers: Scalers, validation: Dataset):
+    def __init__(self, x, y, scalers: Scalers, validation: Dataset):
         """
         :param x:
             The input data.
@@ -103,10 +108,10 @@ class Fold:
         xsc = Scaler.get_default(x.shape[-1]) if xsc is None else xsc
         ysc = Scaler.get_default(y.shape[-1]) if ysc is None else ysc
 
-        self.x: Matrix = xsc.fit_transform(x)
+        self.x = xsc.fit_transform(x)
         """The input data."""
 
-        self.y: Vector = ysc.fit_transform(y)
+        self.y = ysc.fit_transform(y)
         """The output data/info."""
 
         self.scalers: Scalers = scalers

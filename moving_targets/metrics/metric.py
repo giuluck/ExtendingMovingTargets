@@ -1,5 +1,4 @@
 """Basic Metric Interface."""
-from moving_targets.util.typing import Matrix, Vector
 
 
 class Metric:
@@ -15,7 +14,7 @@ class Metric:
         self.__name__: str = name
         """The name of the metric."""
 
-    def __call__(self, x: Matrix, y: Vector, p: Vector) -> float:
+    def __call__(self, x, y, p) -> float:
         """Core method used to compute the metric value.
 
         :param x:

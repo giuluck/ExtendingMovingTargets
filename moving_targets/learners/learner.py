@@ -1,8 +1,8 @@
 """Basic Learner Interface."""
 from abc import ABC
-from typing import Union
+from typing import Any
 
-from moving_targets.util.typing import Vector, Iteration, Matrix
+from moving_targets.util.typing import Iteration
 
 
 class Learner:
@@ -12,7 +12,7 @@ class Learner:
         """"""
         super(Learner, self).__init__()
 
-    def fit(self, macs, x: Matrix, y: Vector, iteration: Iteration, **additional_kwargs):
+    def fit(self, macs, x, y, iteration: Iteration, **additional_kwargs):
         """Fits the learner according to the implemented procedure using (x, y) as training data.
 
         :param macs:
@@ -30,9 +30,9 @@ class Learner:
         :param additional_kwargs:
             Any other useful parameter.
         """
-        raise NotImplementedError("Please implement method 'fit'")
+        raise NotImplementedError("Please implement abstract method 'fit'")
 
-    def predict(self, x: Matrix) -> Union[Vector, Matrix]:
+    def predict(self, x) -> Any:
         """Uses the fitted learner configuration to predict labels from input samples.
 
         :param x:
@@ -41,14 +41,14 @@ class Learner:
         :return:
             The vector of predicted labels.
         """
-        raise NotImplementedError("Please implement method 'predict'")
+        raise NotImplementedError("Please implement abstract method 'predict'")
 
 
 class Classifier(Learner, ABC):
     """Basic interface for a Moving Targets classifier."""
 
     @staticmethod
-    def get_classes(prob: Matrix) -> Union[Vector, Matrix]:
+    def get_classes(prob) -> Any:
         """Gets the output classes given the output probabilities per class.
 
         :param prob:
@@ -63,7 +63,7 @@ class Classifier(Learner, ABC):
         else:
             return prob.argmax(axis=1)
 
-    def predict_classes(self, x: Matrix) -> Vector:
+    def predict_classes(self, x) -> Any:
         """Predicts the output classes of the given input samples.
 
         :param x:

@@ -94,7 +94,7 @@ class TestLosses:
         :return:
             Cvxpy's `LossesHandler` object.
         """
-        raise NotImplementedError(f"Please implement method '_losses'")
+        raise NotImplementedError(f"Please implement abstract method '_losses'")
 
     def _test(self,
               model_loss: Callable,
@@ -121,7 +121,7 @@ class TestLosses:
         :param weights:
             Whether or not to use sample weights.
         """
-        raise NotImplementedError(f"Please implement method '_test'")
+        raise NotImplementedError(f"Please implement abstract method '_test'")
 
     def test_sae(self):
         """Tests Sum of Absolute Errors loss."""

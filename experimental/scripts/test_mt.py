@@ -4,26 +4,28 @@ import warnings
 from sklearn.exceptions import ConvergenceWarning
 
 from experimental.utils import ExperimentHandler
-from experimental.utils.configuration import get_manager
+from moving_targets.learners import LogisticRegression
+from src.datasets import AdultManager
+from src.masters import FairClassification
 
 if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
-    iterations = 15
+    iterations = 1
     callbacks = []
-    manager = get_manager(dataset='redwine')
+    manager = AdultManager(filepath='../../res/adult.csv', test_size=0.99)
 
     ExperimentHandler(
         manager=manager,
-        alpha=1.0,
-        beta=None,
-        loss_fn='mse'
+        learner=LogisticRegression(),
+        master=FairClassification(protected=manager.PROTECTED, loss_fn='mse', time_limit=None),
+        init_step='projection'
     ).experiment(
         iterations=iterations,
         num_folds=None,
         callbacks=callbacks,
         model_verbosity=True,
         fold_verbosity=False,
-        plot_args={},
+        plot_args={'num_columns': 3, 'figsize': (30, 20), 'tight_layout': True},
         summary_args=None
     )

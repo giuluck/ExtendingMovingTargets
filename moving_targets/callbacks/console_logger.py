@@ -4,7 +4,7 @@ import time
 from typing import Optional
 
 from moving_targets.callbacks.callback import Callback
-from moving_targets.util.typing import Iteration, Matrix, Vector, Dataset
+from moving_targets.util.typing import Iteration, Dataset
 
 
 class ConsoleLogger(Callback):
@@ -17,14 +17,12 @@ class ConsoleLogger(Callback):
         self._time: Optional[float] = None
         """An internal variable used to compute elapsed time between routines."""
 
-    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                           **additional_kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         # Prints the current iteration and stores the initial time.
         print(f'-------------------- ITERATION: {iteration:02} --------------------')
         self._time = time.time()
 
-    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                         **additional_kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         # Prints the time elapsed from the iteration start.
         print(f'Time: {time.time() - self._time:.4f} s')
         self._time = None

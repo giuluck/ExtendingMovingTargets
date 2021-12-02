@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from moving_targets.metrics import Metric
-from moving_targets.util.typing import Vector, Matrix, Dataset
+from moving_targets.util.typing import Dataset
 from src.util.preprocessing import Scaler, Scalers, split_dataset, cross_validate
 from src.util.typing import Method
 
@@ -60,7 +60,7 @@ class AbstractManager:
         self.test_data: Tuple[pd.DataFrame, pd.Series] = (test.drop(columns=label), test[label])
         """The test data in the form of a tuple (xts, yts)."""
 
-        self.stratify: Union[None, Vector, Matrix] = None if stratify is None else train[stratify]
+        self.stratify: Optional = None if stratify is None else train[stratify]
         """The train data stratification data, if present."""
 
         self.metrics: List[Metric] = metrics
@@ -72,7 +72,7 @@ class AbstractManager:
         self.y_scaling: Method = y_scaling
         """Y scaling method."""
 
-    def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Optional[Scaler], Optional[Scaler]]:
+    def get_scalers(self, x, y) -> Tuple[Optional[Scaler], Optional[Scaler]]:
         """Returns the dataset scalers.
 
         :param x:
@@ -84,8 +84,8 @@ class AbstractManager:
         :return:
             A pair of scalers, one for the input and one for the output data, respectively.
         """
-        x_scaler = None if self.x_scaling is None else Scaler(self.x_scaling).fit(x)
-        y_scaler = None if self.y_scaling is None else Scaler(self.y_scaling).fit(y)
+        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling).fit(x)
+        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling).fit(y)
         return x_scaler, y_scaler
 
     def get_folds(self, num_folds: Optional[int] = None, **crossval_kwargs) -> DataInfo:

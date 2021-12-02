@@ -5,7 +5,6 @@ from typing import Callable
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from moving_targets.metrics.metric import Metric
-from moving_targets.util.typing import Matrix, Vector
 
 
 class RegressionMetric(Metric):
@@ -24,21 +23,7 @@ class RegressionMetric(Metric):
         self.metric_function: Callable = metric_function
         """The callable function used to compute the metric."""
 
-    def __call__(self, x: Matrix, y: Vector, p: Vector) -> float:
-        """Core method used to compute the metric value.
-
-        :param x:
-            The input matrix (unused).
-
-        :param y:
-            The vector of ground truths.
-
-        :param p:
-            The vector of predictions.
-
-        :return:
-            The metric value.
-        """
+    def __call__(self, x, y, p) -> float:
         return self.metric_function(y, p)
 
 

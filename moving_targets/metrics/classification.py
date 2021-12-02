@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, reca
 
 from moving_targets.learners.learner import Classifier
 from moving_targets.metrics.metric import Metric
-from moving_targets.util.typing import Classes, Matrix, Vector
+from moving_targets.util.typing import Classes
 
 
 class ClassificationMetric(Metric):
@@ -38,21 +38,7 @@ class ClassificationMetric(Metric):
         self.use_prob: bool = use_prob
         """Whether to use the output labels or the output probabilities."""
 
-    def __call__(self, x: Matrix, y: Vector, p: Vector) -> float:
-        """Core method used to compute the metric value.
-
-        :param x:
-            The input matrix (unused).
-
-        :param y:
-            The vector of ground truths.
-
-        :param p:
-            The vector of predictions.
-
-        :return:
-            The metric value.
-        """
+    def __call__(self, x, y, p) -> float:
         # HANDLE EXPLICIT CLASSES
         if self.classes is not None:
             mask = np.in1d(y, self.classes)
@@ -173,12 +159,16 @@ class Accuracy(ClassificationMetric):
 class AUC(ClassificationMetric):
     """AUC Score."""
 
-    def __init__(self, classes: Optional[Classes] = None, name: str = 'auc'):
+    def __init__(self, classes: Optional[Classes] = None, multi_class: str = 'ovo', name: str = 'auc'):
         """
         :param classes:
             The number of classes or a vector of class labels.
 
+        :param multi_class:
+            Determines the type of configuration to use when dealing with multiclass targets, either 'ovr' or 'ovo'.
+
         :param name:
             The name of the metric.
         """
-        super(AUC, self).__init__(metric_function=roc_auc_score, classes=classes, name=name, use_prob=True)
+        super(AUC, self).__init__(metric_function=lambda y, p: roc_auc_score(y, p, multi_class=multi_class),
+                                  classes=classes, name=name, use_prob=True)

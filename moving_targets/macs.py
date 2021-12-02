@@ -1,17 +1,17 @@
 """Core of the Moving Targets algorithm."""
 
 import time
-from typing import List, Dict, Callable, Union, Optional
+from typing import List, Dict, Callable, Union, Optional, Any
 
-from moving_targets.callbacks.logger import Logger
+from moving_targets.callbacks.callback import Callback
+from moving_targets.callbacks.console_logger import ConsoleLogger
 from moving_targets.callbacks.file_logger import FileLogger
 from moving_targets.callbacks.history import History
-from moving_targets.callbacks.console_logger import ConsoleLogger
-from moving_targets.callbacks.callback import Callback
+from moving_targets.callbacks.logger import Logger
 from moving_targets.learners.learner import Learner
 from moving_targets.masters.master import Master
 from moving_targets.metrics.metric import Metric
-from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Dataset, Iteration
 
 
 class MACS(Logger):
@@ -64,7 +64,7 @@ class MACS(Logger):
         self._time: Optional[float] = None
         """An auxiliary variable to keep track of the elapsed time between iterations."""
 
-    def fit(self, x: Matrix, y: Vector, iterations: int = 1, val_data: Optional[Dataset] = None,
+    def fit(self, x, y, iterations: int = 1, val_data: Optional[Dataset] = None,
             callbacks: Optional[List[Callback]] = None, verbose: Union[int, bool] = 2) -> History:
         """Fits the learner based on the Moving Targets iterative procedure.
 
@@ -150,7 +150,7 @@ class MACS(Logger):
         self._update_callbacks(callbacks, lambda c: c.on_process_end(macs=self, val_data=val_data))
         return self._history
 
-    def predict(self, x: Matrix) -> Vector:
+    def predict(self, x) -> Any:
         """Uses the previously trained `Learner` to predict labels from input samples.
 
         :param x:
@@ -165,7 +165,7 @@ class MACS(Logger):
         assert self.fitted, 'The model has not been fitted yet, please call method .fit()'
         return self.learner.predict(x)
 
-    def evaluate(self, x: Matrix, y: Vector) -> Dict[str, float]:
+    def evaluate(self, x, y) -> Dict[str, float]:
         """Evaluates the performances of the model based on the given set of metrics.
 
         :param x:
@@ -183,12 +183,10 @@ class MACS(Logger):
         p = self.predict(x)
         return {metric.__name__: metric(x, y, p) for metric in self.metrics}
 
-    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                           **additional_kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         self._time = time.time()
 
-    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                         **additional_kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         logs = {'iteration': iteration, 'elapsed time': time.time() - self._time}
         # log metrics on training data
         p = self.predict(x)

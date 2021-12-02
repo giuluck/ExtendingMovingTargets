@@ -4,7 +4,7 @@ import sys
 from typing import List, Set, Optional
 
 from moving_targets.callbacks.logger import Logger
-from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Dataset, Iteration
 
 SEPARATOR: str = '--------------------------------------------------'
 
@@ -56,7 +56,7 @@ class FileLogger(Logger):
         self._logged_once: bool = False
         """An internal variable used to write the initial line separator."""
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
+    def on_process_start(self, macs, x, y, val_data: Optional[Dataset], **additional_kwargs):
         # reset file content for overwriting
         if self.filepath is not None:
             open(self.filepath, 'w').close()
@@ -66,34 +66,29 @@ class FileLogger(Logger):
     def on_process_end(self, macs, val_data: Optional[Dataset], **additional_kwargs):
         self._write_on_file('END PROCESS', 'on_process_end')
 
-    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
+    def on_pretraining_start(self, macs, x, y, val_data: Optional[Dataset], **additional_kwargs):
         self._write_on_file('START PRETRAINING', 'on_pretraining_start')
 
-    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
+    def on_pretraining_end(self, macs, x, y, val_data: Optional[Dataset], **additional_kwargs):
         self._write_on_file('END PRETRAINING', 'on_pretraining_end')
 
-    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                           **additional_kwargs):
+    def on_iteration_start(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         self._write_on_file(f'START ITERATION', 'on_iteration_start')
 
-    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                         **additional_kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         self._write_on_file(f'END ITERATION', 'on_iteration_end')
 
-    def on_training_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                          **additional_kwargs):
+    def on_training_start(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         self._write_on_file('START TRAINING', 'on_training_start')
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
+    def on_training_end(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         self._write_on_file('END TRAINING', 'on_training_end')
 
-    def on_adjustment_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                            **additional_kwargs):
+    def on_adjustment_start(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         self._write_on_file('START ADJUSTMENT', 'on_adjustment_start')
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
+    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data: Optional[Dataset], iteration: Iteration,
+                          **additional_kwargs):
         self._write_on_file('END ADJUSTMENT', 'on_adjustment_end')
 
     def _write_on_file(self, message: str, routine_name: str):

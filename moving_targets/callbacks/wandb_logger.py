@@ -5,7 +5,7 @@ from typing import Dict, Optional
 import wandb
 
 from moving_targets.callbacks.logger import Logger
-from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Dataset, Iteration
 
 
 class WandBLogger(Logger):
@@ -42,11 +42,10 @@ class WandBLogger(Logger):
         self.config: Dict = wandb_kwargs
         """The Weights&Biases run configuration."""
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
+    def on_process_start(self, macs, x, y, val_data: Optional[Dataset], **additional_kwargs):
         wandb.init(project=self._project, entity=self._entity, name=self._run_name, config=self.config)
 
-    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                         **additional_kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         wandb.log({k: self._cache[k] for k in sorted(self._cache)})
         self._cache = {}
 

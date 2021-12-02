@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 
 from moving_targets.callbacks.logger import Logger
-from moving_targets.util.typing import Iteration, Matrix, Vector, Dataset
+from moving_targets.util.typing import Iteration, Dataset
 
 
 class History(Logger):
@@ -21,8 +21,7 @@ class History(Logger):
         self._history: List = []
         """An internal list which will be used to create the final DataFrame object at the end of the training."""
 
-    def on_iteration_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                         **additional_kwargs):
+    def on_iteration_end(self, macs, x, y, val_data: Optional[Dataset], iteration: Iteration, **additional_kwargs):
         # Creates a dataframe from the cached items and appends them to a list indexed by iteration.
         self._history.append(pd.DataFrame([self._cache.values()], columns=self._cache.keys(), index=[iteration]))
         self._cache = {}
