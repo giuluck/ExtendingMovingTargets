@@ -1,30 +1,24 @@
 """Cvxpy Master interface."""
 import logging
 from abc import ABC
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import cvxpy as cp
+import numpy as np
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
 from moving_targets.util.typing import Iteration, Solution
 
 
-# noinspection PyUnusedLocal
-def _log(model, x, lb: Optional[float] = None, ub: Optional[float] = None) -> Any:
-    """Cvxpy custom `log_fn` function."""
-    raise ValueError('Cvxpy Master cannot deal with logarithms.')
-
-
 class CvxpyMaster(Master, ABC):
-    """Master interface to Cvxpy solver."""
+    """Master interface to Abstract Cvxpy solver."""
 
-    losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x),
-                           abs_fn=lambda model, x, lb=None, ub=None: cp.abs(x),
-                           log_fn=lambda model, x, lb=None, ub=None: cp.log(x))
-    """The `LossesHandler` object for this backend solver."""
+    scs_losses: LossesHandler = LossesHandler(abs_fn=lambda model, vector: np.array([cp.abs(v) for v in vector]),
+                                              log_fn=lambda model, vector: np.array([cp.log(v) for v in vector]))
+    """The `LossesHandler` object for the 'SCS' backend solver."""
 
-    def __init__(self, alpha: float, beta: float, solver: Optional[str], **solver_args):
+    def __init__(self, alpha: float, beta: float, solver: str, **solver_args):
         """
         :param alpha:
             The non-negative real number which is used to calibrate the two losses in the alpha step.
@@ -40,8 +34,8 @@ class CvxpyMaster(Master, ABC):
         """
         super(CvxpyMaster, self).__init__(alpha=alpha, beta=beta)
 
-        self.solver: Optional[str] = solver
-        """The name of the solver (e.g., SCS, ...)."""
+        self.solver: str = solver
+        """The name of the solver."""
 
         self.solver_args: Dict[str, Any] = solver_args
         """Parameters of the solver to be passed to the `model.solve()` function."""

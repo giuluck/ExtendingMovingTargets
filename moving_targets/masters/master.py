@@ -81,7 +81,7 @@ class Master:
         """
         return False
 
-    def y_loss(self, macs, model, x, y, model_info, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, x, y, model_info, iteration: Iteration) -> Any:
         """Computes the loss of the model variables wrt real targets.
 
         :param macs:
@@ -107,7 +107,7 @@ class Master:
         """
         return 0.0
 
-    def p_loss(self, macs, model, x, y, model_info, iteration: Iteration) -> float:
+    def p_loss(self, macs, model, x, y, model_info, iteration: Iteration) -> Any:
         """Computes the loss of the model variables wrt predictions.
 
         :param macs:

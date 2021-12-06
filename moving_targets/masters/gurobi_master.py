@@ -1,10 +1,10 @@
 """Gurobi Master interface."""
 import logging
 from abc import ABC
-from typing import Optional, Any, Dict
+from typing import Any, Dict
 
 import numpy as np
-from gurobipy import Model, Env, GRB, Var
+from gurobipy import Model, Env, GRB
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
@@ -14,35 +14,34 @@ EPS: float = 1e-9
 """Floating point value used in lower/upper bounds to avoid infeasibility due to numeric errors."""
 
 
-def _abs(model: Model, x: Var, lb: Optional[float] = None, ub: Optional[float] = None) -> Var:
+def _abs(model, vector):
     """Gurobi custom `abs_fn` function."""
-    lb = -float('inf') if lb is None else lb
-    ub = float('inf') if ub is None else ub
-    abs_ub = max(abs(lb), abs(ub))
-    aux_x = model.addVar(lb=lb - EPS, ub=ub + EPS, vtype=GRB.CONTINUOUS, name=f'aux({x})', column=None, obj=0)
-    abs_x = model.addVar(lb=0, ub=abs_ub + EPS, vtype=GRB.CONTINUOUS, name=f'abs({x})', column=None, obj=0)
-    model.addConstr(aux_x == x, name=f'aux({x})')
-    model.addGenConstrAbs(abs_x, aux_x, name=f'abs({x})')
-    return abs_x
+    abs_vector = []
+    for v in vector.flatten():
+        aux_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'aux({v})', lb=-float('inf'), column=None, obj=0)
+        abs_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'abs({v})', column=None, obj=0)
+        model.addConstr(aux_v == v, name=f'aux({v})')
+        model.addGenConstrAbs(abs_v, aux_v, name=f'abs({v})')
+        abs_vector.append(abs_v)
+    return np.array(abs_vector).reshape(vector.shape)
 
 
-def _log(model: Model, x: Var, lb: Optional[float] = None, ub: Optional[float] = None) -> Var:
+def _log(model, vector):
     """Gurobi custom `log_fn` function."""
-    lb = 0 if lb is None else lb
-    ub = float('inf') if ub is None else ub
-    log_lb = -float('inf') if lb == 0 else np.log(lb)
-    log_ub = -float('inf') if ub == 0 else np.log(ub)
-    aux_x = model.addVar(lb=lb - EPS, ub=ub + EPS, vtype=GRB.CONTINUOUS, name=f'aux({x})', column=None, obj=0)
-    log_x = model.addVar(lb=log_lb - EPS, ub=log_ub + EPS, vtype=GRB.CONTINUOUS, name=f'log({x})', column=None, obj=0)
-    model.addConstr(aux_x == x, name=f'aux({x})')
-    model.addGenConstrExp(log_x, aux_x, name=f'log({x})', options='')
-    return log_x
+    log_vector = []
+    for v in vector.flatten():
+        aux_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'aux({v})', lb=-float('inf'), column=None, obj=0)
+        log_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'log({v})', lb=-float('inf'), column=None, obj=0)
+        model.addConstr(aux_v == v, name=f'aux({v})')
+        model.addGenConstrExp(log_v, aux_v, name=f'log({v})')
+        log_vector.append(log_v)
+    return np.array(log_vector).reshape(vector.shape)
 
 
 class GurobiMaster(Master, ABC):
     """Master interface to Gurobi solver."""
 
-    losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: sum(x), abs_fn=_abs, log_fn=_log)
+    losses: LossesHandler = LossesHandler(abs_fn=_abs, log_fn=_log)
     """The `LossesHandler` object for this backend solver."""
 
     def __init__(self, alpha: float, beta: float, verbose: bool, **solver_args):

@@ -3,7 +3,7 @@ import logging
 from abc import ABC
 from typing import Optional
 
-from docplex.mp.dvar import Var
+import numpy as np
 from docplex.mp.model import Model
 
 from moving_targets.masters.losses import LossesHandler
@@ -11,18 +11,15 @@ from moving_targets.masters.master import Master
 from moving_targets.util.typing import Iteration, Solution
 
 
-# noinspection PyUnusedLocal
-def _log(model, x: Var, lb: Optional[float] = None, ub: Optional[float] = None) -> Var:
-    """Cplex custom `log_fn` function."""
-    raise ValueError('Cplex Master cannot deal with logarithms.')
+def _abs(model, vector):
+    """Cplex custom `abs_fn` function."""
+    return np.array([model.abs(v) for v in vector.flatten()]).reshape(vector.shape)
 
 
 class CplexMaster(Master, ABC):
     """Master interface to Cplex solver."""
 
-    losses = LossesHandler(sum_fn=lambda model, x, lb=None, ub=None: model.sum(x),
-                           abs_fn=lambda model, x, lb=None, ub=None: model.abs(x),
-                           log_fn=_log)
+    losses: LossesHandler = LossesHandler(abs_fn=_abs, log_fn=None)
     """The `LossesHandler` object for this backend solver."""
 
     def __init__(self, alpha: float, beta: float, time_limit: Optional[float]):

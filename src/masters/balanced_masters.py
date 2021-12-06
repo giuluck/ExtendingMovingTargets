@@ -1,6 +1,6 @@
 """Master implementation for the Balance Counts problem."""
 from collections import namedtuple
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ class BalancedCounts(CplexMaster):
     Info = namedtuple('Info', 'variables predictions max_count')
     """Data structure for the model info returned by the 'build_model()' method."""
 
-    losses = {
+    accepted_losses: Dict[str, str] = {
         'hd': 'categorical_hamming',
         'hamming_distance': 'categorical_hamming',
         'ce': 'categorical_crossentropy',
@@ -52,7 +52,7 @@ class BalancedCounts(CplexMaster):
         :param time_limit:
             The maximal time for which the master can run during each iteration.
         """
-        assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
+        assert loss_fn in self.accepted_losses.keys(), f"'{loss_fn}' is not a valid loss function"
         super(BalancedCounts, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
 
         self.clip_value: float = clip_value
@@ -62,7 +62,7 @@ class BalancedCounts(CplexMaster):
         """The slack value, expressed in terms of ratio wrt the other classes, to allow some output class to have a
         few labelled samples more than the other classes."""
 
-        self._p_loss: str = self.losses[loss_fn]
+        self._p_loss: str = self.accepted_losses[loss_fn]
         """The loss function computed between the model variables and the learner predictions."""
 
     def build_model(self, macs, model, x: pd.DataFrame, y: pd.Series, iteration: Iteration) -> Info:
@@ -100,11 +100,11 @@ class BalancedCounts(CplexMaster):
             _, classes_counts = np.unique(Classifier.get_classes(pred), return_counts=True)
             return np.all(classes_counts <= max_count)
 
-    def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         variables, _, _ = model_info
-        return CplexMaster.losses.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
+        return BalancedCounts.losses.categorical_hamming(model=model, numeric_variables=y, model_variables=variables)
 
-    def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> float:
+    def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         model_variables, pred, _ = model_info
         if pred is None:
             return 0.0
@@ -112,7 +112,7 @@ class BalancedCounts(CplexMaster):
             # if the chosen loss is hamming distance we use classes instead of probabilities
             pred = Classifier.get_classes(pred) if self._p_loss == 'categorical_hamming' else pred
             # retrieve the loss from the losses handler by name
-            loss_fn = getattr(CplexMaster.losses, self._p_loss)
+            loss_fn = getattr(BalancedCounts.losses, self._p_loss)
             return loss_fn(
                 model=model,
                 numeric_variables=pred,

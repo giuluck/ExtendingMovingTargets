@@ -36,14 +36,8 @@ if __name__ == '__main__':
         init_step=['pretraining', 'projection'],
         alpha=[1.0, 0.1, 0.01],
         beta=[1.0, 0.1, 0.01, None],
-        loss_fn=['mse'],
-        dataset=['shuttle']
-    ) + cartesian_product(
-        init_step=['pretraining', 'projection'],
-        alpha=[1.0, 0.1, 0.01],
-        beta=[1.0, 0.1, 0.01, None],
-        loss_fn=['hd', 'ce', 'mse'],
-        dataset=['dota']
+        loss_fn=['hd', 'ce', 'mse', 'mae'],
+        dataset=['iris', 'redwine', 'whitewine', 'shuttle', 'dota']
     )
 
     for i, config in enumerate(study):

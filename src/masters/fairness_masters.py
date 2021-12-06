@@ -1,6 +1,6 @@
 """Master implementation for the Fair Regression problem."""
 from collections import namedtuple
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -70,17 +70,18 @@ class Fairness(CplexMaster):
         else:
             return self.didi(x=x, y=y, p=pred) <= self.violation
 
-    def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> float:
+    def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         var, _ = model_info
-        y_loss = getattr(CplexMaster.losses, self._y_loss)
+        y_loss = getattr(Fairness.losses, self._y_loss)
         return y_loss(model=model, numeric_variables=y, model_variables=var)
 
-    def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> float:
+    def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         variables, pred = model_info
         if pred is None:
             return 0.0
         else:
-            return CplexMaster.losses.mean_squared_error(model=model, numeric_variables=pred, model_variables=variables)
+            p_loss = getattr(Fairness.losses, self._p_loss)
+            return p_loss(model=model, numeric_variables=pred, model_variables=variables)
 
     def return_solutions(self, macs, solution, x: pd.DataFrame, y: pd.Series, model_info: Info,
                          iteration: Iteration) -> Solution:
@@ -90,7 +91,7 @@ class Fairness(CplexMaster):
 class FairRegression(Fairness):
     """Master for the Fairness Regression problem."""
 
-    losses = {
+    accepted_losses: Dict[str, str] = {
         'mae': 'mean_absolute_error',
         'mean_absolute_error': 'mean_absolute_error',
         'mse': 'mean_squared_error',
@@ -127,10 +128,10 @@ class FairRegression(Fairness):
         :param time_limit:
             The maximal time for which the master can run during each iteration.
         """
-        assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
-        super(FairRegression, self).__init__(classification=False, protected=protected, y_loss=self.losses[loss_fn],
-                                             p_loss=self.losses[loss_fn], violation=violation, alpha=alpha, beta=beta,
-                                             time_limit=time_limit)
+        assert loss_fn in self.accepted_losses.keys(), f"'{loss_fn}' is not a valid loss function"
+        super(FairRegression, self).__init__(classification=False, protected=protected, violation=violation,
+                                             y_loss=self.accepted_losses[loss_fn], p_loss=self.accepted_losses[loss_fn],
+                                             alpha=alpha, beta=beta, time_limit=time_limit)
 
         self.lb: float = lb
         """The variables' lower bound."""
@@ -154,10 +155,9 @@ class FairRegression(Fairness):
                 protected_average = model.sum(protected_variables) / len(protected_variables)
                 # average output target for the whole dataset
                 total_average = model.sum(variables) / len(variables)
-                # linearize with constraints the absolute value of the deviation between the total average samples
-                # and the average samples within the protected group in order to consider the unsigned value
-                model.add_constraint(deviations[idx] >= total_average - protected_average)
-                model.add_constraint(deviations[idx] >= protected_average - total_average)
+                # the partial deviation is computed as the absolute value of the difference between the
+                # total average samples and the average samples within the protected group
+                deviations[idx] = model.abs(total_average - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
         didi = model.sum(deviations)
@@ -175,7 +175,7 @@ class FairRegression(Fairness):
 class FairClassification(Fairness):
     """Master for the Fairness Classification problem."""
 
-    losses = {
+    accepted_losses: Dict[str, str] = {
         'hd': 'categorical_hamming',
         'hamming_distance': 'categorical_hamming',
         'ce': 'categorical_crossentropy',
@@ -213,9 +213,9 @@ class FairClassification(Fairness):
         :param time_limit:
             The maximal time for which the master can run during each iteration.
         """
-        assert loss_fn in self.losses.keys(), f"'{loss_fn}' is not a valid loss function"
+        assert loss_fn in self.accepted_losses.keys(), f"'{loss_fn}' is not a valid loss function"
         super(FairClassification, self).__init__(classification=True, protected=protected, y_loss='categorical_hamming',
-                                                 p_loss=self.losses[loss_fn], violation=violation, alpha=alpha,
+                                                 p_loss=self.accepted_losses[loss_fn], violation=violation, alpha=alpha,
                                                  beta=beta, time_limit=time_limit)
 
         self.clip_value: float = clip_value
@@ -255,10 +255,9 @@ class FairClassification(Fairness):
                     protected_average = model.sum(protected_variables_per_class) / len(protected_variables_per_class)
                     # average number of samples from the whole dataset <class[class_idx]> as target class
                     total_average = model.sum(variables_per_class) / len(variables_per_class)
-                    # linearize with constraints the absolute value of the deviation between the total average samples
-                    # and the average samples within the protected group in order to consider the unsigned value
-                    model.add_constraint(deviations[idx, class_idx] >= total_average - protected_average)
-                    model.add_constraint(deviations[idx, class_idx] >= protected_average - total_average)
+                    # the partial deviation is computed as the absolute value of the difference between the
+                    # total average samples and the average samples within the protected group
+                    deviations[idx, class_idx] = model.abs(total_average - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
         didi = model.sum(deviations)

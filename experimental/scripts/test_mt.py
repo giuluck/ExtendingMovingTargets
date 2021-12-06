@@ -4,22 +4,22 @@ import warnings
 from sklearn.exceptions import ConvergenceWarning
 
 from experimental.utils import ExperimentHandler
-from moving_targets.learners import LogisticRegression
-from src.datasets import AdultManager
-from src.masters import FairClassification
+from moving_targets.learners import *
+from src.datasets import *
+from src.masters import *
 
 if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
-    iterations = 1
+    iterations = 10
     callbacks = []
-    manager = AdultManager(filepath='../../res/adult.csv', test_size=0.99)
+    manager = RedwineManager(filepath='../../res/redwine.csv')
 
     ExperimentHandler(
         manager=manager,
         learner=LogisticRegression(),
-        master=FairClassification(protected=manager.PROTECTED, loss_fn='mse', time_limit=None),
-        init_step='projection'
+        master=BalancedCounts(loss_fn='mae'),
+        init_step='pretraining'
     ).experiment(
         iterations=iterations,
         num_folds=None,
