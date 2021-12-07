@@ -131,8 +131,9 @@ class LossesHandler:
     """Util class that handles the functions for the principal losses to be used in the Master."""
 
     def __init__(self,
-                 sum_fn: Optional[Callable] = lambda model, vector: np.sum(vector),
+                 sum_fn: Callable = lambda model, vector: np.sum(vector),
                  sqr_fn: Optional[Callable] = lambda model, vector: vector**2,
+                 ind_fn: Optional[Callable] = lambda model, vector: 1 - vector,
                  abs_fn: Optional[Callable] = lambda model, vector: np.abs(vector),
                  log_fn: Optional[Callable] = lambda model, vector: np.log(vector)):
         """
@@ -142,21 +143,35 @@ class LossesHandler:
         :param sqr_fn:
             Routine function of type f(<model>, <vector>) -> <vector> that computes the squared value of each element.
 
+            None if the solver does not support quadratic programming.
+
+        :param ind_fn:
+            Routine function of type f(<model>, <vector>) -> <vector> that computes the indicator value of each element.
+
+            None if the solver does not support mixed-integer programming.
+
         :param abs_fn:
             Routine function of type f(<model>, <vector>) -> <vector> that computes the absolute value of each element.
 
+            None if the solver does not support absolute values.
+
         :param log_fn:
             Routine function of type f(<model>, <vector>) -> <vector> that computes the logarithm of each element.
+
+            None if the solver does not support logarithms.
         """
 
         def _fn(operation: str):
             raise ValueError(f'This solver cannot deal with {operation}.')
 
-        self._sum_fn: Callable = sum_fn if sum_fn is not None else lambda model, vector: _fn(operation='sums')
+        self._sum_fn: Callable = sum_fn
         """Routine function that computes the sum of variables."""
 
         self._sqr_fn: Callable = sqr_fn if sqr_fn is not None else lambda model, vector: _fn(operation='squared values')
         """Routine function that computes each partial squared loss."""
+
+        self._ind_fn: Callable = ind_fn if ind_fn is not None else lambda model, vector: _fn(operation='integer values')
+        """Routine function that computes each indicator loss."""
 
         self._abs_fn: Callable = abs_fn if abs_fn is not None else lambda model, vector: _fn(operation='abs values')
         """Routine function that computes each partial absolute loss."""
@@ -226,7 +241,6 @@ class LossesHandler:
         absolute_errors = self._abs_fn(model, model_variables - numeric_variables)
         return sample_weights * absolute_errors.transpose()
 
-    # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _squared_errors(self, model, numeric_variables, model_variables, sample_weights):
         # transpose squared errors array in order to correctly deal with multivariate targets
         squared_errors = self._sqr_fn(model, model_variables - numeric_variables)
@@ -258,7 +272,6 @@ class LossesHandler:
         rbce = self._reversed_binary_crossentropy(model, numeric_variables, model_variables, sample_weights)
         return bce + rbce
 
-    # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _categorical_hamming(self, model, numeric_variables, model_variables, sample_weights):
         # model_variables: (n, c), where c is the number of classes
         # numeric variables: (n, )
@@ -268,17 +281,19 @@ class LossesHandler:
         # model variables, having shape (n * c, ); the indices are obtained by creating a range vector with n elements
         # and step c (i.e., [0, c, 2c, 3c, ...]) and adding the respective class index which is into numeric variables
         num_samples, num_classes = model_variables.shape
-        indices_mask = np.arange(num_samples * num_classes, step=num_classes) + numeric_variables
-        return sample_weights * (1 - model_variables.flatten()[indices_mask])
+        ind_mask = np.arange(num_samples * num_classes, step=num_classes) + numeric_variables
+        ind_losses = self._ind_fn(model, model_variables.flatten()[ind_mask])
+        return sample_weights * ind_losses.transpose()
 
+    # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
         log_losses = -model_variables * np.log(numeric_variables)
-        return self._sum_fn(model, sample_weights * log_losses.transpose())
+        return sample_weights * log_losses.transpose()
 
     def _reversed_categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
         shape = model_variables.shape
         log_losses = -numeric_variables * self._log_fn(model, model_variables.flatten()).reshape(shape)
-        return self._sum_fn(model, sample_weights * log_losses.transpose())
+        return sample_weights * log_losses.transpose()
 
     def _symmetric_categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
         cce = self._categorical_crossentropy(model, numeric_variables, model_variables, sample_weights)

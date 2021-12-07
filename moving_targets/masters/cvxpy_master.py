@@ -14,7 +14,8 @@ from moving_targets.util.typing import Iteration, Solution
 class CvxpyMaster(Master, ABC):
     """Master interface to Abstract Cvxpy solver."""
 
-    scs_losses: LossesHandler = LossesHandler(abs_fn=lambda model, vector: np.array([cp.abs(v) for v in vector]),
+    scs_losses: LossesHandler = LossesHandler(ind_fn=None,
+                                              abs_fn=lambda model, vector: np.array([cp.abs(v) for v in vector]),
                                               log_fn=lambda model, vector: np.array([cp.log(v) for v in vector]))
     """The `LossesHandler` object for the 'SCS' backend solver."""
 
