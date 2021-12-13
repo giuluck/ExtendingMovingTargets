@@ -14,28 +14,28 @@ EPS: float = 1e-9
 """Floating point value used in lower/upper bounds to avoid infeasibility due to numeric errors."""
 
 
-def _abs(model, vector):
+def _abs(m, mvs, nvs):
     """Gurobi custom `abs_fn` function."""
     abs_vector = []
-    for v in vector.flatten():
-        aux_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'aux({v})', lb=-float('inf'), column=None, obj=0)
-        abs_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'abs({v})', column=None, obj=0)
-        model.addConstr(aux_v == v, name=f'aux({v})')
-        model.addGenConstrAbs(abs_v, aux_v, name=f'abs({v})')
-        abs_vector.append(abs_v)
-    return np.array(abs_vector).reshape(vector.shape)
+    for mv, nv in zip(mvs, nvs):
+        aux_var = m.addVar(vtype=GRB.CONTINUOUS, name=f'aux({mv})', lb=-float('inf'), column=None, obj=0)
+        abs_var = m.addVar(vtype=GRB.CONTINUOUS, name=f'abs({mv})', column=None, obj=0)
+        m.addConstr(aux_var == mv - nv, name=f'aux({mv})')
+        m.addGenConstrAbs(abs_var, aux_var, name=f'abs({mv})')
+        abs_vector.append(abs_var)
+    return abs_vector
 
 
-def _log(model, vector):
+def _log(m, mvs, nvs):
     """Gurobi custom `log_fn` function."""
     log_vector = []
-    for v in vector.flatten():
-        aux_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'aux({v})', lb=-float('inf'), column=None, obj=0)
-        log_v = model.addVar(vtype=GRB.CONTINUOUS, name=f'log({v})', lb=-float('inf'), column=None, obj=0)
-        model.addConstr(aux_v == v, name=f'aux({v})')
-        model.addGenConstrExp(log_v, aux_v, name=f'log({v})')
-        log_vector.append(log_v)
-    return np.array(log_vector).reshape(vector.shape)
+    for mv, nv in zip(mvs, nvs):
+        aux_var = m.addVar(vtype=GRB.CONTINUOUS, name=f'aux({mv})', lb=-float('inf'), column=None, obj=0)
+        log_var = m.addVar(vtype=GRB.CONTINUOUS, name=f'log({mv})', lb=-float('inf'), column=None, obj=0)
+        m.addConstr(aux_var == mv, name=f'aux({mv})')
+        m.addGenConstrExp(log_var, aux_var, name=f'log({mv})')
+        log_vector.append(-nv * log_var)
+    return log_vector
 
 
 class GurobiMaster(Master, ABC):

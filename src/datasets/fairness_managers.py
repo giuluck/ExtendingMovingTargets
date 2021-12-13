@@ -48,14 +48,14 @@ class AdultManager(AbstractManager):
         :param test_size:
             The amount of total samples to be considered for training (either relative or absolute).
         """
+        didi = DIDI(classification=True, protected=AdultManager.PROTECTED, percentage=True, name='didi')
         super().__init__(filepath=filepath,
                          test_size=test_size,
                          label=AdultManager.TARGET,
                          stratify=AdultManager.TARGET,
                          x_scaling='std',
                          y_scaling=None,
-                         metrics=[CrossEntropy(name='cce'), Accuracy(name='acc'),
-                                  DIDI(classification=True, protected=AdultManager.PROTECTED, name='didi')])
+                         metrics=[CrossEntropy(name='ce'), Accuracy(name='acc'), didi])
 
     def get_scalers(self, x, y) -> Tuple[Optional[Scaler], Optional[Scaler]]:
         # the x scaler uses the given default method for numeric features while the categorical ones (which have an

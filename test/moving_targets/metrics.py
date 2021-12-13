@@ -228,12 +228,17 @@ class TestMetrics(unittest.TestCase):
             }
         }
         for protected, target_dict in expected_results.items():
-            for target, actual_didi in target_dict.items():
+            for target, didi in target_dict.items():
                 x = data.drop(columns=[target])
                 y = data[target]
                 if 'reg' in target:
-                    metric_didi = DIDI(classification=False, protected=protected).__call__(x=x, y=y, p=y)
+                    p = y
+                    didi_abs = DIDI(classification=False, protected=protected, percentage=False)
+                    didi_per = DIDI(classification=False, protected=protected, percentage=True)
                 else:
                     p = LabelBinarizer().fit_transform(y)
-                    metric_didi = DIDI(classification=True, protected=protected).__call__(x=x, y=y, p=p)
-                self.assertAlmostEqual(actual_didi, metric_didi, places=PLACES, msg=f"p: '{protected}', t: '{target}'")
+                    didi_abs = DIDI(classification=True, protected=protected, percentage=False)
+                    didi_per = DIDI(classification=True, protected=protected, percentage=True)
+                metric_didi_abs, metric_didi_per = didi_abs(x=x, y=y, p=p), didi_per(x=x, y=y, p=p)
+                self.assertAlmostEqual(didi, metric_didi_abs, places=PLACES, msg=f"p: '{protected}', t: '{target}'")
+                self.assertAlmostEqual(1.0, metric_didi_per, places=PLACES, msg=f"p: '{protected}', t: '{target}'")

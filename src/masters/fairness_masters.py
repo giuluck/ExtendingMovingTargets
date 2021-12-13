@@ -1,11 +1,12 @@
 """Master implementation for the Fair Regression problem."""
 from collections import namedtuple
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 import numpy as np
 import pandas as pd
 
 from moving_targets.learners.learner import Classifier
+from moving_targets.masters import LossesHandler
 from moving_targets.masters.cplex_master import CplexMaster
 from moving_targets.metrics import DIDI
 from moving_targets.util.typing import Iteration, Solution
@@ -17,8 +18,8 @@ class Fairness(CplexMaster):
     Info = namedtuple('Info', 'variables predictions')
     """Data structure for the model info returned by the 'build_model()' method."""
 
-    def __init__(self, classification: bool, protected: str, y_loss: str, p_loss: str, violation: float, alpha: float,
-                 beta: float, time_limit: Optional[float]):
+    def __init__(self, classification: bool, protected: str, y_loss: Callable, p_loss: Callable, violation: float,
+                 alpha: float, beta: float, time_limit: Optional[float]):
         """
         :param classification:
             Whether the task is a classification (True) or a regression (False) task.
@@ -49,13 +50,13 @@ class Fairness(CplexMaster):
         self.violation: float = violation
         """The maximal accepted level of violation of the constraint."""
 
-        self.didi: DIDI = DIDI(classification=classification, protected=protected)
+        self.didi: DIDI = DIDI(classification=classification, protected=protected, percentage=True)
         """A `DisparateImpactDiscriminationIndex` metric object used to compute the DIDI."""
 
-        self._y_loss: str = y_loss
+        self._y_loss: Callable = y_loss
         """The loss function computed between the model variables and the original targets."""
 
-        self._p_loss: str = p_loss
+        self._p_loss: Callable = p_loss
         """The loss function computed between the model variables and the learner predictions."""
 
     def build_model(self, macs, model, x: pd.DataFrame, y: pd.Series, iteration: Iteration) -> Info:
@@ -65,23 +66,15 @@ class Fairness(CplexMaster):
         _, pred = model_info
         # if either beta is None or there are no predictions (due to initial projection step) we use alpha
         # otherwise we compute the didi using the metric, then returns True if the violation is under the threshold
-        if self.beta is None or pred is None:
-            return False
-        else:
-            return self.didi(x=x, y=y, p=pred) <= self.violation
+        return False if self.beta is None or pred is None else self.didi(x=x, y=y, p=pred) <= self.violation
 
     def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         var, _ = model_info
-        y_loss = getattr(Fairness.losses, self._y_loss)
-        return y_loss(model=model, numeric_variables=y, model_variables=var)
+        return self._y_loss(model=model, numeric_variables=y, model_variables=var)
 
     def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         variables, pred = model_info
-        if pred is None:
-            return 0.0
-        else:
-            p_loss = getattr(Fairness.losses, self._p_loss)
-            return p_loss(model=model, numeric_variables=pred, model_variables=variables)
+        return 0.0 if pred is None else self._p_loss(model=model, numeric_variables=pred, model_variables=variables)
 
     def return_solutions(self, macs, solution, x: pd.DataFrame, y: pd.Series, model_info: Info,
                          iteration: Iteration) -> Solution:
@@ -129,9 +122,9 @@ class FairRegression(Fairness):
             The maximal time for which the master can run during each iteration.
         """
         assert loss_fn in self.accepted_losses.keys(), f"'{loss_fn}' is not a valid loss function"
+        _loss = getattr(FairRegression.losses, FairRegression.accepted_losses[loss_fn])
         super(FairRegression, self).__init__(classification=False, protected=protected, violation=violation,
-                                             y_loss=self.accepted_losses[loss_fn], p_loss=self.accepted_losses[loss_fn],
-                                             alpha=alpha, beta=beta, time_limit=time_limit)
+                                             y_loss=_loss, p_loss=_loss, alpha=alpha, beta=beta, time_limit=time_limit)
 
         self.lb: float = lb
         """The variables' lower bound."""
@@ -146,7 +139,7 @@ class FairRegression(Fairness):
         indicator_matrix = self.didi.get_indicator_matrix(x=x)
 
         # calculate deviations between the average output and the average output respectively to each protected class
-        deviations = model.continuous_var_list(keys=indicator_matrix.columns, lb=0.0, name='deviations')
+        deviations = model.continuous_var_list(keys=indicator_matrix.columns, name='deviations')
         for idx, label in enumerate(indicator_matrix.columns):
             # subset of the variables having <label> as protected feature (i.e., the current protected group)
             protected_variables = variables[indicator_matrix[label] == 1]
@@ -160,7 +153,8 @@ class FairRegression(Fairness):
                 deviations[idx] = model.abs(total_average - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
-        didi = model.sum(deviations)
+        train_didi = DIDI.regression_didi(indicator_matrix=indicator_matrix, targets=y)
+        didi = model.sum(deviations) / train_didi
         model.add_constraint(didi <= self.violation, ctname='fairness_constraint')
 
         # return model info
@@ -174,6 +168,15 @@ class FairRegression(Fairness):
 
 class FairClassification(Fairness):
     """Master for the Fairness Classification problem."""
+
+    losses: LossesHandler = LossesHandler(sqr_fn=lambda m, mvs, nvs: (nvs * (1 - mvs) + (1 - nvs) * mvs) ** 2,
+                                          abs_fn=lambda m, mvs, nvs: nvs * (1 - mvs) + (1 - nvs) * mvs,
+                                          log_fn=None)
+    """The `LossesHandler` object for this backend solver.
+
+    Uses a custom absolute function that speeds up the computation due to the assumption of binary model variables
+    (i.e., it computes an hamming distance with continuous numeric targets).
+    """
 
     accepted_losses: Dict[str, str] = {
         'hd': 'categorical_hamming',
@@ -214,12 +217,16 @@ class FairClassification(Fairness):
             The maximal time for which the master can run during each iteration.
         """
         assert loss_fn in self.accepted_losses.keys(), f"'{loss_fn}' is not a valid loss function"
-        super(FairClassification, self).__init__(classification=True, protected=protected, y_loss='categorical_hamming',
-                                                 p_loss=self.accepted_losses[loss_fn], violation=violation, alpha=alpha,
-                                                 beta=beta, time_limit=time_limit)
+        y_loss = FairClassification.losses.categorical_hamming
+        p_loss = getattr(FairClassification.losses, FairClassification.accepted_losses[loss_fn])
+        super(FairClassification, self).__init__(classification=True, protected=protected, y_loss=y_loss, p_loss=p_loss,
+                                                 violation=violation, alpha=alpha, beta=beta, time_limit=time_limit)
 
         self.clip_value: float = clip_value
         """The clipping value for probabilities, in case they are used."""
+
+        self.use_prob: bool = FairClassification.accepted_losses[loss_fn] != 'categorical_hamming'
+        """Whether to use output probabilities or output classes in the p_loss."""
 
     def build_model(self, macs, model, x: pd.DataFrame, y: pd.Series, iteration: Iteration) -> Fairness.Info:
         # retrieve predictions and indicator matrix
@@ -260,7 +267,8 @@ class FairClassification(Fairness):
                     deviations[idx, class_idx] = model.abs(total_average - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
-        didi = model.sum(deviations)
+        train_didi = DIDI.classification_didi(indicator_matrix=indicator_matrix, targets=y, classes=classes)
+        didi = model.sum(deviations) / train_didi
         model.add_constraint(didi <= self.violation, ctname='fairness_constraint')
 
         # return model info
@@ -269,7 +277,7 @@ class FairClassification(Fairness):
     def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Fairness.Info,
                iteration: Iteration) -> float:
         variables, pred = model_info
-        pred = Classifier.get_classes(pred) if pred is not None and self._p_loss == 'categorical_hamming' else pred
+        pred = pred if self.use_prob or pred is None else Classifier.get_classes(pred)
         return super(FairClassification, self).p_loss(macs=macs, model=model, x=x, y=y, iteration=iteration,
                                                       model_info=Fairness.Info(variables=variables, predictions=pred))
 

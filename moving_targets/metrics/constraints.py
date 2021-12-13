@@ -42,7 +42,31 @@ class ClassFrequenciesStd(Metric):
 class DIDI(Metric):
     """Disparate Impact Discrimination Index."""
 
-    def __init__(self, classification: bool, protected: str, name: str = 'didi percentage'):
+    @staticmethod
+    def classification_didi(indicator_matrix, targets, classes):
+        didi = 0.0
+        for label in indicator_matrix.columns:
+            # subset of the targets having <label> as protected feature (i.e., the current protected group)
+            protected_targets = targets[indicator_matrix[label] == 1]
+            if len(protected_targets) > 0:
+                # list of deviations from the total percentage of samples respectively to each target class
+                deviation_per_class = [np.mean(protected_targets == c) - np.mean(targets == c) for c in classes]
+                # total deviation (partial didi) respectively to each protected group
+                didi += np.abs(deviation_per_class).sum()
+        return didi
+
+    @staticmethod
+    def regression_didi(indicator_matrix, targets):
+        didi = 0.0
+        for label in indicator_matrix.columns:
+            # subset of the targets having <label> as protected feature (i.e., the current protected group)
+            protected_targets = targets[indicator_matrix[label] == 1]
+            if len(protected_targets) > 0:
+                # total deviation (partial didi) respectively to each protected group
+                didi += abs(np.mean(protected_targets) - np.mean(targets))
+        return didi
+
+    def __init__(self, classification: bool, protected: str, percentage: bool = True, name: str = 'didi'):
         """
         :param classification:
             Whether the task is a classification (True) or a regression (False) task.
@@ -56,6 +80,9 @@ class DIDI(Metric):
             assumed to be a one-hot encoded version of the categorical column (thus, the number of classes is inferred
             from the number of columns).
 
+        :param percentage:
+            Whether or not to normalize the DIDI index of the predictions over the DIDI index of the ground truths.
+
         :param name:
             The name of the metric.
         """
@@ -67,25 +94,19 @@ class DIDI(Metric):
         self.protected: str = protected
         """The name of the protected feature."""
 
+        self.percentage: bool = percentage
+        """Whether or not to normalize the DIDI index of the predictions over the DIDI index of the ground truths."""
+
     def __call__(self, x: pd.DataFrame, y, p) -> float:
-        didi = 0.0
-        targets = Classifier.get_classes(p) if self.classification else p
-        indicator_matrix = self.get_indicator_matrix(x=x)
-        for label in indicator_matrix.columns:
-            # subset of the targets having <label> as protected feature (i.e., the current protected group)
-            protected_targets = targets[indicator_matrix[label] == 1]
-            if len(protected_targets) > 0:
-                if self.classification:
-                    # array of all the output classes
-                    classes = np.unique(y)
-                    # list of deviations from the total percentage of samples respectively to each target class
-                    deviation_per_class = [np.mean(protected_targets == c) - np.mean(targets == c) for c in classes]
-                    # total deviation (partial didi) respectively to each protected group
-                    didi += np.abs(deviation_per_class).sum()
-                else:
-                    # total deviation (partial didi) respectively to each protected group
-                    didi += abs(np.mean(protected_targets) - np.mean(targets))
-        return didi
+        m = self.get_indicator_matrix(x=x)
+        if self.classification:
+            c = np.unique(y)
+            didi_p = DIDI.classification_didi(indicator_matrix=m, targets=Classifier.get_classes(p), classes=c)
+            didi_y = DIDI.classification_didi(indicator_matrix=m, targets=y, classes=c) if self.percentage else 1.0
+        else:
+            didi_p = DIDI.regression_didi(indicator_matrix=m, targets=Classifier.get_classes(p))
+            didi_y = DIDI.regression_didi(indicator_matrix=m, targets=y) if self.percentage else 1.0
+        return didi_p / didi_y
 
     def get_indicator_matrix(self, x: pd.DataFrame) -> pd.DataFrame:
         """Computes the indicator matrix given the input data and a protected feature.

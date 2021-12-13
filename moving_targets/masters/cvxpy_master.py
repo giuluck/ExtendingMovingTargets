@@ -4,7 +4,6 @@ from abc import ABC
 from typing import Any, Dict
 
 import cvxpy as cp
-import numpy as np
 
 from moving_targets.masters.losses import LossesHandler
 from moving_targets.masters.master import Master
@@ -15,8 +14,8 @@ class CvxpyMaster(Master, ABC):
     """Master interface to Abstract Cvxpy solver."""
 
     scs_losses: LossesHandler = LossesHandler(ind_fn=None,
-                                              abs_fn=lambda model, vector: np.array([cp.abs(v) for v in vector]),
-                                              log_fn=lambda model, vector: np.array([cp.log(v) for v in vector]))
+                                              abs_fn=lambda m, mvs, nvs: [cp.abs(v) for v in mvs - nvs],
+                                              log_fn=lambda m, mvs, nvs: [-nv * cp.log(mv) for mv, nv in zip(mvs, nvs)])
     """The `LossesHandler` object for the 'SCS' backend solver."""
 
     def __init__(self, alpha: float, beta: float, solver: str, **solver_args):

@@ -87,7 +87,7 @@ class IntMeanLoss(MeanLoss):
         super(IntMeanLoss, self).__init__(loss_fn=loss_fn, sum_fn=sum_fn)
 
     def __call__(self, model, numeric_variables, model_variables, sample_weight: Optional = None) -> float:
-        int_numeric_variables = np.array(numeric_variables).astype(int)
+        int_numeric_variables = numeric_variables.astype(int)
         assert np.allclose(numeric_variables, int_numeric_variables), 'the given numeric variables are not integer'
         return super(IntMeanLoss, self).__call__(
             model=model,
@@ -118,7 +118,7 @@ class ClippedMeanLoss(MeanLoss):
         """Floating point value that indicates the width of the interval."""
 
     def __call__(self, model, numeric_variables, model_variables, sample_weight: Optional = None) -> float:
-        numeric_variables = np.clip(numeric_variables.astype(float), a_min=self._clip_value, a_max=1 - self._clip_value)
+        numeric_variables = np.clip(numeric_variables, a_min=self._clip_value, a_max=1 - self._clip_value)
         return super(ClippedMeanLoss, self).__call__(
             model=model,
             numeric_variables=numeric_variables,
@@ -131,34 +131,30 @@ class LossesHandler:
     """Util class that handles the functions for the principal losses to be used in the Master."""
 
     def __init__(self,
-                 sum_fn: Callable = lambda model, vector: np.sum(vector),
-                 sqr_fn: Optional[Callable] = lambda model, vector: vector**2,
-                 ind_fn: Optional[Callable] = lambda model, vector: 1 - vector,
-                 abs_fn: Optional[Callable] = lambda model, vector: np.abs(vector),
-                 log_fn: Optional[Callable] = lambda model, vector: np.log(vector)):
+                 sum_fn: Callable = lambda m, v: np.sum(v),
+                 ind_fn: Optional[Callable] = lambda m, mvs, nvs: 1 - mvs[nvs],
+                 sqr_fn: Optional[Callable] = lambda m, mvs, nvs: (mvs - nvs) ** 2,
+                 abs_fn: Optional[Callable] = lambda m, mvs, nvs: np.abs(mvs - nvs),
+                 log_fn: Optional[Callable] = lambda m, mvs, nvs: -nvs * np.log(mvs)):
         """
         :param sum_fn:
-            Routine function of type f(<model>, <vector>) -> <float> that computes the sum of variables.
-
-        :param sqr_fn:
-            Routine function of type f(<model>, <vector>) -> <vector> that computes the squared value of each element.
-
-            None if the solver does not support quadratic programming.
+            Routine function of type f(<model>, <variables>) -> <float> that computes the sum of variables.
 
         :param ind_fn:
-            Routine function of type f(<model>, <vector>) -> <vector> that computes the indicator value of each element.
+            Routine function of type f(<model>, <model variables>, <numeric variables>) -> <vector> that computes the
+            indicator loss for each paired elements. None if the solver does not support mixed-integer programming.
 
-            None if the solver does not support mixed-integer programming.
+        :param sqr_fn:
+            Routine function of type f(<model>, <model variables>, <numeric variables>) -> <vector> that computes the
+            squared errors for each paired elements. None if the solver does not support quadratic programming.
 
         :param abs_fn:
-            Routine function of type f(<model>, <vector>) -> <vector> that computes the absolute value of each element.
-
-            None if the solver does not support absolute values.
+            Routine function of type f(<model>, <model variables>, <numeric variables>) -> <vector> that computes the
+            absolute errors for each paired elements. None if the solver does not support absolute values.
 
         :param log_fn:
-            Routine function of type f(<model>, <vector>) -> <vector> that computes the logarithm of each element.
-
-            None if the solver does not support logarithms.
+            Routine function of type f(<model>, <model variables>, <numeric variables>) -> <vector> that computes the
+            log loss for each paired elements. None if the solver does not support logarithms.
         """
 
         def _fn(operation: str):
@@ -167,16 +163,16 @@ class LossesHandler:
         self._sum_fn: Callable = sum_fn
         """Routine function that computes the sum of variables."""
 
-        self._sqr_fn: Callable = sqr_fn if sqr_fn is not None else lambda model, vector: _fn(operation='squared values')
-        """Routine function that computes each partial squared loss."""
-
-        self._ind_fn: Callable = ind_fn if ind_fn is not None else lambda model, vector: _fn(operation='integer values')
+        self._ind_fn: Callable = ind_fn if ind_fn is not None else lambda m, mvs, nvs: _fn(operation='integer values')
         """Routine function that computes each indicator loss."""
 
-        self._abs_fn: Callable = abs_fn if abs_fn is not None else lambda model, vector: _fn(operation='abs values')
+        self._sqr_fn: Callable = sqr_fn if sqr_fn is not None else lambda m, mvs, nvs: _fn(operation='squared values')
+        """Routine function that computes each partial squared loss."""
+
+        self._abs_fn: Callable = abs_fn if abs_fn is not None else lambda m, mvs, nvs: _fn(operation='abs values')
         """Routine function that computes each partial absolute loss."""
 
-        self._log_fn: Callable = log_fn if log_fn is not None else lambda model, vector: _fn(operation='logarithms')
+        self._log_fn: Callable = log_fn if log_fn is not None else lambda m, mvs, nvs: _fn(operation='logarithms')
         """Routine function that computes each partial log loss."""
 
         self.sum_of_absolute_errors: SumLoss = SumLoss(loss_fn=self._absolute_errors, sum_fn=self._sum_fn)
@@ -238,13 +234,13 @@ class LossesHandler:
 
     def _absolute_errors(self, model, numeric_variables, model_variables, sample_weights):
         # transpose absolute errors array in order to correctly deal with multivariate targets
-        absolute_errors = self._abs_fn(model, model_variables - numeric_variables)
-        return sample_weights * absolute_errors.transpose()
+        abs_losses = self._abs_fn(model, model_variables.flatten(), numeric_variables.flatten())
+        return sample_weights * np.array(abs_losses).reshape(model_variables.shape).transpose()
 
     def _squared_errors(self, model, numeric_variables, model_variables, sample_weights):
         # transpose squared errors array in order to correctly deal with multivariate targets
-        squared_errors = self._sqr_fn(model, model_variables - numeric_variables)
-        return sample_weights * squared_errors.transpose()
+        sqr_errors = self._sqr_fn(model, model_variables.flatten(), numeric_variables.flatten())
+        return sample_weights * np.array(sqr_errors).reshape(model_variables.shape).transpose()
 
     def _binary_hamming(self, model, numeric_variables, model_variables, sample_weights):
         # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
@@ -282,8 +278,8 @@ class LossesHandler:
         # and step c (i.e., [0, c, 2c, 3c, ...]) and adding the respective class index which is into numeric variables
         num_samples, num_classes = model_variables.shape
         ind_mask = np.arange(num_samples * num_classes, step=num_classes) + numeric_variables
-        ind_losses = self._ind_fn(model, model_variables.flatten()[ind_mask])
-        return sample_weights * ind_losses.transpose()
+        ind_losses = self._ind_fn(model, model_variables.flatten(), ind_mask)
+        return sample_weights * np.array(ind_losses)
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
@@ -291,9 +287,8 @@ class LossesHandler:
         return sample_weights * log_losses.transpose()
 
     def _reversed_categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
-        shape = model_variables.shape
-        log_losses = -numeric_variables * self._log_fn(model, model_variables.flatten()).reshape(shape)
-        return sample_weights * log_losses.transpose()
+        log_losses = self._log_fn(model, model_variables.flatten(), numeric_variables.flatten())
+        return sample_weights * np.array(log_losses).reshape(model_variables.shape).transpose()
 
     def _symmetric_categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
         cce = self._categorical_crossentropy(model, numeric_variables, model_variables, sample_weights)

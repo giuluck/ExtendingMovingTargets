@@ -3,7 +3,6 @@ import logging
 from abc import ABC
 from typing import Optional
 
-import numpy as np
 from docplex.mp.model import Model
 
 from moving_targets.masters.losses import LossesHandler
@@ -11,15 +10,10 @@ from moving_targets.masters.master import Master
 from moving_targets.util.typing import Iteration, Solution
 
 
-def _abs(model, vector):
-    """Cplex custom `abs_fn` function."""
-    return np.array([model.abs(v) for v in vector.flatten()]).reshape(vector.shape)
-
-
 class CplexMaster(Master, ABC):
     """Master interface to Cplex solver."""
 
-    losses: LossesHandler = LossesHandler(abs_fn=_abs, log_fn=None)
+    losses: LossesHandler = LossesHandler(abs_fn=lambda m, mvs, nvs: [m.abs(v) for v in mvs - nvs], log_fn=None)
     """The `LossesHandler` object for this backend solver."""
 
     def __init__(self, alpha: float, beta: float, time_limit: Optional[float]):
@@ -63,8 +57,17 @@ class CplexMaster(Master, ABC):
             model.set_time_limit(self.time_limit)
         model_info = self.build_model(macs=macs, model=model, x=x, y=y, iteration=iteration)
         # algorithm core: check for feasibility and behave depending on that
+
+        # TODO: remove print
+        import time
+        temp = time.time()
         y_loss = self.y_loss(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration)
+        print('y_loss:', time.time() - temp)
+        temp = time.time()
         p_loss = self.p_loss(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration)
+        print('p_loss:', time.time() - temp)
+        print()
+
         if self.beta_step(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration):
             model.add(p_loss <= self.beta)
             model.minimize(y_loss)

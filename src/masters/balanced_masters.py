@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from moving_targets.learners.learner import Classifier
+from moving_targets.masters import LossesHandler
 from moving_targets.masters.cplex_master import CplexMaster
 from moving_targets.util.typing import Iteration
 
@@ -15,6 +16,13 @@ class BalancedCounts(CplexMaster):
 
     Info = namedtuple('Info', 'variables predictions max_count')
     """Data structure for the model info returned by the 'build_model()' method."""
+
+    losses: LossesHandler = LossesHandler(abs_fn=lambda m, mvs, nvs: nvs * (1 - mvs) + (1 - nvs) * mvs, log_fn=None)
+    """The `LossesHandler` object for this backend solver.
+    
+    Uses a custom absolute function that speeds up the computation due to the assumption of binary model variables
+    (i.e., it computes an hamming distance with continuous numeric targets).
+    """
 
     accepted_losses: Dict[str, str] = {
         'hd': 'categorical_hamming',
@@ -113,11 +121,7 @@ class BalancedCounts(CplexMaster):
             pred = Classifier.get_classes(pred) if self._p_loss == 'categorical_hamming' else pred
             # retrieve the loss from the losses handler by name
             loss_fn = getattr(BalancedCounts.losses, self._p_loss)
-            return loss_fn(
-                model=model,
-                numeric_variables=pred,
-                model_variables=model_variables
-            )
+            return loss_fn(model=model, numeric_variables=pred, model_variables=model_variables)
 
     def return_solutions(self, macs, solution, x: pd.DataFrame, y: pd.Series, model_info: Info,
                          iteration: Iteration) -> np.ndarray:
