@@ -106,7 +106,11 @@ class DIDI(Metric):
         else:
             didi_p = DIDI.regression_didi(indicator_matrix=m, targets=Classifier.get_classes(p))
             didi_y = DIDI.regression_didi(indicator_matrix=m, targets=y) if self.percentage else 1.0
-        return didi_p / didi_y
+        # handle division by zero
+        if didi_y == 0.0:
+            return 0.0 if didi_p == 0.0 else float('inf')
+        else:
+            return didi_p / didi_y
 
     def get_indicator_matrix(self, x: pd.DataFrame) -> pd.DataFrame:
         """Computes the indicator matrix given the input data and a protected feature.

@@ -72,7 +72,7 @@ class AbstractManager:
         self.y_scaling: Method = y_scaling
         """Y scaling method."""
 
-    def get_scalers(self, x, y) -> Tuple[Optional[Scaler], Optional[Scaler]]:
+    def get_scalers(self) -> Scalers:
         """Returns the dataset scalers.
 
         :param x:
@@ -84,8 +84,8 @@ class AbstractManager:
         :return:
             A pair of scalers, one for the input and one for the output data, respectively.
         """
-        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling).fit(x)
-        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling).fit(y)
+        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling)
+        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling)
         return x_scaler, y_scaler
 
     def get_folds(self, num_folds: Optional[int] = None, **crossval_kwargs) -> DataInfo:
@@ -104,9 +104,10 @@ class AbstractManager:
         :return:
             Either a tuple of `Dataset` and `Scalers` or a list of them, depending on the number of folds.
         """
+        scalers = self.get_scalers()
         if num_folds is None:
             splits = dict(train=self.train_data, test=self.test_data)
-            return splits, self.get_scalers(*self.train_data)
+            return splits, scalers
         elif num_folds > 0:
             if num_folds == 1:
                 fold = split_dataset(*self.train_data, test_size=0.2, val_size=0.0, stratify=self.stratify,
@@ -115,7 +116,7 @@ class AbstractManager:
                 folds = [fold]
             else:
                 folds = cross_validate(*self.train_data, num_folds=num_folds, stratify=self.stratify, **crossval_kwargs)
-            return [({**fold, 'test': self.test_data}, self.get_scalers(*fold['train'])) for fold in folds]
+            return [({**fold, 'test': self.test_data}, scalers) for fold in folds]
         else:
             raise ValueError(f"{num_folds} is not an accepted value for 'num_folds'")
 

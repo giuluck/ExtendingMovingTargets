@@ -41,13 +41,12 @@ class SumLoss:
         :return:
             A real number representing the final loss.
         """
-        # use uniform weights if none are passed, otherwise normalize the weights so that they sum to len(samples)
-        if sample_weight is None:
-            sample_weight = np.ones(len(numeric_variables))
-        else:
+        # compute pairwise partial losses
+        partial_losses = self._loss_fn(model, numeric_variables, model_variables)
+        # if present, normalize the weights so that they sum to len(samples) and multiply them for the partial losses
+        if sample_weight is not None:
             sample_weight = len(sample_weight) * np.array(sample_weight) / np.sum(sample_weight)
-        # compute sum of returned losses
-        partial_losses = self._loss_fn(model, numeric_variables, model_variables, sample_weight)
+            return self._sum_fn(model, sample_weight * partial_losses)
         return self._sum_fn(model, partial_losses)
 
 
@@ -131,7 +130,7 @@ class LossesHandler:
     """Util class that handles the functions for the principal losses to be used in the Master."""
 
     def __init__(self,
-                 sum_fn: Callable = lambda m, v: np.sum(v),
+                 sum_fn: Callable = lambda m, v: sum(v.flatten()),
                  ind_fn: Optional[Callable] = lambda m, mvs, nvs: 1 - mvs[nvs],
                  sqr_fn: Optional[Callable] = lambda m, mvs, nvs: (mvs - nvs) ** 2,
                  abs_fn: Optional[Callable] = lambda m, mvs, nvs: np.abs(mvs - nvs),
@@ -232,43 +231,43 @@ class LossesHandler:
         )
         """`ClippedMeanLoss` object that computes the symmetric categorical crossentropy loss."""
 
-    def _absolute_errors(self, model, numeric_variables, model_variables, sample_weights):
+    def _absolute_errors(self, model, numeric_variables, model_variables):
         # transpose absolute errors array in order to correctly deal with multivariate targets
         abs_losses = self._abs_fn(model, model_variables.flatten(), numeric_variables.flatten())
-        return sample_weights * np.array(abs_losses).reshape(model_variables.shape).transpose()
+        return np.array(abs_losses).reshape(model_variables.shape).transpose()
 
-    def _squared_errors(self, model, numeric_variables, model_variables, sample_weights):
+    def _squared_errors(self, model, numeric_variables, model_variables):
         # transpose squared errors array in order to correctly deal with multivariate targets
         sqr_errors = self._sqr_fn(model, model_variables.flatten(), numeric_variables.flatten())
-        return sample_weights * np.array(sqr_errors).reshape(model_variables.shape).transpose()
+        return np.array(sqr_errors).reshape(model_variables.shape).transpose()
 
-    def _binary_hamming(self, model, numeric_variables, model_variables, sample_weights):
+    def _binary_hamming(self, model, numeric_variables, model_variables):
         # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
         model_variables = np.array([1 - model_variables, model_variables]).transpose()
-        return self._categorical_hamming(model, numeric_variables, model_variables, sample_weights)
+        return self._categorical_hamming(model, numeric_variables, model_variables)
 
-    def _binary_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
-        # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
-        # if numeric_variable is p, then the probability of 0 is 1 - p and the probability of 1 is p,
-        # thus the array becomes [1 - p, p]
-        model_variables = np.array([1 - model_variables, model_variables]).transpose()
-        numeric_variables = np.array([1 - numeric_variables, numeric_variables]).transpose()
-        return self._categorical_crossentropy(model, numeric_variables, model_variables, sample_weights)
-
-    def _reversed_binary_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
+    def _binary_crossentropy(self, model, numeric_variables, model_variables):
         # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
         # if numeric_variable is p, then the probability of 0 is 1 - p and the probability of 1 is p,
         # thus the array becomes [1 - p, p]
         model_variables = np.array([1 - model_variables, model_variables]).transpose()
         numeric_variables = np.array([1 - numeric_variables, numeric_variables]).transpose()
-        return self._reversed_categorical_crossentropy(model, numeric_variables, model_variables, sample_weights)
+        return self._categorical_crossentropy(model, numeric_variables, model_variables)
 
-    def _symmetric_binary_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
-        bce = self._binary_crossentropy(model, numeric_variables, model_variables, sample_weights)
-        rbce = self._reversed_binary_crossentropy(model, numeric_variables, model_variables, sample_weights)
+    def _reversed_binary_crossentropy(self, model, numeric_variables, model_variables):
+        # if model_variable is 0 then the array becomes [1, 0], otherwise if it is 1 then the array becomes [0, 1]
+        # if numeric_variable is p, then the probability of 0 is 1 - p and the probability of 1 is p,
+        # thus the array becomes [1 - p, p]
+        model_variables = np.array([1 - model_variables, model_variables]).transpose()
+        numeric_variables = np.array([1 - numeric_variables, numeric_variables]).transpose()
+        return self._reversed_categorical_crossentropy(model, numeric_variables, model_variables)
+
+    def _symmetric_binary_crossentropy(self, model, numeric_variables, model_variables):
+        bce = self._binary_crossentropy(model, numeric_variables, model_variables)
+        rbce = self._reversed_binary_crossentropy(model, numeric_variables, model_variables)
         return bce + rbce
 
-    def _categorical_hamming(self, model, numeric_variables, model_variables, sample_weights):
+    def _categorical_hamming(self, model, numeric_variables, model_variables):
         # model_variables: (n, c), where c is the number of classes
         # numeric variables: (n, )
         #
@@ -279,18 +278,18 @@ class LossesHandler:
         num_samples, num_classes = model_variables.shape
         ind_mask = np.arange(num_samples * num_classes, step=num_classes) + numeric_variables
         ind_losses = self._ind_fn(model, model_variables.flatten(), ind_mask)
-        return sample_weights * np.array(ind_losses)
+        return np.array(ind_losses)
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
-    def _categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
+    def _categorical_crossentropy(self, model, numeric_variables, model_variables):
         log_losses = -model_variables * np.log(numeric_variables)
-        return sample_weights * log_losses.transpose()
+        return log_losses.transpose()
 
-    def _reversed_categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
+    def _reversed_categorical_crossentropy(self, model, numeric_variables, model_variables):
         log_losses = self._log_fn(model, model_variables.flatten(), numeric_variables.flatten())
-        return sample_weights * np.array(log_losses).reshape(model_variables.shape).transpose()
+        return np.array(log_losses).reshape(model_variables.shape).transpose()
 
-    def _symmetric_categorical_crossentropy(self, model, numeric_variables, model_variables, sample_weights):
-        cce = self._categorical_crossentropy(model, numeric_variables, model_variables, sample_weights)
-        rcce = self._reversed_categorical_crossentropy(model, numeric_variables, model_variables, sample_weights)
+    def _symmetric_categorical_crossentropy(self, model, numeric_variables, model_variables):
+        cce = self._categorical_crossentropy(model, numeric_variables, model_variables)
+        rcce = self._reversed_categorical_crossentropy(model, numeric_variables, model_variables)
         return cce + rcce

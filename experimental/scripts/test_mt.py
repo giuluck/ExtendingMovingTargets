@@ -12,13 +12,33 @@ if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
     tasks = {
+        'iris': dict(
+            manager=IrisManager(filepath='../../res/iris.csv'),
+            learner=LogisticRegression(),
+            master=BalancedCounts(loss_fn='ce')
+        ),
         'redwine': dict(
             manager=RedwineManager(filepath='../../res/redwine.csv'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='mse')
+            master=BalancedCounts(loss_fn='ce')
+        ),
+        'whitewine': dict(
+            manager=WhitewineManager(filepath='../../res/whitewine.csv'),
+            learner=LogisticRegression(),
+            master=BalancedCounts(loss_fn='ce')
+        ),
+        'shuttle': dict(
+            manager=ShuttleManager(filepath='../../res/shuttle.trn'),
+            learner=LogisticRegression(),
+            master=BalancedCounts(loss_fn='ce')
+        ),
+        'dota': dict(
+            manager=DotaManager(filepath='../../res/dota2.csv'),
+            learner=LogisticRegression(),
+            master=BalancedCounts(loss_fn='ce')
         ),
         'adult': dict(
-            manager=AdultManager(filepath='../../res/adult.csv'),  # test_size=0.999),
+            manager=AdultManager(filepath='../../res/adult.csv', test_size=0.2),
             learner=LogisticRegression(),
             master=FairClassification(protected='race', loss_fn='hd')
         ),

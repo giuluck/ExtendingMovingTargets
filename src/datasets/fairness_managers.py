@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ from moving_targets.metrics import DIDI, CrossEntropy, Accuracy, MSE, R2
 from moving_targets.util.typing import Number
 from src.datasets import AbstractManager
 from src.util.cleaning import get_top_features
-from src.util.preprocessing import split_dataset, Scaler
+from src.util.preprocessing import split_dataset, Scaler, Scalers
 
 
 class AdultManager(AbstractManager):
@@ -52,17 +52,17 @@ class AdultManager(AbstractManager):
         super().__init__(filepath=filepath,
                          test_size=test_size,
                          label=AdultManager.TARGET,
-                         stratify=None,
+                         stratify=AdultManager.TARGET,
                          x_scaling='std',
                          y_scaling=None,
                          metrics=[CrossEntropy(name='ce'), Accuracy(name='acc'), didi])
 
-    def get_scalers(self, x, y) -> Tuple[Optional[Scaler], Optional[Scaler]]:
+    def get_scalers(self) -> Scalers:
         # the x scaler uses the given default method for numeric features while the categorical ones (which have an
         # underscore in the name) are not scaled
-        custom_methods = {c: None for c in x.columns if '_' in c}
-        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling, **custom_methods).fit(x)
-        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling).fit(y)
+        custom_methods = {c: None for c in self.train_data[0].columns if '_' in c}
+        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling, **custom_methods)
+        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling)
         return x_scaler, y_scaler
 
 
@@ -126,10 +126,10 @@ class CommunitiesManager(AbstractManager):
                          y_scaling='norm',
                          metrics=[MSE(name='mse'), R2(name='r2'), didi])
 
-    def get_scalers(self, x, y) -> Tuple[Optional[Scaler], Optional[Scaler]]:
+    def get_scalers(self) -> Scalers:
         # the x scaler uses the given default method for each feature but the protected one
         # (which is a categorical binary feature, thus it needs not scaling)
         custom_methods = {CommunitiesManager.PROTECTED: None}
-        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling, **custom_methods).fit(x)
-        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling).fit(y)
+        x_scaler = None if self.x_scaling is None else Scaler(default_method=self.x_scaling, **custom_methods)
+        y_scaler = None if self.y_scaling is None else Scaler(default_method=self.y_scaling)
         return x_scaler, y_scaler

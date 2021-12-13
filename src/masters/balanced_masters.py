@@ -17,7 +17,9 @@ class BalancedCounts(CplexMaster):
     Info = namedtuple('Info', 'variables predictions max_count')
     """Data structure for the model info returned by the 'build_model()' method."""
 
-    losses: LossesHandler = LossesHandler(abs_fn=lambda m, mvs, nvs: nvs * (1 - mvs) + (1 - nvs) * mvs, log_fn=None)
+    losses: LossesHandler = LossesHandler(sum_fn=lambda m, v: m.sum(v.flatten()),
+                                          abs_fn=lambda m, mvs, nvs: nvs * (1 - mvs) + (1 - nvs) * mvs,
+                                          log_fn=None)
     """The `LossesHandler` object for this backend solver.
     
     Uses a custom absolute function that speeds up the computation due to the assumption of binary model variables

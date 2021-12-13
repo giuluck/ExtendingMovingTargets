@@ -1,7 +1,7 @@
 """Experiment Configuration."""
 
 import random
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -104,9 +104,8 @@ class Fold:
         :param validation:
             A shared validation dataset which is common among all the k folds.
         """
-        xsc, ysc = scalers
-        xsc = Scaler.get_default(x.shape[-1]) if xsc is None else xsc
-        ysc = Scaler.get_default(y.shape[-1]) if ysc is None else ysc
+        xsc = Scaler(default_method=None) if scalers[0] is None else scalers[0]
+        ysc = Scaler(default_method=None) if scalers[1] is None else scalers[1]
 
         self.x = xsc.fit_transform(x)
         """The input data."""
@@ -114,7 +113,7 @@ class Fold:
         self.y = ysc.fit_transform(y)
         """The output data/info."""
 
-        self.scalers: Scalers = scalers
+        self.scalers: Tuple[Scaler, Scaler] = (xsc, ysc)
         """The tuple of x/y scalers."""
 
         self.validation: Dataset = {k: (xsc.transform(x), ysc.transform(y)) for k, (x, y) in validation.items()}

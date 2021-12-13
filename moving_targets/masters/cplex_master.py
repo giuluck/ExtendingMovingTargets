@@ -13,7 +13,9 @@ from moving_targets.util.typing import Iteration, Solution
 class CplexMaster(Master, ABC):
     """Master interface to Cplex solver."""
 
-    losses: LossesHandler = LossesHandler(abs_fn=lambda m, mvs, nvs: [m.abs(v) for v in mvs - nvs], log_fn=None)
+    losses: LossesHandler = LossesHandler(sum_fn=lambda m, v: m.sum(v.flatten()),
+                                          abs_fn=lambda m, mvs, nvs: [m.abs(v) for v in mvs - nvs],
+                                          log_fn=None)
     """The `LossesHandler` object for this backend solver."""
 
     def __init__(self, alpha: float, beta: float, time_limit: Optional[float]):

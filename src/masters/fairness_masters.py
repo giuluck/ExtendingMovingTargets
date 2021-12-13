@@ -66,11 +66,14 @@ class Fairness(CplexMaster):
         _, pred = model_info
         # if either beta is None or there are no predictions (due to initial projection step) we use alpha
         # otherwise we compute the didi using the metric, then returns True if the violation is under the threshold
-        return False if self.beta is None or pred is None else self.didi(x=x, y=y, p=pred) <= self.violation
+        if self.beta is None or pred is None:
+            return False
+        else:
+            return self.didi(x=x, y=y, p=pred) <= self.violation
 
     def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         var, _ = model_info
-        return self._y_loss(model=model, numeric_variables=y, model_variables=var)
+        return self._y_loss(model=model, numeric_variables=y.values, model_variables=var)
 
     def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         variables, pred = model_info
@@ -153,9 +156,9 @@ class FairRegression(Fairness):
                 deviations[idx] = model.abs(total_average - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
+        didi = model.sum(deviations)
         train_didi = DIDI.regression_didi(indicator_matrix=indicator_matrix, targets=y)
-        didi = model.sum(deviations) / train_didi
-        model.add_constraint(didi <= self.violation, ctname='fairness_constraint')
+        model.add_constraint(didi <= self.violation * train_didi, ctname='fairness_constraint')
 
         # return model info
         return Fairness.Info(variables=variables, predictions=pred)
@@ -169,7 +172,8 @@ class FairRegression(Fairness):
 class FairClassification(Fairness):
     """Master for the Fairness Classification problem."""
 
-    losses: LossesHandler = LossesHandler(sqr_fn=lambda m, mvs, nvs: (nvs * (1 - mvs) + (1 - nvs) * mvs) ** 2,
+    losses: LossesHandler = LossesHandler(sum_fn=lambda m, v: m.sum(v),
+                                          sqr_fn=lambda m, mvs, nvs: (nvs * (1 - mvs) + (1 - nvs) * mvs) ** 2,
                                           abs_fn=lambda m, mvs, nvs: nvs * (1 - mvs) + (1 - nvs) * mvs,
                                           log_fn=None)
     """The `LossesHandler` object for this backend solver.
@@ -235,9 +239,6 @@ class FairClassification(Fairness):
 
         # define model variables
         classes = np.unique(y)
-
-        print(classes)
-
         num_samples = len(y)
         num_classes = len(classes)
         variables = model.binary_var_matrix(keys1=num_samples, keys2=classes, name='y').values()
@@ -270,30 +271,19 @@ class FairClassification(Fairness):
                     deviations[idx, class_idx] = model.abs(total_average - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
+        didi = model.sum(deviations)
         train_didi = DIDI.classification_didi(indicator_matrix=indicator_matrix, targets=y, classes=classes)
-        didi = model.sum(deviations) / train_didi
-        model.add_constraint(didi <= self.violation, ctname='fairness_constraint')
+        model.add_constraint(didi <= self.violation * train_didi, ctname='fairness_constraint')
 
         # return model info
         return Fairness.Info(variables=variables, predictions=pred)
 
-    def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Fairness.Info,
-               iteration: Iteration) -> Any:
-        variables, _ = model_info
-        return model.sum([1 - variables[i, int(c)] for i, c in enumerate(y)]) / len(y)
-
     def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Fairness.Info,
                iteration: Iteration) -> float:
         variables, pred = model_info
-        if pred is None:
-            loss = 0.0
-        elif self.use_prob:
-            pred = np.clip(pred, a_min=.01, a_max=.99)
-            loss = model.sum(variables * np.log(pred))
-        else:
-            pred = Classifier.get_classes(pred)
-            loss = model.sum([1 - variables[i, c] for i, c in enumerate(pred)])
-        return loss / len(y)
+        pred = pred if self.use_prob or pred is None else Classifier.get_classes(pred)
+        return super(FairClassification, self).p_loss(macs=macs, model=model, x=x, y=y, iteration=iteration,
+                                                      model_info=Fairness.Info(variables=variables, predictions=pred))
 
     def return_solutions(self, macs, solution, x: pd.DataFrame, y: pd.Series, model_info: Fairness.Info,
                          iteration: Iteration) -> Solution:

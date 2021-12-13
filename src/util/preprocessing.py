@@ -236,7 +236,7 @@ class Scaler:
         return Scaler(default_method=None).fit(data=[[0.] * num_features])
 
 
-Scalers = Union[Optional[Scaler], Tuple[Optional[Scaler], Optional[Scaler]]]
+Scalers = Tuple[Optional[Scaler], Optional[Scaler]]
 """Either an (optional) scaler for both the input and the output data, or a tuple of (optional) scalers for the input
 and the output data, respectively."""
 
