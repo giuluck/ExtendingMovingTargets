@@ -20,7 +20,7 @@ if __name__ == '__main__':
         'adult': dict(
             manager=AdultManager(filepath='../../res/adult.csv'),  # test_size=0.999),
             learner=LogisticRegression(),
-            master=FairClassification(protected='race', loss_fn='ce')
+            master=FairClassification(protected='race', loss_fn='hd')
         ),
         'communities': dict(
             manager=CommunitiesManager(filepath='../../res/communities.csv'),

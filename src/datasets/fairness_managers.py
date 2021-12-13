@@ -52,7 +52,7 @@ class AdultManager(AbstractManager):
         super().__init__(filepath=filepath,
                          test_size=test_size,
                          label=AdultManager.TARGET,
-                         stratify=AdultManager.TARGET,
+                         stratify=None,
                          x_scaling='std',
                          y_scaling=None,
                          metrics=[CrossEntropy(name='ce'), Accuracy(name='acc'), didi])
@@ -115,6 +115,7 @@ class CommunitiesManager(AbstractManager):
         :param n_features:
             The number of input features to be extracted from the cleaned dataset by importance.
         """
+        didi = DIDI(classification=False, protected=CommunitiesManager.PROTECTED, percentage=True, name='didi')
         super().__init__(filepath=filepath,
                          test_size=test_size,
                          max_nan=max_nan,
@@ -123,8 +124,7 @@ class CommunitiesManager(AbstractManager):
                          stratify=None,
                          x_scaling='std',
                          y_scaling='norm',
-                         metrics=[MSE(name='mse'), R2(name='r2'),
-                                  DIDI(classification=False, protected=CommunitiesManager.PROTECTED, name='didi')])
+                         metrics=[MSE(name='mse'), R2(name='r2'), didi])
 
     def get_scalers(self, x, y) -> Tuple[Optional[Scaler], Optional[Scaler]]:
         # the x scaler uses the given default method for each feature but the protected one
