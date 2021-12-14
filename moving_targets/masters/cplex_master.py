@@ -60,15 +60,8 @@ class CplexMaster(Master, ABC):
         model_info = self.build_model(macs=macs, model=model, x=x, y=y, iteration=iteration)
         # algorithm core: check for feasibility and behave depending on that
 
-        # TODO: remove print
-        import time
-        temp = time.time()
         y_loss = self.y_loss(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration)
-        print('y_loss:', time.time() - temp)
-        temp = time.time()
         p_loss = self.p_loss(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration)
-        print('p_loss:', time.time() - temp)
-        print()
 
         if self.beta_step(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration):
             model.add(p_loss <= self.beta)

@@ -206,23 +206,23 @@ class TestMetrics(unittest.TestCase):
             'onehot_protected_0': [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
             'onehot_protected_1': [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
             'onehot_protected_2': [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            'reg_target': [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+            'reg_target': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
             'bin_target': [1, 1, 0, 0, 0, 0, 1, 1, 1, 1],
             'multi_target': [1, 2, 0, 0, 0, 0, 1, 1, 1, 2]
         })
         expected_results = {
             'bin_protected': {
-                'reg_target': 5.0,
+                'reg_target': 0.5,
                 'bin_target': 0.8,
                 'multi_target': 0.8
             },
             'multi_protected': {
-                'reg_target': 7.0,
+                'reg_target': 0.7,
                 'bin_target': 1.6333,
                 'multi_target': 1.7666
             },
             'onehot_protected': {
-                'reg_target': 7.0,
+                'reg_target': 0.7,
                 'bin_target': 1.6333,
                 'multi_target': 1.7666
             }

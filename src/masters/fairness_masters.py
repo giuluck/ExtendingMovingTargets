@@ -143,14 +143,14 @@ class FairRegression(Fairness):
 
         # calculate deviations between the average output and the average output respectively to each protected class
         deviations = model.continuous_var_list(keys=indicator_matrix.columns, name='deviations')
+        # average output target for the whole dataset
+        total_average = model.sum(variables) / len(variables)
         for idx, label in enumerate(indicator_matrix.columns):
             # subset of the variables having <label> as protected feature (i.e., the current protected group)
             protected_variables = variables[indicator_matrix[label] == 1]
             if len(protected_variables) > 0:
                 # average output target for the protected group
                 protected_average = model.sum(protected_variables) / len(protected_variables)
-                # average output target for the whole dataset
-                total_average = model.sum(variables) / len(variables)
                 # the partial deviation is computed as the absolute value of the difference between the
                 # total average samples and the average samples within the protected group
                 deviations[idx] = model.abs(total_average - protected_average)
@@ -173,7 +173,6 @@ class FairClassification(Fairness):
     """Master for the Fairness Classification problem."""
 
     losses: LossesHandler = LossesHandler(sum_fn=lambda m, v: m.sum(v),
-                                          sqr_fn=lambda m, mvs, nvs: (nvs * (1 - mvs) + (1 - nvs) * mvs) ** 2,
                                           abs_fn=lambda m, mvs, nvs: nvs * (1 - mvs) + (1 - nvs) * mvs,
                                           log_fn=None)
     """The `LossesHandler` object for this backend solver.
@@ -253,22 +252,20 @@ class FairClassification(Fairness):
         labels = indicator_matrix.columns
         deviations = model.continuous_var_matrix(keys1=labels, keys2=classes, lb=0.0, name='deviations').values()
         deviations = np.array(list(deviations)).reshape(len(labels), num_classes)
+        # average number of samples from the whole dataset <class[class_idx]> as target class
+        total_averages = np.array([model.sum(variables[:, c]) / len(variables[:, c]) for c in range(num_classes)])
         for idx, label in enumerate(indicator_matrix.columns):
             # subset of the variables having <label> as protected feature (i.e., the current protected group)
             protected_variables = variables[indicator_matrix[label] == 1]
             if len(protected_variables) > 0:
                 for class_idx in range(num_classes):
-                    # subset of variables having <class[class_idx]> as target class
-                    variables_per_class = variables[:, class_idx]
                     # subset of variables having <class[class_idx]> as target class and <label> as protected feature
                     protected_variables_per_class = protected_variables[:, class_idx]
                     # average number of samples within the protected group having <class[class_idx]> as target class
                     protected_average = model.sum(protected_variables_per_class) / len(protected_variables_per_class)
-                    # average number of samples from the whole dataset <class[class_idx]> as target class
-                    total_average = model.sum(variables_per_class) / len(variables_per_class)
                     # the partial deviation is computed as the absolute value of the difference between the
                     # total average samples and the average samples within the protected group
-                    deviations[idx, class_idx] = model.abs(total_average - protected_average)
+                    deviations[idx, class_idx] = model.abs(total_averages[class_idx] - protected_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
         didi = model.sum(deviations)

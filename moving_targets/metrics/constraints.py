@@ -45,25 +45,28 @@ class DIDI(Metric):
     @staticmethod
     def classification_didi(indicator_matrix, targets, classes):
         didi = 0.0
+        total_averages_per_class = np.array([np.mean(targets == c) for c in classes])
         for label in indicator_matrix.columns:
             # subset of the targets having <label> as protected feature (i.e., the current protected group)
             protected_targets = targets[indicator_matrix[label] == 1]
             if len(protected_targets) > 0:
                 # list of deviations from the total percentage of samples respectively to each target class
-                deviation_per_class = [np.mean(protected_targets == c) - np.mean(targets == c) for c in classes]
+                protected_averages_per_class = np.array([np.mean(protected_targets == c) for c in classes])
                 # total deviation (partial didi) respectively to each protected group
-                didi += np.abs(deviation_per_class).sum()
+                didi += np.abs(total_averages_per_class - protected_averages_per_class).sum()
         return didi
 
     @staticmethod
     def regression_didi(indicator_matrix, targets):
         didi = 0.0
+        total_average = np.mean(targets)
         for label in indicator_matrix.columns:
             # subset of the targets having <label> as protected feature (i.e., the current protected group)
             protected_targets = targets[indicator_matrix[label] == 1]
             if len(protected_targets) > 0:
                 # total deviation (partial didi) respectively to each protected group
-                didi += abs(np.mean(protected_targets) - np.mean(targets))
+                protected_average = np.mean(protected_targets)
+                didi += abs(protected_average - total_average)
         return didi
 
     def __init__(self, classification: bool, protected: str, percentage: bool = True, name: str = 'didi'):
@@ -104,7 +107,7 @@ class DIDI(Metric):
             didi_p = DIDI.classification_didi(indicator_matrix=m, targets=Classifier.get_classes(p), classes=c)
             didi_y = DIDI.classification_didi(indicator_matrix=m, targets=y, classes=c) if self.percentage else 1.0
         else:
-            didi_p = DIDI.regression_didi(indicator_matrix=m, targets=Classifier.get_classes(p))
+            didi_p = DIDI.regression_didi(indicator_matrix=m, targets=p)
             didi_y = DIDI.regression_didi(indicator_matrix=m, targets=y) if self.percentage else 1.0
         # handle division by zero
         if didi_y == 0.0:
@@ -129,7 +132,8 @@ class DIDI(Metric):
             # if a single protected column is found out, this is interpreted as a categorical column
             feature = x[protected[0]]
             classes = np.unique(feature)
-            return pd.concat(([pd.Series(feature == i, name=i, dtype=int) for i in classes]), axis=1)
+            indicators = [pd.Series(feature == c, name=f'{self.protected}_{c}', dtype=int) for c in classes]
+            return pd.concat(indicators, axis=1)
         if len(protected) > 1:
             # if multiple protected columns are found out, these are interpreted as one-hot encoded columns
             return x[protected].astype(int)
