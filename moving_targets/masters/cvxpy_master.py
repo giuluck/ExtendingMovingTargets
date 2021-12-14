@@ -1,7 +1,7 @@
 """Cvxpy Master interface."""
 import logging
 from abc import ABC
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import cvxpy as cp
 
@@ -18,13 +18,13 @@ class CvxpyMaster(Master, ABC):
                                               log_fn=lambda m, mvs, nvs: [-nv * cp.log(mv) for mv, nv in zip(mvs, nvs)])
     """The `LossesHandler` object for the 'SCS' backend solver."""
 
-    def __init__(self, alpha: float, beta: float, solver: str, **solver_args):
+    def __init__(self, alpha: Optional[float], beta: Optional[float], solver: str, **solver_args):
         """
         :param alpha:
-            The non-negative real number which is used to calibrate the two losses in the alpha step.
+            The initial positive real number which is used to calibrate the two losses in the alpha step.
 
         :param beta:
-            The non-negative real number which is used to constraint the p_loss in the beta step.
+            The initial non-negative real number which is used to constraint the p_loss in the beta step.
 
         :param solver:
             The name of the solver (e.g., SCS, ...).
@@ -59,21 +59,24 @@ class CvxpyMaster(Master, ABC):
         :return:
             The output of the `self.return_solutions()` method.
         """
-        # build model and get losses
+        # build model
         constraints = []
-        model_info = self.build_model(macs, constraints, x, y, iteration)
-        # algorithm core: check for feasibility and behave depending on that
-        y_loss = self.y_loss(macs, constraints, x, y, model_info, iteration)
-        p_loss = self.p_loss(macs, constraints, x, y, model_info, iteration)
-        if self.beta_step(macs, constraints, x, y, model_info, iteration):
-            constraints.append(p_loss - self.beta <= 0)
-            objective = cp.Minimize(y_loss)
+        # retrieve info and get losses
+        info = self.build_model(macs=macs, model=constraints, x=x, y=y, iteration=iteration)
+        y_loss = self.y_loss(macs=macs, model=constraints, x=x, y=y, model_info=info, iteration=iteration)
+        p_loss = self.p_loss(macs=macs, model=constraints, x=x, y=y, model_info=info, iteration=iteration)
+        # check for feasibility and behave depending on that
+        beta = self.beta(macs=macs, model=constraints, x=x, y=y, model_info=info, iteration=iteration)
+        if beta is None:
+            alpha = self.alpha(macs=macs, model=constraints, x=x, y=y, model_info=info, iteration=iteration)
+            objective = cp.Minimize(y_loss + (1.0 / alpha) * p_loss)
         else:
-            objective = cp.Minimize(y_loss + (1.0 / self.alpha) * p_loss)
+            constraints.append(p_loss <= beta)
+            objective = cp.Minimize(y_loss)
         # solve the problem and get the adjusted labels
         model = cp.Problem(objective, constraints)
         model.solve(solver=self.solver, **self.solver_args)
         if model.status in ['infeasible', 'unbounded']:
             logging.warning(f'Status {model.status} returned at iteration {iteration}, stop training.')
             return None
-        return self.return_solutions(macs, model, x, y, model_info, iteration)
+        return self.return_solutions(macs=macs, solution=model, x=x, y=y, model_info=info, iteration=iteration)

@@ -1,9 +1,8 @@
 """Gurobi Master interface."""
 import logging
 from abc import ABC
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-import numpy as np
 from gurobipy import Model, Env, GRB
 
 from moving_targets.masters.losses import LossesHandler
@@ -44,13 +43,13 @@ class GurobiMaster(Master, ABC):
     losses: LossesHandler = LossesHandler(abs_fn=_abs, log_fn=_log)
     """The `LossesHandler` object for this backend solver."""
 
-    def __init__(self, alpha: float, beta: float, verbose: bool, **solver_args):
+    def __init__(self, alpha: Optional[float], beta: Optional[float], verbose: bool, **solver_args):
         """
         :param alpha:
-            The non-negative real number which is used to calibrate the two losses in the alpha step.
+            The initial positive real number which is used to calibrate the two losses in the alpha step.
 
         :param beta:
-            The non-negative real number which is used to constraint the p_loss in the beta step.
+            The initial non-negative real number which is used to constraint the p_loss in the beta step.
 
         :param verbose:
             Whether or not to print information during the optimization process.
@@ -85,7 +84,7 @@ class GurobiMaster(Master, ABC):
         :return:
             The output of the `self.return_solutions()` method.
         """
-        # build model and get losses
+        # build model
         with Env(empty=True) as env:
             if not self.verbose:
                 env.setParam('OutputFlag', 0)
@@ -93,16 +92,19 @@ class GurobiMaster(Master, ABC):
             with Model(env=env, name='model') as model:
                 for param, value in self.solver_args.items():
                     model.setParam(param, value)
-                model_info = self.build_model(macs, model, x, y, iteration)
-                # algorithm core: check for feasibility and behave depending on that
-                y_loss = self.y_loss(macs, model, x, y, model_info, iteration)
-                p_loss = self.p_loss(macs, model, x, y, model_info, iteration)
+                # retrieve info and get losses
+                info = self.build_model(macs=macs, model=model, x=x, y=y, iteration=iteration)
+                y_loss = self.y_loss(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+                p_loss = self.p_loss(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
                 model.update()
-                if self.beta_step(macs, model, x, y, model_info, iteration):
-                    model.addConstr(p_loss <= self.beta, name='loss')
-                    model.setObjective(y_loss, GRB.MINIMIZE)
+                # check for feasibility and behave depending on that
+                beta = self.beta(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+                if beta is None:
+                    alpha = self.alpha(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+                    model.setObjective(y_loss + (1.0 / alpha) * p_loss, GRB.MINIMIZE)
                 else:
-                    model.setObjective(y_loss + (1.0 / self.alpha) * p_loss, GRB.MINIMIZE)
+                    model.addConstr(p_loss <= beta, name='loss')
+                    model.setObjective(y_loss, GRB.MINIMIZE)
                 # run the optimization procedure (if the time limit expires, tries to reach at least one solution)
                 model.optimize()
                 if model.Status == GRB.TIME_LIMIT:
@@ -113,4 +115,4 @@ class GurobiMaster(Master, ABC):
                 if model.SolCount == 0:
                     logging.warning(f'Status {model.Status} returned at iteration {iteration}, stop training.')
                     return None
-                return self.return_solutions(macs, model, x, y, model_info, iteration)
+                return self.return_solutions(macs=macs, solution=model, x=x, y=y, model_info=info, iteration=iteration)

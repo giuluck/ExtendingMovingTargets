@@ -52,7 +52,7 @@ if __name__ == '__main__':
     iterations = 15
     callbacks = []
 
-    ExperimentHandler(init_step='pretraining', **tasks['adult']).experiment(
+    ExperimentHandler(init_step='pretraining', **tasks['iris']).experiment(
         iterations=iterations,
         num_folds=None,
         callbacks=callbacks,

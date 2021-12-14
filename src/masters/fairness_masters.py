@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, Callable
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
 
 from moving_targets.learners.learner import Classifier
 from moving_targets.masters import LossesHandler
@@ -19,7 +20,7 @@ class Fairness(CplexMaster):
     """Data structure for the model info returned by the 'build_model()' method."""
 
     def __init__(self, classification: bool, protected: str, y_loss: Callable, p_loss: Callable, violation: float,
-                 alpha: float, beta: float, time_limit: Optional[float]):
+                 alpha: Optional[float], beta: Optional[float], time_limit: Optional[float]):
         """
         :param classification:
             Whether the task is a classification (True) or a regression (False) task.
@@ -62,14 +63,20 @@ class Fairness(CplexMaster):
     def build_model(self, macs, model, x: pd.DataFrame, y: pd.Series, iteration: Iteration) -> Info:
         raise NotImplementedError("Please implement abstract method 'build_model'")
 
-    def beta_step(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> bool:
+    def beta(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info,
+             iteration: Iteration) -> Optional[float]:
         _, pred = model_info
         # if either beta is None or there are no predictions (due to initial projection step) we use alpha
-        # otherwise we compute the didi using the metric, then returns True if the violation is under the threshold
-        if self.beta is None or pred is None:
-            return False
+        if self._beta is None or pred is None:
+            macs.log(beta=0)
+            return None
+        # otherwise we check for feasibility by computing the didi on the predictions: if infeasible, we use alpha
+        if self.didi(x=x, y=y, p=pred) <= self.violation:
+            macs.log(beta=1)
+            return self._beta
         else:
-            return self.didi(x=x, y=y, p=pred) <= self.violation
+            macs.log(beta=0)
+            return None
 
     def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         var, _ = model_info
@@ -96,7 +103,8 @@ class FairRegression(Fairness):
     """A dictionary of losses aliases that are accepted."""
 
     def __init__(self, protected: str, loss_fn: str = 'mse', violation: float = 0.2, lb: float = 0.0,
-                 ub: float = float('inf'), alpha: float = 1., beta: float = 1., time_limit: Optional[float] = 30):
+                 ub: float = float('inf'), alpha: Optional[float] = 1., beta: Optional[float] = 1.,
+                 time_limit: Optional[float] = 30):
         """
         :param protected:
             The name of the protected feature.
@@ -195,7 +203,7 @@ class FairClassification(Fairness):
     """A dictionary of losses aliases that are accepted."""
 
     def __init__(self, protected: str, loss_fn: str = 'hd', violation: float = 0.2, clip_value: float = 1e-2,
-                 alpha: float = 1., beta: float = 1., time_limit: Optional[float] = 30):
+                 alpha: Optional[float] = 1., beta: Optional[float] = 1., time_limit: Optional[float] = 30):
         """
         :param protected:
             The name of the protected feature.
@@ -284,6 +292,28 @@ class FairClassification(Fairness):
 
         # return model info
         return Fairness.Info(variables=variables, predictions=pred)
+
+    def beta(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Fairness.Info,
+             iteration: Iteration) -> Optional[float]:
+        if super(FairClassification, self).beta(macs, model, x, y, model_info, iteration) is None:
+            return None
+        # if the super class has not returned None it means that both the model is feasible and the beta step is
+        # supported, still, we need to adjust beta due in case of p_losses using probabilities, indeed:
+        #   > we must increase the given default value (self._beta) of a minimum loss which cannot be made zero by
+        #     p_losses that use probabilities instead of class predictions since they will always have a minimal amount
+        #     of error due to the fact that continuous values are used
+        #   > this minimal loss is computed as the loss between the class probabilities and the actual classes, and in
+        #     order to compute the loss we rely on the given "_p_loss()" callable function by passing numpy as the
+        #     cplex model and the one-hot encoded classes (necessary for compatibility) as the cplex variables
+        #       -- note: this is kind of a hack, thus it should be fixed in some cleaner ways
+        if self.use_prob:
+            _, pred = model_info
+            pred_classes = Classifier.get_classes(pred)
+            pred_classes = OneHotEncoder(sparse=False).fit_transform(pred_classes.reshape((-1, 1)))
+            minimal_loss = self._p_loss(model=np, numeric_variables=pred, model_variables=pred_classes)
+            return minimal_loss + self._beta
+        else:
+            return self._beta
 
     def p_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Fairness.Info,
                iteration: Iteration) -> float:

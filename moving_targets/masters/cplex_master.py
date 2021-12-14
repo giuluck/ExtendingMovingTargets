@@ -18,13 +18,13 @@ class CplexMaster(Master, ABC):
                                           log_fn=None)
     """The `LossesHandler` object for this backend solver."""
 
-    def __init__(self, alpha: float, beta: float, time_limit: Optional[float]):
+    def __init__(self, alpha: Optional[float], beta: Optional[float], time_limit: Optional[float]):
         """
         :param alpha:
-            The non-negative real number which is used to calibrate the two losses in the alpha step.
+            The initial positive real number which is used to calibrate the two losses in the alpha step.
 
         :param beta:
-            The non-negative real number which is used to constraint the p_loss in the beta step.
+            The initial non-negative real number which is used to constraint the p_loss in the beta step.
 
         :param time_limit:
             The maximal time for which the master can run during each iteration.
@@ -53,24 +53,25 @@ class CplexMaster(Master, ABC):
         :return:
             The output of the `self.return_solutions()` method.
         """
-        # build model and get losses
+        # build model
         model = Model(name='model')
         if self.time_limit is not None:
             model.set_time_limit(self.time_limit)
-        model_info = self.build_model(macs=macs, model=model, x=x, y=y, iteration=iteration)
-        # algorithm core: check for feasibility and behave depending on that
-
-        y_loss = self.y_loss(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration)
-        p_loss = self.p_loss(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration)
-
-        if self.beta_step(macs=macs, model=model, x=x, y=y, model_info=model_info, iteration=iteration):
-            model.add(p_loss <= self.beta)
-            model.minimize(y_loss)
+        # retrieve info and get losses
+        info = self.build_model(macs=macs, model=model, x=x, y=y, iteration=iteration)
+        y_loss = self.y_loss(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+        p_loss = self.p_loss(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+        # check for feasibility and behave depending on that
+        beta = self.beta(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+        if beta is None:
+            alpha = self.alpha(macs=macs, model=model, x=x, y=y, model_info=info, iteration=iteration)
+            model.minimize(y_loss + (1.0 / alpha) * p_loss)
         else:
-            model.minimize(y_loss + (1.0 / self.alpha) * p_loss)
+            model.add(p_loss <= beta)
+            model.minimize(y_loss)
         # solve the problem and get the adjusted labels
         solution = model.solve()
         if solution is None:
             logging.warning(f'Model is infeasible at iteration {iteration}, stop training.')
             return None
-        return self.return_solutions(macs=macs, solution=solution, x=x, y=y, model_info=model_info, iteration=iteration)
+        return self.return_solutions(macs=macs, solution=solution, x=x, y=y, model_info=info, iteration=iteration)

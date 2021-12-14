@@ -1,9 +1,10 @@
 """Master implementation for the Balance Counts problem."""
 from collections import namedtuple
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
 
 from moving_targets.learners.learner import Classifier
 from moving_targets.masters import LossesHandler
@@ -38,8 +39,8 @@ class BalancedCounts(CplexMaster):
     }
     """A dictionary of losses aliases that are accepted."""
 
-    def __init__(self, loss_fn: str = 'hd', clip_value: float = 1e-2, slack: float = 1.05, alpha: float = 1.,
-                 beta: float = 1., time_limit: Optional[float] = 30):
+    def __init__(self, loss_fn: str = 'hd', clip_value: float = 1e-2, slack: float = 1.05, alpha: Optional[float] = 1.,
+                 beta: Optional[float] = 1., time_limit: Optional[float] = 30):
         """
         :param loss_fn:
             The loss function computed between the model variables and the learner predictions.
@@ -63,6 +64,7 @@ class BalancedCounts(CplexMaster):
             The maximal time for which the master can run during each iteration.
         """
         assert loss_fn in self.accepted_losses.keys(), f"'{loss_fn}' is not a valid loss function"
+        loss_fn = BalancedCounts.accepted_losses[loss_fn]
         super(BalancedCounts, self).__init__(alpha=alpha, beta=beta, time_limit=time_limit)
 
         self.clip_value: float = clip_value
@@ -72,7 +74,10 @@ class BalancedCounts(CplexMaster):
         """The slack value, expressed in terms of ratio wrt the other classes, to allow some output class to have a
         few labelled samples more than the other classes."""
 
-        self._p_loss: str = self.accepted_losses[loss_fn]
+        self.use_prob: bool = loss_fn != 'categorical_hamming'
+        """Whether to use output probabilities or output classes in the p_loss."""
+
+        self._p_loss: Callable = getattr(BalancedCounts.losses, loss_fn)
         """The loss function computed between the model variables and the learner predictions."""
 
     def build_model(self, macs, model, x: pd.DataFrame, y: pd.Series, iteration: Iteration) -> Info:
@@ -100,15 +105,37 @@ class BalancedCounts(CplexMaster):
         # return model info
         return BalancedCounts.Info(variables=variables, predictions=pred, max_count=max_count)
 
-    def beta_step(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> bool:
+    def beta(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info,
+             iteration: Iteration) -> Optional[float]:
         _, pred, max_count = model_info
-        # if either beta is None or there are no predictions (due to initial projection step) we use alpha, otherwise
-        # we compute the class counts on the output classes and return True if they are all under the maximal value
-        if self.beta is None or pred is None:
-            return False
+        # STEP 1:
+        #   > if either beta is None or there are no predictions (due to initial projection step) we use alpha
+        if self._beta is None or pred is None:
+            macs.log(beta=0)
+            return None
+        # STEP 2:
+        #   > we check for feasibility by computing the class counts on the predictions: if infeasible, we use alpha
+        pred_classes = Classifier.get_classes(pred)
+        _, classes_counts = np.unique(pred_classes, return_counts=True)
+        if np.any(classes_counts > max_count):
+            macs.log(beta=0)
+            return None
+        # STEP 3:
+        #   > since the model is feasible and the beta step is supported, we return a real beta value
+        #   > the given default value (self._beta), however, must be increased of a minimum loss which cannot be made
+        #     zero by p_losses that use probabilities instead of class predictions; indeed, they will always have a
+        #     minimal amount of error due to the fact that continuous values are used
+        #   > this minimal loss is computed as the loss between the class probabilities and the actual classes, and in
+        #     order to compute the loss we rely on the given "_p_loss()" callable function by passing numpy as the
+        #     cplex model and the one-hot encoded classes (necessary for compatibility) as the cplex variables
+        #       -- note: this is kind of a hack, thus it should be fixed in some cleaner ways
+        macs.log(beta=1)
+        if self.use_prob:
+            pred_classes = OneHotEncoder(sparse=False).fit_transform(pred_classes.reshape((-1, 1)))
+            minimal_loss = self._p_loss(model=np, numeric_variables=pred, model_variables=pred_classes)
+            return minimal_loss + self._beta
         else:
-            _, classes_counts = np.unique(Classifier.get_classes(pred), return_counts=True)
-            return np.all(classes_counts <= max_count)
+            return self._beta
 
     def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:
         variables, _, _ = model_info
@@ -119,11 +146,8 @@ class BalancedCounts(CplexMaster):
         if pred is None:
             return 0.0
         else:
-            # if the chosen loss is hamming distance we use classes instead of probabilities
-            pred = Classifier.get_classes(pred) if self._p_loss == 'categorical_hamming' else pred
-            # retrieve the loss from the losses handler by name
-            loss_fn = getattr(BalancedCounts.losses, self._p_loss)
-            return loss_fn(model=model, numeric_variables=pred, model_variables=model_variables)
+            pred = pred if self.use_prob else Classifier.get_classes(pred)
+            return self._p_loss(model=model, numeric_variables=pred, model_variables=model_variables)
 
     def return_solutions(self, macs, solution, x: pd.DataFrame, y: pd.Series, model_info: Info,
                          iteration: Iteration) -> np.ndarray:
