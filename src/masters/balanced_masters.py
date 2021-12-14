@@ -91,11 +91,11 @@ class BalancedCounts(CplexMaster):
         # constrain the class counts to the maximal value
         for c in range(num_classes):
             class_count = model.sum([variables[i, c] for i in range(num_samples)])
-            model.add_constraint(class_count <= max_count)
+            model.add(class_count <= max_count)
         # each sample should be labeled with one class only
         for i in range(num_samples):
             class_label = model.sum(variables[i, c] for c in range(num_classes))
-            model.add_constraint(class_label == 1)
+            model.add(class_label == 1)
 
         # return model info
         return BalancedCounts.Info(variables=variables, predictions=pred, max_count=max_count)

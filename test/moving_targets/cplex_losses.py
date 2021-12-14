@@ -29,6 +29,6 @@ class TestCplexLosses(TestLosses):
         else:
             variables = model.binary_var_matrix(keys1=num_samples, keys2=classes[0], name='y')
             variables = np.array(list(variables.values())).reshape((num_samples, classes[0]))
-        model.add_constraints([var == val for var, val in zip(variables.flatten(), values.flatten())])
+        model.add([var == val for var, val in zip(variables.flatten(), values.flatten())])
         model.minimize(loss(model, variables))
         return model.solve().objective_value

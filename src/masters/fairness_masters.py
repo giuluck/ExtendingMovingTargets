@@ -151,14 +151,15 @@ class FairRegression(Fairness):
             if len(protected_variables) > 0:
                 # average output target for the protected group
                 protected_average = model.sum(protected_variables) / len(protected_variables)
-                # the partial deviation is computed as the absolute value of the difference between the
-                # total average samples and the average samples within the protected group
-                deviations[idx] = model.abs(total_average - protected_average)
+                # the partial deviation is computed as the absolute value (which is linearized) of the difference
+                # between the total average samples and the average samples within the protected group
+                model.add(deviations[idx] >= total_average - protected_average)
+                model.add(deviations[idx] >= protected_average - total_average)
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
         didi = model.sum(deviations)
         train_didi = DIDI.regression_didi(indicator_matrix=indicator_matrix, targets=y)
-        model.add_constraint(didi <= self.violation * train_didi, ctname='fairness_constraint')
+        model.add(didi <= self.violation * train_didi)
 
         # return model info
         return Fairness.Info(variables=variables, predictions=pred)
@@ -240,13 +241,21 @@ class FairClassification(Fairness):
         classes = np.unique(y)
         num_samples = len(y)
         num_classes = len(classes)
-        variables = model.binary_var_matrix(keys1=num_samples, keys2=classes, name='y').values()
-        variables = np.array(list(variables)).reshape(num_samples, num_classes)
 
-        # each sample should be labeled with one class only
-        for i in range(num_samples):
-            class_label = model.sum(variables[i, c] for c in range(num_classes))
-            model.add_constraint(class_label == 1)
+        # handle binary classification problems in a faster way
+        if num_classes == 2:
+            # create column array of binary variables
+            variables = np.array(model.binary_var_list(keys=num_samples, name='y')).reshape((-1, 1))
+            # create a matrix from the list of variables so that the second column is the opposite of the first one
+            variables = np.concatenate((variables, 1 - variables), axis=1)
+        else:
+            # create matrix of binary variables
+            variables = model.binary_var_matrix(keys1=num_samples, keys2=classes, name='y').values()
+            variables = np.array(list(variables)).reshape(num_samples, num_classes)
+            # each sample should be labeled with one class only
+            for i in range(num_samples):
+                class_label = model.sum(variables[i, c] for c in range(num_classes))
+                model.add(class_label == 1)
 
         # calculate deviations between the average output and the average output respectively to each protected class
         labels = indicator_matrix.columns
@@ -263,14 +272,15 @@ class FairClassification(Fairness):
                     protected_variables_per_class = protected_variables[:, class_idx]
                     # average number of samples within the protected group having <class[class_idx]> as target class
                     protected_average = model.sum(protected_variables_per_class) / len(protected_variables_per_class)
-                    # the partial deviation is computed as the absolute value of the difference between the
-                    # total average samples and the average samples within the protected group
-                    deviations[idx, class_idx] = model.abs(total_averages[class_idx] - protected_average)
+                    # the partial deviation is computed as the absolute value (which is linearized) of the difference
+                    # between the total average samples and the average samples within the protected group
+                    model.add(deviations[idx, class_idx] >= total_averages[class_idx] - protected_average)
+                    model.add(deviations[idx, class_idx] >= protected_average - total_averages[class_idx])
 
         # the DIDI is computed as the sum of this deviations, and it is constrained to be lower than the given value
         didi = model.sum(deviations)
         train_didi = DIDI.classification_didi(indicator_matrix=indicator_matrix, targets=y, classes=classes)
-        model.add_constraint(didi <= self.violation * train_didi, ctname='fairness_constraint')
+        model.add(didi <= self.violation * train_didi)
 
         # return model info
         return Fairness.Info(variables=variables, predictions=pred)
