@@ -111,14 +111,14 @@ class BalancedCounts(CplexMaster):
         # STEP 1:
         #   > if either beta is None or there are no predictions (due to initial projection step) we use alpha
         if self._beta is None or pred is None:
-            macs.log(beta=0)
+            macs.log(use_beta=0)
             return None
         # STEP 2:
         #   > we check for feasibility by computing the class counts on the predictions: if infeasible, we use alpha
         pred_classes = Classifier.get_classes(pred)
         _, classes_counts = np.unique(pred_classes, return_counts=True)
         if np.any(classes_counts > max_count):
-            macs.log(beta=0)
+            macs.log(use_beta=0)
             return None
         # STEP 3:
         #   > since the model is feasible and the beta step is supported, we return a real beta value
@@ -129,7 +129,7 @@ class BalancedCounts(CplexMaster):
         #     order to compute the loss we rely on the given "_p_loss()" callable function by passing numpy as the
         #     cplex model and the one-hot encoded classes (necessary for compatibility) as the cplex variables
         #       -- note: this is kind of a hack, thus it should be fixed in some cleaner ways
-        macs.log(beta=1)
+        macs.log(use_beta=1)
         if self.use_prob:
             pred_classes = OneHotEncoder(sparse=False).fit_transform(pred_classes.reshape((-1, 1)))
             minimal_loss = self._p_loss(model=np, numeric_variables=pred, model_variables=pred_classes)

@@ -68,14 +68,14 @@ class Fairness(CplexMaster):
         _, pred = model_info
         # if either beta is None or there are no predictions (due to initial projection step) we use alpha
         if self._beta is None or pred is None:
-            macs.log(beta=0)
+            macs.log(use_beta=0)
             return None
         # otherwise we check for feasibility by computing the didi on the predictions: if infeasible, we use alpha
         if self.didi(x=x, y=y, p=pred) <= self.violation:
-            macs.log(beta=1)
+            macs.log(use_beta=1)
             return self._beta
         else:
-            macs.log(beta=0)
+            macs.log(use_beta=0)
             return None
 
     def y_loss(self, macs, model, x: pd.DataFrame, y: pd.Series, model_info: Info, iteration: Iteration) -> Any:

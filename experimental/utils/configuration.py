@@ -40,10 +40,13 @@ def default_config(handler, **config_kwargs) -> Dict:
     """
     config = dict()
     for k, v in handler.__dict__.items():
-        if k in ['manager', 'wandb_args', 'wandb_config']:
+        # exclude these items
+        if k in ['manager', 'verbose', 'wandb_args', 'wandb_config']:
             pass
-        elif isinstance(v, dict):
-            config.update({f"{k.replace('_args', '')}/{kk}": vv for kk, vv in v.items()})
+        # explore up to one level of non-primitive types and update dictionary
+        elif hasattr(v, '__dict__'):
+            config.update({f"{k}/{kk.strip('_')}": vv for kk, vv in v.__dict__.items() if not hasattr(vv, '__dict__')})
+        # directly assign values to primitive types
         else:
             config[k] = v
     config.update(config_kwargs)

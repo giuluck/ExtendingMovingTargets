@@ -25,7 +25,7 @@ if __name__ == '__main__':
         'whitewine': dict(
             manager=WhitewineManager(filepath='../../res/whitewine.csv'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='ce')
+            master=BalancedCounts(loss_fn='mae')
         ),
         'shuttle': dict(
             manager=ShuttleManager(filepath='../../res/shuttle.trn'),
@@ -43,7 +43,7 @@ if __name__ == '__main__':
             master=FairClassification(protected='race', loss_fn='ce')
         ),
         'communities': dict(
-            manager=CommunitiesManager(filepath='../../res/communities.csv', test_size=0.99),
+            manager=CommunitiesManager(filepath='../../res/communities.csv'),
             learner=LinearRegression(),
             master=FairRegression(protected='race', loss_fn='mse')
         )
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     iterations = 15
     callbacks = []
 
-    ExperimentHandler(init_step='pretraining', **tasks['iris']).experiment(
+    ExperimentHandler(init_step='pretraining', **tasks['whitewine']).experiment(
         iterations=iterations,
         num_folds=None,
         callbacks=callbacks,
