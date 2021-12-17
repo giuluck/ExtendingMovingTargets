@@ -43,7 +43,11 @@ class BalancedCountsManager(AbstractManager, ABC):
                          stratify='class',
                          x_scaling='std',
                          y_scaling=None,
-                         metrics=[CrossEntropy(name='ce'), Accuracy(name='acc'), ClassFrequenciesStd(name='std')])
+                         metrics=[
+                             CrossEntropy(name='loss'),
+                             Accuracy(name='metric'),
+                             ClassFrequenciesStd(name='constraint')
+                         ])
 
 
 class IrisManager(BalancedCountsManager):

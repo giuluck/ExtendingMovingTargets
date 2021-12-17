@@ -48,14 +48,14 @@ class AdultManager(AbstractManager):
         :param test_size:
             The amount of total samples to be considered for training (either relative or absolute).
         """
-        didi = DIDI(classification=True, protected=AdultManager.PROTECTED, percentage=True, name='didi')
+        didi = DIDI(classification=True, protected=AdultManager.PROTECTED, percentage=True, name='constraint')
         super().__init__(filepath=filepath,
                          test_size=test_size,
                          label=AdultManager.TARGET,
                          stratify=AdultManager.TARGET,
                          x_scaling='std',
                          y_scaling=None,
-                         metrics=[CrossEntropy(name='ce'), Accuracy(name='acc'), didi])
+                         metrics=[CrossEntropy(name='loss'), Accuracy(name='metric'), didi])
 
     def get_scalers(self) -> Scalers:
         # the x scaler uses the given default method for numeric features while the categorical ones (which have an
@@ -115,7 +115,7 @@ class CommunitiesManager(AbstractManager):
         :param n_features:
             The number of input features to be extracted from the cleaned dataset by importance.
         """
-        didi = DIDI(classification=False, protected=CommunitiesManager.PROTECTED, percentage=True, name='didi')
+        didi = DIDI(classification=False, protected=CommunitiesManager.PROTECTED, percentage=True, name='constraint')
         super().__init__(filepath=filepath,
                          test_size=test_size,
                          max_nan=max_nan,
@@ -124,7 +124,7 @@ class CommunitiesManager(AbstractManager):
                          stratify=None,
                          x_scaling='std',
                          y_scaling='norm',
-                         metrics=[MSE(name='mse'), R2(name='r2'), didi])
+                         metrics=[MSE(name='loss'), R2(name='metric'), didi])
 
     def get_scalers(self) -> Scalers:
         # the x scaler uses the given default method for each feature but the protected one
