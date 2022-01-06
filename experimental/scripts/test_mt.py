@@ -1,10 +1,11 @@
 """Moving Targets Test Script."""
 import warnings
 
+from moving_targets.learners import *
+from moving_targets.masters.backends import GurobiBackend
 from sklearn.exceptions import ConvergenceWarning
 
 from experimental.utils import ExperimentHandler
-from moving_targets.learners import *
 from src.datasets import *
 from src.masters import *
 
@@ -15,49 +16,49 @@ if __name__ == '__main__':
         'iris': dict(
             manager=IrisManager(filepath='../../res/iris.csv'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='ce')
+            master=BalancedCounts(backend=GurobiBackend(time_limit=30), loss='mse')
         ),
         'redwine': dict(
             manager=RedwineManager(filepath='../../res/redwine.csv'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='ce')
+            master=BalancedCounts(backend=GurobiBackend(time_limit=30), loss='mse')
         ),
         'whitewine': dict(
             manager=WhitewineManager(filepath='../../res/whitewine.csv'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='mae')
+            master=BalancedCounts(backend=GurobiBackend(time_limit=30), loss='mse')
         ),
         'shuttle': dict(
             manager=ShuttleManager(filepath='../../res/shuttle.trn'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='ce')
+            master=BalancedCounts(backend=GurobiBackend(time_limit=30), loss='mse')
         ),
         'dota': dict(
             manager=DotaManager(filepath='../../res/dota2.csv'),
             learner=LogisticRegression(),
-            master=BalancedCounts(loss_fn='ce')
+            master=BalancedCounts(backend=GurobiBackend(time_limit=30), loss='mse')
         ),
         'adult': dict(
             manager=AdultManager(filepath='../../res/adult.csv'),
             learner=LogisticRegression(),
-            master=FairClassification(protected='race', loss_fn='ce')
+            master=FairClassification(backend=GurobiBackend(time_limit=30), protected='race', loss='mse')
         ),
         'communities': dict(
             manager=CommunitiesManager(filepath='../../res/communities.csv'),
             learner=LinearRegression(),
-            master=FairRegression(protected='race', loss_fn='mse')
+            master=FairRegression(backend=GurobiBackend(time_limit=30), protected='race', loss='mse')
         )
     }
 
-    iterations = 15
+    iterations = 5
     callbacks = []
 
-    ExperimentHandler(init_step='pretraining', **tasks['whitewine']).experiment(
+    ExperimentHandler(init_step='pretraining', **tasks['adult']).experiment(
         iterations=iterations,
         num_folds=None,
         callbacks=callbacks,
-        model_verbosity=True,
+        model_verbosity=1,
         fold_verbosity=False,
-        plot_args={'num_columns': 3, 'figsize': (15, 10), 'tight_layout': True},
+        plot_args=dict(figsize=(20, 10)),
         summary_args=None
     )

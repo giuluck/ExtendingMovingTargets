@@ -3,9 +3,9 @@
 from abc import ABC
 
 import pandas as pd
-
 from moving_targets.metrics import CrossEntropy, Accuracy, ClassFrequenciesStd
 from moving_targets.util.typing import Number
+
 from src.datasets import AbstractManager
 from src.util.preprocessing import split_dataset
 

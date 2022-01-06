@@ -4,12 +4,12 @@ import time
 from typing import Dict, Any, Union, List, Optional, Callable, Tuple
 
 import wandb
-
-from experimental.utils.configuration import Fold, default_config, setup
 from moving_targets import MACS
 from moving_targets.callbacks import History, Callback, WandBLogger
 from moving_targets.learners import Learner
 from moving_targets.masters import Master
+
+from experimental.utils.configuration import Fold, default_config, setup
 from src.datasets import AbstractManager
 
 
@@ -148,7 +148,8 @@ class ExperimentHandler:
             learner=self.learner,
             master=self.master,
             init_step=self.init_step,
-            metrics=self.manager.metrics
+            metrics=self.manager.metrics,
+            stats=True
         )
         history = model.fit(
             x=fold.x,

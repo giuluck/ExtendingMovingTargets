@@ -5,11 +5,11 @@ from typing import Dict, Tuple
 
 import numpy as np
 import tensorflow as tf
-
 from moving_targets.util.typing import Dataset
+
 from src.datasets import AbstractManager, IrisManager, RedwineManager, WhitewineManager, ShuttleManager, DotaManager, \
     CommunitiesManager, AdultManager
-from src.util.preprocessing import Scalers, Scaler
+from src.util.preprocessing import Scalers, Scaler, IdentityScaler
 
 
 def setup(seed: int = 0):
@@ -107,8 +107,8 @@ class Fold:
         :param validation:
             A shared validation dataset which is common among all the k folds.
         """
-        xsc = Scaler(default_method=None) if scalers[0] is None else scalers[0]
-        ysc = Scaler(default_method=None) if scalers[1] is None else scalers[1]
+        xsc = IdentityScaler() if scalers[0] is None else scalers[0]
+        ysc = IdentityScaler() if scalers[1] is None else scalers[1]
 
         self.x = xsc.fit_transform(x)
         """The input data."""

@@ -2,10 +2,10 @@ from typing import Optional, List
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
-
 from moving_targets.metrics import DIDI, CrossEntropy, Accuracy, MSE, R2
 from moving_targets.util.typing import Number
+from sklearn.preprocessing import OneHotEncoder
+
 from src.datasets import AbstractManager
 from src.util.cleaning import get_top_features
 from src.util.preprocessing import split_dataset, Scaler, Scalers
@@ -37,7 +37,8 @@ class AdultManager(AbstractManager):
         categorical_features = pd.DataFrame(categorical_features, columns=encoder.get_feature_names_out())
         numerical_features = features.select_dtypes(exclude=['object'])
         # obtain output data by concatenating features
-        df = pd.concat((numerical_features, categorical_features, protected, target), axis=1).astype(float)
+        df = pd.concat((numerical_features, categorical_features, protected), axis=1).astype(float)
+        df[AdultManager.TARGET] = target.astype('category').cat.codes
         return split_dataset(df, stratify=df[AdultManager.TARGET], test_size=test_size, val_size=0.0)
 
     def __init__(self, filepath: str, test_size: Number = 0.2):

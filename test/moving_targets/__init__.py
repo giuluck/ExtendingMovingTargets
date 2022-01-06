@@ -1,1 +1,0 @@
-"""Tests Moving Targets Package."""

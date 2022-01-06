@@ -4,10 +4,10 @@ from typing import Union, Dict, Tuple, List, Optional, Any
 
 import numpy as np
 import pandas as pd
+from moving_targets.util.typing import Number
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn.preprocessing import OneHotEncoder
 
-from moving_targets.util.typing import Number
 from src.util.typing import Method, Extrapolation, Methods
 
 
@@ -223,17 +223,21 @@ class Scaler:
         # handle output
         return Scaler._handle_output(data=data, is_2d=self._is_2d, is_pandas=self._is_pandas)
 
-    @staticmethod
-    def get_default(num_features: int) -> Any:
-        """Builds a blank scaler which works on data with the given number of features.
 
-        :param num_features:
-            The number of features.
+class IdentityScaler(Scaler):
+    """Utility class to handle no scaling."""
 
-        :return:
-            A blank scaler.
-        """
-        return Scaler(default_method=None).fit(data=[[0.] * num_features])
+    def __init__(self):
+        super(IdentityScaler, self).__init__()
+
+    def fit(self, data):
+        return self
+
+    def transform(self, data) -> Any:
+        return data
+
+    def inverse_transform(self, data) -> Any:
+        return data
 
 
 Scalers = Tuple[Optional[Scaler], Optional[Scaler]]

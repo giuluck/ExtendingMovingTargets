@@ -4,9 +4,9 @@ from typing import List, Tuple, Dict, Union, Optional
 
 import numpy as np
 import pandas as pd
-
 from moving_targets.metrics import Metric
 from moving_targets.util.typing import Dataset
+
 from src.util.preprocessing import Scaler, Scalers, split_dataset, cross_validate
 from src.util.typing import Method
 
@@ -54,10 +54,10 @@ class AbstractManager:
             Any dataset-dependent argument to be passed to the static `load_data()` function.
         """
         train, test = self.load_data(**load_data_kwargs).values()
-        self.train_data: Tuple[pd.DataFrame, pd.Series] = (train.drop(columns=label), train[label])
+        self.train_data: Tuple[pd.DataFrame, np.ndarray] = (train.drop(columns=label), train[label].values)
         """The training data in the form of a tuple (xtr, ytr)."""
 
-        self.test_data: Tuple[pd.DataFrame, pd.Series] = (test.drop(columns=label), test[label])
+        self.test_data: Tuple[pd.DataFrame, np.ndarray] = (test.drop(columns=label), test[label].values)
         """The test data in the form of a tuple (xts, yts)."""
 
         self.stratify: Optional = None if stratify is None else train[stratify]
@@ -74,12 +74,6 @@ class AbstractManager:
 
     def get_scalers(self) -> Scalers:
         """Returns the dataset scalers.
-
-        :param x:
-            The input data.
-
-        :param y:
-            The output data.
 
         :return:
             A pair of scalers, one for the input and one for the output data, respectively.

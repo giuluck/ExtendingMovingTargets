@@ -3,11 +3,12 @@
 import os
 import warnings
 
+from moving_targets.callbacks import WandBLogger
+from moving_targets.learners import *
+from moving_targets.masters.backends import GurobiBackend
 from sklearn.exceptions import ConvergenceWarning
 
 from experimental.utils.configuration import get_manager
-from moving_targets.callbacks import WandBLogger
-from moving_targets.learners import *
 from src.masters import *
 from src.util.dictionaries import cartesian_product, merge_dictionaries
 
@@ -37,13 +38,13 @@ if __name__ == '__main__':
         init_step=['pretraining', 'projection'],
         alpha=[10.0, 1.0, 0.1, 0.01],
         beta=[1.0, 0.1, 0.01, None],
-        loss_fn=['hd', 'ce', 'mse', 'mae'],
+        loss=['hd', 'ce', 'mse', 'mae'],
         dataset=['iris', 'redwine', 'whitewine', 'dota', 'shuttle', 'adult']
     ) + cartesian_product(
         init_step=['pretraining', 'projection'],
         alpha=[10.0, 1.0, 0.1, 0.01],
         beta=[1.0, 0.1, 0.01, None],
-        loss_fn=['mse', 'mae'],
+        loss=['mse', 'mae'],
         dataset=['communities']
     )
 
@@ -51,15 +52,16 @@ if __name__ == '__main__':
         if cfg['dataset'] == 'communities':
             manager = get_manager('communities')
             learner = LinearRegression()
-            master = FairRegression(protected='race', loss_fn=cfg['loss_fn'], alpha=cfg['alpha'], beta=cfg['beta'])
+            master = FairRegression(protected='race', loss=cfg['loss'], alpha=cfg['alpha'], beta=cfg['beta'])
         elif cfg['dataset'] == 'adult':
             manager = get_manager('adult')
-            learner = LogisticRegression()
-            master = FairClassification(protected='race', loss_fn=cfg['loss_fn'], alpha=cfg['alpha'], beta=cfg['beta'])
+            learner = LogisticRegression(max_iter=10000)
+            master = FairClassification(backend=GurobiBackend(time_limit=30), protected='race',
+                                        loss=cfg['loss'], alpha=cfg['alpha'], beta=cfg['beta'])
         else:
             manager = get_manager(cfg['dataset'])
-            learner = LogisticRegression()
-            master = BalancedCounts(loss_fn=cfg['loss_fn'], alpha=cfg['alpha'], beta=cfg['beta'])
+            learner = LogisticRegression(max_iter=10000)
+            master = BalancedCounts(loss=cfg['loss'], alpha=cfg['alpha'], beta=cfg['beta'])
         handler = ExperimentHandler(
             manager=manager,
             learner=learner,
@@ -74,7 +76,7 @@ if __name__ == '__main__':
             num_folds=num_folds,
             model_verbosity=model_verbosity,
             fold_verbosity=fold_verbosity,
-            callbacks=[wandb_logger(handler, loss=cfg['loss_fn'])]
+            callbacks=[wandb_logger(handler, loss=cfg['loss'])]
         )
         print(f'-- elapsed time: {time.time() - start_time}')
 
