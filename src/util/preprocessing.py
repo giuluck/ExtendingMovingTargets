@@ -28,8 +28,6 @@ class Scaler:
             - None, performs no scaling
 
         :param methods:
-
-
             If a single value is passed, all the features are scaled with the same method.
             If a list or a dictionary is passed, each feature is scaled with the respective method.
         """

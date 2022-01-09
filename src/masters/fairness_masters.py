@@ -1,11 +1,11 @@
 """Master implementation for the Fair Regression problem."""
 
 import numpy as np
-from moving_targets.masters import RegressionMaster, ClassificationMaster
+from moving_targets.masters import SingleTargetRegression, SingleTargetClassification
 from moving_targets.metrics import DIDI
 
 
-class FairRegression(RegressionMaster):
+class FairRegression(SingleTargetRegression):
     """Master for the Fairness Regression problem."""
 
     def __init__(self, protected, backend='gurobi', loss='mse', violation=0.2, lb=0.0, ub=None, alpha=1.0, beta=1.0):
@@ -78,7 +78,7 @@ class FairRegression(RegressionMaster):
         return variables
 
 
-class FairClassification(ClassificationMaster):
+class FairClassification(SingleTargetClassification):
     """Master for the Fairness Classification problem."""
 
     def __init__(self, protected, backend='gurobi', loss='mse', violation=0.2, alpha=1.0, beta=1.0):

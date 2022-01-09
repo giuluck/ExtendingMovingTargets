@@ -1,11 +1,11 @@
 """Master implementation for the Balance Counts problem."""
 
 import numpy as np
-from moving_targets.masters import ClassificationMaster
+from moving_targets.masters import SingleTargetClassification
 from moving_targets.util import probabilities
 
 
-class BalancedCounts(ClassificationMaster):
+class BalancedCounts(SingleTargetClassification):
     """Master for the Balanced Counts problem in which output classes are constrained to be equally distributed."""
 
     def __init__(self, backend='gurobi', loss='mse', alpha=1.0, beta=1.0):
