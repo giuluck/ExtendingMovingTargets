@@ -2,13 +2,14 @@
 
 import numpy as np
 from moving_targets.masters import SingleTargetClassification
+from moving_targets.masters.backends import Backend
 from moving_targets.util import probabilities
 
 
 class BalancedCounts(SingleTargetClassification):
     """Master for the Balanced Counts problem in which output classes are constrained to be equally distributed."""
 
-    def __init__(self, backend='gurobi', loss='mse', alpha=1.0, beta=1.0):
+    def __init__(self, backend: Backend, loss: str, alpha: float, beta: float, adaptive: bool):
         """
         :param backend:
             The backend instance or backend alias.
@@ -23,6 +24,9 @@ class BalancedCounts(SingleTargetClassification):
 
         :param beta:
             The non-negative real number which is used to constraint the p_loss in the beta step.
+
+        :param adaptive:
+            Whether or not to use an adaptive strategy for the alpha value.
         """
 
         # noinspection PyUnusedLocal
@@ -33,8 +37,11 @@ class BalancedCounts(SingleTargetClassification):
             max_count = np.ceil(len(y) / len(classes))
             return np.all(counts <= max_count)
 
-        super().__init__(backend=backend, satisfied=satisfied, alpha=alpha, beta=beta, y_loss='hd', p_loss=loss,
-                         stats=True)
+        super().__init__(backend=backend, satisfied=satisfied, alpha=alpha, beta=beta,
+                         y_loss='hd', p_loss=loss, stats=True)
+
+        self.adaptive: bool = adaptive
+        """Whether or not to use an adaptive strategy for the alpha value."""
 
     def build(self, x, y, p):
         # retrieve the variables
@@ -51,3 +58,10 @@ class BalancedCounts(SingleTargetClassification):
         self.backend.add_constraints(constraints=constraints)
         # return the variables
         return variables
+
+    def alpha(self, x, y, p, v) -> float:
+        alpha = super(BalancedCounts, self).alpha(x, y, p, v)
+        if self.adaptive:
+            return alpha / self._macs.iteration
+        else:
+            return alpha

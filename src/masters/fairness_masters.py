@@ -2,13 +2,14 @@
 
 import numpy as np
 from moving_targets.masters import SingleTargetRegression, SingleTargetClassification
+from moving_targets.masters.backends import Backend
 from moving_targets.metrics import DIDI
 
 
 class FairRegression(SingleTargetRegression):
     """Master for the Fairness Regression problem."""
 
-    def __init__(self, protected, backend='gurobi', loss='mse', violation=0.2, lb=0.0, ub=None, alpha=1.0, beta=1.0):
+    def __init__(self, protected: str, backend: Backend, loss: str, alpha: float, beta: float, adaptive: bool):
         """
         :param protected:
             The name of the protected feature.
@@ -21,23 +22,17 @@ class FairRegression(SingleTargetRegression):
 
             Must be either 'mean_squared_error' or 'mean_absolute_error'.
 
-        :param violation:
-            The maximal accepted level of violation of the constraint.
-
-        :param lb:
-            The variables' lower bound.
-
-        :param ub:
-            The variables' upper bound.
-
         :param alpha:
             The non-negative real number which is used to calibrate the two losses in the alpha step.
 
         :param beta:
             The non-negative real number which is used to constraint the p_loss in the beta step.
+
+        :param adaptive:
+            Whether or not to use an adaptive strategy for the alpha value.
         """
 
-        self.violation = violation
+        self.violation = 0.2
         """The maximal accepted level of violation of the constraint."""
 
         self.didi = DIDI(protected=protected, classification=False, percentage=True)
@@ -47,7 +42,10 @@ class FairRegression(SingleTargetRegression):
         # since we know that the predictions must be positive, so we clip them to 0.0 in order to avoid (wrong)
         # negative predictions to influence the satisfiability computation
         super().__init__(satisfied=lambda x, y, p: self.didi(x=x, y=y, p=p.clip(0.0)) <= self.violation,
-                         backend=backend, lb=lb, ub=ub, alpha=alpha, beta=beta, y_loss=loss, p_loss=loss, stats=True)
+                         backend=backend, lb=0.0, ub=None, alpha=alpha, beta=beta, y_loss=loss, p_loss=loss, stats=True)
+
+        self.adaptive: bool = adaptive
+        """Whether or not to use an adaptive strategy for the alpha value."""
 
     def build(self, x, y, p):
         variables = super(FairRegression, self).build(x, y, p)
@@ -77,11 +75,18 @@ class FairRegression(SingleTargetRegression):
         self.backend.add_constraint(didi <= self.violation * train_didi)
         return variables
 
+    def alpha(self, x, y, p, v) -> float:
+        alpha = super(FairRegression, self).alpha(x, y, p, v)
+        if self.adaptive:
+            return alpha / self._macs.iteration
+        else:
+            return alpha
+
 
 class FairClassification(SingleTargetClassification):
     """Master for the Fairness Classification problem."""
 
-    def __init__(self, protected, backend='gurobi', loss='mse', violation=0.2, alpha=1.0, beta=1.0):
+    def __init__(self, protected: str, backend: Backend, loss: str, alpha: float, beta: float, adaptive: bool):
         """
         :param protected:
             The name of the protected feature.
@@ -94,17 +99,17 @@ class FairClassification(SingleTargetClassification):
 
             Must be either 'mean_squared_error' or 'mean_absolute_error'.
 
-        :param violation:
-            The maximal accepted level of violation of the constraint.
-
         :param alpha:
             The non-negative real number which is used to calibrate the two losses in the alpha step.
 
         :param beta:
             The non-negative real number which is used to constraint the p_loss in the beta step.
+
+        :param adaptive:
+            Whether or not to use an adaptive strategy for the alpha value.
         """
 
-        self.violation = violation
+        self.violation = 0.2
         """The maximal accepted level of violation of the constraint."""
 
         self.didi = DIDI(protected=protected, classification=True, percentage=True)
@@ -113,6 +118,9 @@ class FairClassification(SingleTargetClassification):
         # the constraint is satisfied if the percentage DIDI is lower or equal to the expected violation
         super().__init__(satisfied=lambda x, y, p: self.didi(x=x, y=y, p=p) <= self.violation,
                          backend=backend, alpha=alpha, beta=beta, y_loss='hd', p_loss=loss, stats=True)
+
+        self.adaptive: bool = adaptive
+        """Whether or not to use an adaptive strategy for the alpha value."""
 
     def build(self, x, y, p):
         # retrieve model variables from the super method and, for compatibility between the binary/multiclass scenarios,
@@ -144,3 +152,10 @@ class FairClassification(SingleTargetClassification):
         train_didi = DIDI.classification_didi(indicator_matrix=indicator_matrix, targets=y)
         self.backend.add_constraint(didi <= self.violation * train_didi)
         return super_vars
+
+    def alpha(self, x, y, p, v) -> float:
+        alpha = super(FairClassification, self).alpha(x, y, p, v)
+        if self.adaptive:
+            return alpha / self._macs.iteration
+        else:
+            return alpha

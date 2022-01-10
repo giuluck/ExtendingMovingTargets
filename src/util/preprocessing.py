@@ -8,10 +8,12 @@ from moving_targets.util.typing import Number
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn.preprocessing import OneHotEncoder
 
-from src.util.typing import Method, Extrapolation, Methods
+from src.util.typing import Method, Extrapolation
 
 
 class Scaler:
+    """Custom scaler that is able to treat each feature separately."""
+
     def __init__(self, *methods: Method, default_method: Method = None, **custom_methods: Method):
         """
         :param default_method:
@@ -44,7 +46,7 @@ class Scaler:
         """The default scaling method."""
 
         # if more than a single method is passed we use them, otherwise we use the custom_methods dictionary
-        self.methods: Methods = list(methods) if len(methods) > 1 else custom_methods
+        self.methods: Union[List[Method], Dict[str, Method]] = list(methods) if len(methods) > 1 else custom_methods
         """The custom scaling methods."""
 
         self._is_2d: bool = True
@@ -53,16 +55,14 @@ class Scaler:
         self._is_pandas: bool = True
         """Whether or not the input data is pandas-like."""
 
-        self._onehot: Dict[int, Tuple[OneHotEncoder, object]] = {}
-        """The dictionary of onehot encoders (paired with the previous column name, if any) indexed by column number."""
+        self._onehot: Dict[int, Tuple[OneHotEncoder, Any]] = {}
+        """The dictionary of onehot encoders (paired with the previous column id, if any) indexed by column number."""
 
         self._translation: Optional[np.ndarray] = None
         """The translation vector."""
 
         self._scaling: Optional[np.ndarray] = None
         """The scaling vector."""
-
-    """Custom scaler that is able to treat each feature separately."""
 
     @staticmethod
     def _handle_input(data) -> Tuple[Any, Tuple[bool, bool]]:
@@ -172,6 +172,7 @@ class Scaler:
             The scaled data.
         """
         # handle input
+        data_types = data.dtype if isinstance(data, np.ndarray) else data.dtypes
         data, _ = Scaler._handle_input(data=data)
 
         # handle one hot encoding and scale
@@ -185,7 +186,7 @@ class Scaler:
         data = (data - self._translation) / self._scaling
 
         # handle output
-        return Scaler._handle_output(data=data, is_2d=is_2d, is_pandas=self._is_pandas)
+        return Scaler._handle_output(data=data, is_2d=is_2d, is_pandas=self._is_pandas).astype(data_types)
 
     def fit_transform(self, data) -> Any:
         """Fits the scaler parameters.
@@ -208,6 +209,7 @@ class Scaler:
             The original data.
         """
         # handle input
+        data_types = data.dtype if isinstance(data, np.ndarray) else data.dtypes
         data, _ = Scaler._handle_input(data=data)
 
         # handle one hot encoding and scale
@@ -219,31 +221,7 @@ class Scaler:
             data.insert(loc=index, column=column, value=decoded)
 
         # handle output
-        return Scaler._handle_output(data=data, is_2d=self._is_2d, is_pandas=self._is_pandas)
-
-
-class IdentityScaler(Scaler):
-    """Utility class to handle no scaling."""
-
-    def __init__(self):
-        super(IdentityScaler, self).__init__()
-
-    def fit(self, data):
-        return self
-
-    def transform(self, data) -> Any:
-        return data
-
-    def inverse_transform(self, data) -> Any:
-        return data
-
-
-Scalers = Tuple[Optional[Scaler], Optional[Scaler]]
-"""Either an (optional) scaler for both the input and the output data, or a tuple of (optional) scalers for the input
-and the output data, respectively."""
-
-ValidationArgs = Union[pd.DataFrame, pd.Series]
-"""Either a `DataFrame` or a `Series` that needs to be split for cross-validation."""
+        return Scaler._handle_output(data=data, is_2d=self._is_2d, is_pandas=self._is_pandas).astype(data_types)
 
 
 def split_dataset(*dataset,
@@ -313,7 +291,7 @@ def split_dataset(*dataset,
         return {'train': train_data, 'validation': val_data, 'test': test_data}
 
 
-def cross_validate(*dataset: ValidationArgs,
+def cross_validate(*dataset,
                    num_folds: int = 10,
                    random_state: int = 0,
                    shuffle: bool = True,
