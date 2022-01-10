@@ -5,8 +5,9 @@ from typing import Union, Dict, Tuple, List, Optional, Any
 import numpy as np
 import pandas as pd
 from moving_targets.util.typing import Number
+from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 
 from src.util.typing import Method, Extrapolation
 
@@ -323,3 +324,25 @@ def cross_validate(*dataset,
         folds.append(
             {'train': tuple([v.iloc[tr] for v in dataset]), 'validation': tuple([v.iloc[vl] for v in dataset])})
     return folds
+
+
+def get_top_features(x, y, n: int = 10) -> list:
+    """Get the n most relevant features of the input dataset. In order to do feature selection, we have to fix a model:
+    here we use a random forest for simplicity, since feature importance is already implemented in sklearn routines.
+    :param x:
+        The input data.
+    :param y:
+        The output data.
+    :param n:
+        The number of features to be taken.
+    :return:
+        A list of n features ordered by importance.
+    """
+    x_scaled = MinMaxScaler().fit_transform(x)
+    y_scaled = MinMaxScaler().fit_transform(y)
+    features = list(x.columns)
+    model = SelectKBest(k=n).fit(x_scaled, y_scaled.reshape((-1,)))
+    # noinspection PyUnresolvedReferences
+    feat_ranking = model.scores_
+    ranked_features = np.take(features, np.argsort(feat_ranking))
+    return list(ranked_features)[:n]

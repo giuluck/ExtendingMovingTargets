@@ -15,7 +15,7 @@ if __name__ == '__main__':
         loss='mse',
         alpha=1,
         beta=1,
-        adaptive=False
+        adaptive=True
     ).experiment(
         iterations=5,
         num_folds=None,

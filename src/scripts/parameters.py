@@ -12,7 +12,7 @@ from moving_targets.callbacks import WandBLogger
 from sklearn.exceptions import ConvergenceWarning
 
 from src.managers import get_manager
-from src.util.dictionaries import cartesian_product
+from src.util.experiments import cartesian_product
 
 import time
 import shutil

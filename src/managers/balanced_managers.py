@@ -8,8 +8,8 @@ from moving_targets.learners import LogisticRegression
 from moving_targets.metrics import CrossEntropy, Accuracy, ClassFrequenciesStd, Metric
 from moving_targets.util.errors import not_implemented_message
 
-from src.managers import AbstractManager
-from src.masters import BalancedCounts
+from src.managers.abstract_manager import AbstractManager
+from src.util.masters import BalancedCounts
 from src.util.preprocessing import split_dataset
 
 

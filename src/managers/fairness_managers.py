@@ -8,10 +8,9 @@ from moving_targets.learners import LinearRegression, LogisticRegression
 from moving_targets.metrics import DIDI, CrossEntropy, Accuracy, MSE, R2, Metric
 from sklearn.preprocessing import OneHotEncoder
 
-from src.managers import AbstractManager
-from src.masters import FairRegression, FairClassification
-from src.util.cleaning import get_top_features
-from src.util.preprocessing import split_dataset, Scaler
+from src.managers.abstract_manager import AbstractManager
+from src.util.masters import FairRegression, FairClassification
+from src.util.preprocessing import get_top_features, split_dataset, Scaler
 
 
 class AdultManager(AbstractManager):
