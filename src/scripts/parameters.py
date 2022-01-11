@@ -3,12 +3,9 @@
 import os
 import warnings
 
-from moving_targets.masters.backends import GurobiBackend
-
 os.environ['WANDB_SILENT'] = 'true'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from moving_targets.callbacks import WandBLogger
 from sklearn.exceptions import ConvergenceWarning
 
 from src.managers import get_manager
@@ -31,20 +28,20 @@ if __name__ == '__main__':
         beta=[1.0, 0.1, 0.01, None],
         loss=['hd', 'ce', 'mse', 'mae'],
         adaptive=[False, True],
-        dataset=['iris', 'redwine', 'whitewine', 'dota', 'shuttle', 'adult'],
-        fixed_parameters=dict(backend=GurobiBackend(time_limit=30))
+        dataset=['iris', 'redwine', 'whitewine', 'dota', 'shuttle', 'adult']
     ) + cartesian_product(
         init_step=['pretraining', 'projection'],
         alpha=[10.0, 1.0, 0.1, 0.01],
         beta=[1.0, 0.1, 0.01, None],
         loss=['mse', 'mae'],
         adaptive=[False, True],
-        fixed_parameters=dict(backend=GurobiBackend(time_limit=30), dataset='communities')
+        dataset=['communities']
     )
 
     for i, config in enumerate(study):
         manager = get_manager(**config)
-        logger = WandBLogger(project='emt_parameters', entity='giuluck', run_name=manager.name(), **manager.kwargs)
+        manager.get_wandb_logger(project='emt_parameters')
+
         start_time = time.time()
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end=' ')
         manager.experiment(
@@ -52,7 +49,7 @@ if __name__ == '__main__':
             num_folds=num_folds,
             model_verbosity=model_verbosity,
             fold_verbosity=fold_verbosity,
-            callbacks=[logger]
+            callbacks=[manager.get_wandb_logger(project='emt_parameters')]
         )
         print(f'-- elapsed time: {time.time() - start_time}')
 

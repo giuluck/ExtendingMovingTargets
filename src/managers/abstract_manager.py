@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from moving_targets import MACS
 from moving_targets.callbacks import Callback, WandBLogger
+from moving_targets.masters.backends import Backend, GurobiBackend
 from moving_targets.metrics import Metric
 from moving_targets.util.errors import not_implemented_message
 from moving_targets.util.typing import Dataset
@@ -13,6 +14,45 @@ from moving_targets.util.typing import Dataset
 from src.util.experiments import setup
 from src.util.preprocessing import Scaler, split_dataset, cross_validate
 from src.util.typing import Method
+
+
+class Config:
+    """Data class containing the Dataset Manager configuration."""
+
+    def __init__(self,
+                 init_step: str = 'pretraining',
+                 alpha: Optional[float] = 1.0,
+                 beta: Optional[float] = None,
+                 loss: str = 'mse',
+                 adaptive: bool = False,
+                 backend: Union[str, Backend] = GurobiBackend(time_limit=30)):
+        """
+        :param init_step:
+            The MACS initial step.
+
+        :param alpha:
+            The Master alpha.
+
+        :param beta:
+            The Master beta.
+
+        :param loss:
+            The Master loss.
+
+        :param adaptive:
+            The Master alpha strategy.
+
+        :param backend:
+            The Master backend.
+        """
+        self.macs_kwargs: Dict[str, Any] = dict(init_step=init_step)
+        """The dictionary of MACS parameters."""
+
+        self.master_kwargs: Dict[str, Any] = dict(alpha=alpha, beta=beta, loss=loss, adaptive=adaptive, backend=backend)
+        """The dictionary of Master parameters."""
+
+        self.learner_kwargs: Dict[str, Any] = dict()
+        """The dictionary of Learner parameters."""
 
 
 class Fold:
@@ -69,6 +109,9 @@ class Fold:
 class AbstractManager:
     """Abstract dataset manager."""
 
+    _SEED: int = 0
+    """The random seed."""
+
     @classmethod
     def name(cls) -> str:
         """The dataset name
@@ -79,11 +122,8 @@ class AbstractManager:
         return cls.__name__.replace('Manager', '').lower()
 
     @classmethod
-    def data(cls, **data_kwargs) -> Dict[str, pd.DataFrame]:
+    def data(cls) -> Dict[str, pd.DataFrame]:
         """Loads the dataset.
-
-        :param data_kwargs:
-            Any dataset-dependent argument that may be necessary in the implementation of this method.
 
         :return:
             A dictionary of dataframes representing the train and test sets, respectively.
@@ -91,11 +131,11 @@ class AbstractManager:
         raise NotImplementedError(not_implemented_message(name='load_data', static=True))
 
     @classmethod
-    def model(cls, **model_kwargs) -> MACS:
+    def model(cls, config: Config) -> MACS:
         """The model to evaluate.
 
-        :param model_kwargs:
-            Any model-dependent argument that may be necessary in the implementation of this method.
+        :param config:
+            A configuration instance to set the experiment parameters.
 
         :return:
             A `MACS` instance.
@@ -116,8 +156,7 @@ class AbstractManager:
                  stratify: bool,
                  x_scaling: Method,
                  y_scaling: Method,
-                 seed: int = 0,
-                 **kwargs):
+                 config: Config):
         """
         :param label:
             The name of the target feature.
@@ -131,22 +170,16 @@ class AbstractManager:
         :param y_scaling:
             The output data default scaling method.
 
-        :param seed:
-            The random seed.
-
-        :param kwargs:
-            Any additional argument to be passed to the static `data()` and 'model()' functions.
+        :param config:
+            A configuration instance to set the experiment parameters.
         """
-        train, test = self.data(**kwargs).values()
+        train, test = self.data().values()
 
         self.train: pd.DataFrame = train
         """The training data."""
 
         self.test: pd.DataFrame = test
         """The test data."""
-
-        self.kwargs: Dict[str, Any] = kwargs
-        """Any additional argument to be passed to the static `data()` and 'model()' functions."""
 
         self.label: str = label
         """The name of the target feature."""
@@ -160,8 +193,8 @@ class AbstractManager:
         self.y_scaling: Method = y_scaling
         """The output data default scaling method."""
 
-        self.seed: int = seed
-        """The random seed."""
+        self.config: Config = config
+        """A configuration instance to set the experiment parameters."""
 
     def get_scalers(self) -> Tuple[Scaler, Scaler]:
         """Returns the dataset scalers.
@@ -203,6 +236,15 @@ class AbstractManager:
             folds = cross_validate(self.train, num_folds=num_folds, stratify=self.stratify, **kwargs)
             return [Fold(data=fold['train'], validation={**fold, 'test': self.test}, **fold_kwargs) for fold in folds]
 
+    def get_wandb_logger(self, project: str, entity: str = 'giuluck'):
+        config = {}
+        for field, value in self.config.__dict__.items():
+            if isinstance(value, dict):
+                config.update(value)
+            else:
+                config[field] = value
+        return WandBLogger(project=project, entity=entity, run_name=self.name(), **config)
+
     def experiment(self,
                    iterations: int,
                    num_folds: Optional[int] = None,
@@ -243,7 +285,7 @@ class AbstractManager:
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
         folds = self.get_folds(num_folds=num_folds)
         for i, fold in enumerate([folds] if num_folds is None else folds):
-            setup(seed=self.seed)
+            setup(seed=self._SEED)
             if folds_index is not None and i not in folds_index:
                 continue
             # handle verbosity
@@ -255,7 +297,7 @@ class AbstractManager:
                 if isinstance(c, WandBLogger) and num_folds is not None:
                     c.config['fold'] = i
             # fit model
-            model = self.model(**self.kwargs)
+            model = self.model(self.config)
             history = model.fit(
                 x=fold.x,
                 y=fold.y,

@@ -8,7 +8,7 @@ from moving_targets.learners import LinearRegression, LogisticRegression
 from moving_targets.metrics import DIDI, CrossEntropy, Accuracy, MSE, R2, Metric
 from sklearn.preprocessing import OneHotEncoder
 
-from src.managers.abstract_manager import AbstractManager
+from src.managers.abstract_manager import AbstractManager, Config
 from src.util.masters import FairRegression, FairClassification
 from src.util.preprocessing import get_top_features, split_dataset, Scaler
 
@@ -20,7 +20,7 @@ class AdultManager(AbstractManager):
     """List of ignored features."""
 
     @classmethod
-    def data(cls, **data_kwargs) -> Dict[str, pd.DataFrame]:
+    def data(cls) -> Dict[str, pd.DataFrame]:
         with importlib.resources.path('res', 'adult.csv') as filepath:
             df = pd.read_csv(filepath, header=0, sep=';', na_values='?', skipinitialspace=True)
         df = df.dropna(axis=0).reset_index(drop=True)
@@ -39,20 +39,13 @@ class AdultManager(AbstractManager):
         return split_dataset(df, stratify=df['income'], test_size=0.2, val_size=0.0)
 
     @classmethod
-    def model(cls, **model_kwargs) -> MACS:
+    def model(cls, config: Config) -> MACS:
         return MACS(
-            init_step=model_kwargs['init_step'],
-            learner=LogisticRegression(max_iter=10000),
-            master=FairClassification(
-                protected='race',
-                backend=model_kwargs['backend'],
-                loss=model_kwargs['loss'],
-                alpha=model_kwargs['alpha'],
-                beta=model_kwargs['beta'],
-                adaptive=model_kwargs['adaptive']
-            ),
+            learner=LogisticRegression(max_iter=10000, **config.learner_kwargs),
+            master=FairClassification(protected='race', **config.master_kwargs),
             metrics=cls.metrics(),
-            stats=True
+            stats=True,
+            **config.macs_kwargs
         )
 
     @classmethod
@@ -60,20 +53,16 @@ class AdultManager(AbstractManager):
         didi = DIDI(classification=True, protected='race', percentage=True, name='constraint')
         return [CrossEntropy(name='loss'), Accuracy(name='metric'), didi]
 
-    def __init__(self, seed: int = 0, **kwargs):
+    def __init__(self, config: Config):
         """
-        :param seed:
-            The random seed.
-
-        :param kwargs:
-            Any additional argument to be passed to the 'model()' function.
+        :param config:
+            A configuration instance to set the experiment parameters.
         """
         super(AdultManager, self).__init__(label='income',
                                            stratify=True,
                                            x_scaling='std',
                                            y_scaling=None,
-                                           seed=seed,
-                                           **kwargs)
+                                           config=config)
 
     def get_scalers(self) -> Tuple[Scaler, Scaler]:
         # the x scaler uses the given default method for numeric features while the categorical ones (which have an
@@ -93,20 +82,21 @@ class CommunitiesManager(AbstractManager):
                            'larcPerPop', 'autoTheft', 'autoTheftPerPop', 'arsons', 'arsonsPerPop', 'nonViolPerPop']
     """List of ignored features."""
 
+    _MAX_NAN: float = 0.05
+    """Relative maximal number of nan values for a column to be kept."""
+
+    _N_FEATURES: int = 15
+    """Number of input features to keep along with the protected one."""
+
     @classmethod
-    def data(cls, **data_kwargs) -> Dict[str, pd.DataFrame]:
-        # check data kwargs
-        max_nan = data_kwargs.get('max_nan') or 0.05
-        n_features = data_kwargs.get('n_features') or 15
-        assert max_nan >= 0, "'max_nan' should be a positive value, either float or integer"
-        assert n_features >= 0, "'n_features' should be a positive integer value"
+    def data(cls) -> Dict[str, pd.DataFrame]:
         # load dataset
         with importlib.resources.path('res', 'communities.csv') as filepath:
             df = pd.read_csv(filepath, header=0, sep=';', na_values='?', skipinitialspace=True)
-        max_nan = max_nan if isinstance(max_nan, int) else int(max_nan * len(df))
         # drop rows with no associated attribute to be predicted, then build a set of ignored features which are either
         # in the default set or have too many missing values, and finally remove rows with missing values and cast
         df = df.dropna(subset=['violentPerPop'], axis=0).reset_index(drop=True)
+        max_nan = int(cls._MAX_NAN * len(df))
         ignored = set(cls._IGNORED)
         for c in df.columns:
             num_nan = np.sum(df[c].isna())
@@ -115,24 +105,17 @@ class CommunitiesManager(AbstractManager):
         df = df.drop(list(ignored), axis=1).dropna(axis=0).reset_index(drop=True).astype(float)
         # perform feature selection on dataframe without protected feature (which is added at then end)
         x, y = df.drop(columns=['race', 'violentPerPop']), df[['violentPerPop']]
-        ft = get_top_features(x=x, y=y, n=n_features) + ['race', 'violentPerPop']
+        ft = get_top_features(x=x, y=y, n=cls._N_FEATURES) + ['race', 'violentPerPop']
         return split_dataset(df[ft], test_size=0.2, val_size=0.0)
 
     @classmethod
-    def model(cls, **model_kwargs) -> MACS:
+    def model(cls, config: Config) -> MACS:
         return MACS(
-            init_step=model_kwargs['init_step'],
-            learner=LinearRegression(),
-            master=FairRegression(
-                protected='race',
-                backend=model_kwargs['backend'],
-                loss=model_kwargs['loss'],
-                alpha=model_kwargs['alpha'],
-                beta=model_kwargs['beta'],
-                adaptive=model_kwargs['adaptive']
-            ),
+            learner=LinearRegression(**config.learner_kwargs),
+            master=FairRegression(protected='race', **config.master_kwargs),
             metrics=cls.metrics(),
-            stats=True
+            stats=True,
+            **config.macs_kwargs
         )
 
     @classmethod
@@ -140,20 +123,16 @@ class CommunitiesManager(AbstractManager):
         didi = DIDI(classification=False, protected='race', percentage=True, name='constraint')
         return [MSE(name='loss'), R2(name='metric'), didi]
 
-    def __init__(self, seed: int = 0, **kwargs):
+    def __init__(self, config: Config):
         """
-        :param seed:
-            The random seed.
-
-        :param kwargs:
-            Any additional argument to be passed to the 'model()' function.
+        :param config:
+            A configuration instance to set the experiment parameters.
         """
         super(CommunitiesManager, self).__init__(label='violentPerPop',
                                                  stratify=True,
                                                  x_scaling='std',
                                                  y_scaling=None,
-                                                 seed=seed,
-                                                 **kwargs)
+                                                 config=config)
 
     def get_scalers(self) -> Tuple[Scaler, Scaler]:
         # the x scaler uses the given default method for each feature but the protected one

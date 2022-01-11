@@ -9,8 +9,7 @@ if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
     manager = get_manager(
-        dataset='whitewine',
-        backend='gurobi',
+        dataset='communities',
         init_step='pretraining',
         loss='mse',
         alpha=1,

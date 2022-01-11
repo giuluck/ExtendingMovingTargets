@@ -8,7 +8,7 @@ from moving_targets.learners import LogisticRegression
 from moving_targets.metrics import CrossEntropy, Accuracy, ClassFrequenciesStd, Metric
 from moving_targets.util.errors import not_implemented_message
 
-from src.managers.abstract_manager import AbstractManager
+from src.managers.abstract_manager import AbstractManager, Config
 from src.util.masters import BalancedCounts
 from src.util.preprocessing import split_dataset
 
@@ -21,46 +21,36 @@ class BalancedCountsManager(AbstractManager):
         raise NotImplementedError(not_implemented_message(name='_load'))
 
     @classmethod
-    def data(cls, **data_kwargs) -> Dict[str, pd.DataFrame]:
+    def data(cls) -> Dict[str, pd.DataFrame]:
         with importlib.resources.path('res', f"{cls.name()}.csv") as filepath:
             df = cls._load(filepath)
         df['class'] = df['class'].astype('category').cat.codes
         return split_dataset(df, stratify=df['class'], test_size=0.2, val_size=0.0)
 
     @classmethod
-    def model(cls, **model_kwargs) -> MACS:
+    def model(cls, config: Config) -> MACS:
         return MACS(
-            init_step=model_kwargs['init_step'],
-            learner=LogisticRegression(max_iter=10000),
-            master=BalancedCounts(
-                backend=model_kwargs['backend'],
-                loss=model_kwargs['loss'],
-                alpha=model_kwargs['alpha'],
-                beta=model_kwargs['beta'],
-                adaptive=model_kwargs['adaptive']
-            ),
+            learner=LogisticRegression(max_iter=10000, **config.learner_kwargs),
+            master=BalancedCounts(**config.master_kwargs),
             metrics=cls.metrics(),
-            stats=True
+            stats=True,
+            **config.macs_kwargs
         )
 
     @classmethod
     def metrics(cls) -> List[Metric]:
         return [CrossEntropy(name='loss'), Accuracy(name='metric'), ClassFrequenciesStd(name='constraint')]
 
-    def __init__(self, seed: int = 0, **kwargs):
+    def __init__(self, config: Config):
         """
-        :param seed:
-            The random seed.
-
-        :param kwargs:
-            Any additional argument to be passed to the 'model()' function.
+        :param config:
+            A configuration instance to set the experiment parameters.
         """
         super(BalancedCountsManager, self).__init__(label='class',
                                                     stratify=True,
                                                     x_scaling='std',
                                                     y_scaling=None,
-                                                    seed=seed,
-                                                    **kwargs)
+                                                    config=config)
 
 
 class IrisManager(BalancedCountsManager):
