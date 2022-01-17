@@ -25,14 +25,14 @@ if __name__ == '__main__':
     study = cartesian_product(
         init_step=['pretraining', 'projection'],
         alpha=[10.0, 1.0, 0.1, 0.01],
-        beta=[1.0, 0.1, 0.01, None],
+        beta=[1.0],
         loss=['hd', 'ce', 'mse', 'mae'],
         adaptive=[False, True],
         dataset=['iris', 'redwine', 'whitewine', 'dota', 'shuttle', 'adult']
     ) + cartesian_product(
         init_step=['pretraining', 'projection'],
         alpha=[10.0, 1.0, 0.1, 0.01],
-        beta=[1.0, 0.1, 0.01, None],
+        beta=[1.0],
         loss=['mse', 'mae'],
         adaptive=[False, True],
         dataset=['communities']
@@ -41,7 +41,6 @@ if __name__ == '__main__':
     for i, config in enumerate(study):
         manager = get_manager(**config)
         manager.get_wandb_logger(project='emt_parameters')
-
         start_time = time.time()
         print(f'Trial {i + 1:0{len(str(len(study)))}}/{len(study)}', end=' ')
         manager.experiment(

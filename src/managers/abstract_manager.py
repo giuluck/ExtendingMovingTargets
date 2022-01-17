@@ -237,6 +237,17 @@ class AbstractManager:
             return [Fold(data=fold['train'], validation={**fold, 'test': self.test}, **fold_kwargs) for fold in folds]
 
     def get_wandb_logger(self, project: str, entity: str = 'giuluck'):
+        """Builds a Weights&Biases logger for the experiment.
+
+        :param project:
+            The WandB project name.
+
+        :param entity:
+            The WandB project entity.
+
+        :return:
+            A `WandBLogger` instance with the respective parameter configuration.
+        """
         config = {}
         for field, value in self.config.__dict__.items():
             if isinstance(value, dict):
