@@ -4,7 +4,6 @@ from typing import Union, Dict, Tuple, List, Optional, Any
 
 import numpy as np
 import pandas as pd
-from moving_targets.util.typing import Number
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
@@ -226,8 +225,8 @@ class Scaler:
 
 
 def split_dataset(*dataset,
-                  test_size: Number = 0.2,
-                  val_size: Optional[Number] = None,
+                  test_size: float = 0.2,
+                  val_size: Optional[float] = None,
                   extrapolation: Extrapolation = None,
                   random_state: int = 0,
                   shuffle: bool = True,

@@ -112,7 +112,7 @@ class CommunitiesManager(AbstractManager):
     def model(cls, config: Config) -> MACS:
         return MACS(
             learner=LinearRegression(**config.learner_kwargs),
-            master=FairRegression(protected='race', **config.master_kwargs),
+            master=FairRegression(protected='race', lb=0.0, ub=float('inf'), **config.master_kwargs),
             metrics=cls.metrics(),
             stats=True,
             **config.macs_kwargs

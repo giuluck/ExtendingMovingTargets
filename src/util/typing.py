@@ -2,9 +2,7 @@
 
 from typing import Union, List, Dict, Tuple
 
-from moving_targets.util.typing import Number
-
-Method = Union[None, str, Tuple[Number, Number]]
+Method = Union[None, str, Tuple[float, float]]
 """Scaling method. It can be either None (no scaling), a string representing the kind of scaling, or a tuple of
 integers representing the lower and upper bounds, respectively.
 """

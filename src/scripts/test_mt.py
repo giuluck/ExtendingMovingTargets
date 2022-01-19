@@ -13,7 +13,7 @@ if __name__ == '__main__':
         init_step='pretraining',
         loss='mse',
         alpha=1,
-        beta=1,
+        beta=None,
         adaptive=True
     ).experiment(
         iterations=5,

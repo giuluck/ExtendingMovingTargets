@@ -1,17 +1,18 @@
 """Master implementations for the various tasks."""
+from typing import Optional
 
 import numpy as np
-
-from moving_targets.masters import SingleTargetRegression, SingleTargetClassification
+from moving_targets.masters import RegressionMaster, ClassificationMaster
 from moving_targets.masters.backends import Backend
+from moving_targets.masters.optimizers import ConstantSlope
 from moving_targets.metrics import DIDI
 from moving_targets.util import probabilities
 
 
-class BalancedCounts(SingleTargetClassification):
+class BalancedCounts(ClassificationMaster):
     """Master for the Balanced Counts problem in which output classes are constrained to be equally distributed."""
 
-    def __init__(self, backend: Backend, loss: str, alpha: float, beta: float, adaptive: bool):
+    def __init__(self, backend: Backend, loss: str, alpha: float, beta: Optional[float], adaptive: bool):
         """
         :param backend:
             The backend instance or backend alias.
@@ -30,24 +31,19 @@ class BalancedCounts(SingleTargetClassification):
         :param adaptive:
             Whether or not to use an adaptive strategy for the alpha value.
         """
+        alpha = ConstantSlope(base=alpha) if adaptive else alpha
+        super().__init__(backend=backend, y_loss='hd', p_loss=loss, alpha=alpha, beta=beta, stats=True)
 
-        # noinspection PyUnusedLocal
-        def satisfied(x, y, p):
-            # constraint is satisfied if all the classes counts are lower than then average number of counts per class
-            pred = probabilities.get_classes(p)
-            classes, counts = np.unique(pred, return_counts=True)
-            max_count = np.ceil(len(y) / len(classes))
-            return np.all(counts <= max_count)
+    def use_beta(self, x, y: np.ndarray, p: np.ndarray) -> bool:
+        # constraint is satisfied if all the classes counts are lower than then average number of counts per class
+        pred = probabilities.get_classes(p)
+        classes, counts = np.unique(pred, return_counts=True)
+        max_count = np.ceil(len(y) / len(classes))
+        return np.all(counts <= max_count)
 
-        super().__init__(backend=backend, satisfied=satisfied, alpha=alpha, beta=beta,
-                         y_loss='hd', p_loss=loss, stats=True)
-
-        self.adaptive: bool = adaptive
-        """Whether or not to use an adaptive strategy for the alpha value."""
-
-    def build(self, x, y, p):
+    def build(self, x, y: np.ndarray) -> np.ndarray:
         # retrieve the variables
-        variables = super(BalancedCounts, self).build(x, y, p)
+        variables = super(BalancedCounts, self).build(x, y)
         # compute the upper bound for number of counts of a class, which will be used to constraint the model variables
         classes = np.unique(y)
         max_count = np.ceil(len(y) / len(classes))
@@ -61,15 +57,8 @@ class BalancedCounts(SingleTargetClassification):
         # return the variables
         return variables
 
-    def alpha(self, x, y, p, v) -> float:
-        alpha = super(BalancedCounts, self).alpha(x, y, p, v)
-        if self.adaptive:
-            return alpha / self._macs.iteration
-        else:
-            return alpha
 
-
-class FairClassification(SingleTargetClassification):
+class FairClassification(ClassificationMaster):
     """Master for the Fairness Classification problem."""
 
     def __init__(self, protected: str, backend: Backend, loss: str, alpha: float, beta: float, adaptive: bool):
@@ -101,17 +90,17 @@ class FairClassification(SingleTargetClassification):
         self.didi = DIDI(protected=protected, classification=True, percentage=True)
         """A DIDI metric instance used to compute both the indicator matrices and the satisfiability."""
 
+        alpha = ConstantSlope(base=alpha) if adaptive else alpha
+        super().__init__(backend=backend, y_loss='hd', p_loss=loss, alpha=alpha, beta=beta, stats=True)
+
+    def use_beta(self, x, y: np.ndarray, p: np.ndarray) -> bool:
         # the constraint is satisfied if the percentage DIDI is lower or equal to the expected violation
-        super().__init__(satisfied=lambda x, y, p: self.didi(x=x, y=y, p=p) <= self.violation,
-                         backend=backend, alpha=alpha, beta=beta, y_loss='hd', p_loss=loss, stats=True)
+        return self.didi(x=x, y=y, p=p) <= self.violation
 
-        self.adaptive: bool = adaptive
-        """Whether or not to use an adaptive strategy for the alpha value."""
-
-    def build(self, x, y, p):
+    def build(self, x, y: np.ndarray) -> np.ndarray:
         # retrieve model variables from the super method and, for compatibility between the binary/multiclass scenarios,
         # optionally transform 1d variables (representing a binary classification task) into a 2d matrix
-        super_vars = super(FairClassification, self).build(x, y, p)
+        super_vars = super(FairClassification, self).build(x, y)
         variables = np.transpose([1 - super_vars, super_vars]) if super_vars.ndim == 1 else super_vars
 
         # as a first step, we need to compute the deviations between the average output for the total dataset and the
@@ -139,18 +128,19 @@ class FairClassification(SingleTargetClassification):
         self.backend.add_constraint(didi <= self.violation * train_didi)
         return super_vars
 
-    def alpha(self, x, y, p, v) -> float:
-        alpha = super(FairClassification, self).alpha(x, y, p, v)
-        if self.adaptive:
-            return alpha / self._macs.iteration
-        else:
-            return alpha
 
-
-class FairRegression(SingleTargetRegression):
+class FairRegression(RegressionMaster):
     """Master for the Fairness Regression problem."""
 
-    def __init__(self, protected: str, backend: Backend, loss: str, alpha: float, beta: float, adaptive: bool):
+    def __init__(self,
+                 protected: str,
+                 backend: Backend,
+                 loss: str,
+                 alpha: float,
+                 beta: float,
+                 lb: float,
+                 ub: float,
+                 adaptive: bool):
         """
         :param protected:
             The name of the protected feature.
@@ -169,6 +159,12 @@ class FairRegression(SingleTargetRegression):
         :param beta:
             The non-negative real number which is used to constraint the p_loss in the beta step.
 
+        :param lb:
+            The model variables lower bounds.
+
+        :param ub:
+            The model variables upper bounds.
+
         :param adaptive:
             Whether or not to use an adaptive strategy for the alpha value.
         """
@@ -179,17 +175,17 @@ class FairRegression(SingleTargetRegression):
         self.didi = DIDI(protected=protected, classification=False, percentage=True)
         """A DIDI metric instance used to compute both the indicator matrices and the satisfiability."""
 
+        alpha = ConstantSlope(base=alpha) if adaptive else alpha
+        super().__init__(backend=backend, y_loss=loss, p_loss=loss, alpha=alpha, beta=beta, lb=lb, ub=ub, stats=True)
+
+    def use_beta(self, x, y: np.ndarray, p: np.ndarray) -> bool:
         # the constraint is satisfied if the percentage DIDI is lower or equal to the expected violation; moreover,
         # since we know that the predictions must be positive, so we clip them to 0.0 in order to avoid (wrong)
         # negative predictions to influence the satisfiability computation
-        super().__init__(satisfied=lambda x, y, p: self.didi(x=x, y=y, p=p.clip(0.0)) <= self.violation,
-                         backend=backend, lb=0.0, ub=None, alpha=alpha, beta=beta, y_loss=loss, p_loss=loss, stats=True)
+        return self.didi(x=x, y=y, p=p.clip(0.0)) <= self.violation
 
-        self.adaptive: bool = adaptive
-        """Whether or not to use an adaptive strategy for the alpha value."""
-
-    def build(self, x, y, p):
-        variables = super(FairRegression, self).build(x, y, p)
+    def build(self, x, y: np.ndarray) -> np.ndarray:
+        variables = super(FairRegression, self).build(x, y)
 
         # as a first step, we need to compute the deviations between the average output for the total dataset and the
         # average output respectively to each protected class
@@ -215,10 +211,3 @@ class FairRegression(SingleTargetRegression):
         train_didi = DIDI.regression_didi(indicator_matrix=indicator_matrix, targets=y)
         self.backend.add_constraint(didi <= self.violation * train_didi)
         return variables
-
-    def alpha(self, x, y, p, v) -> float:
-        alpha = super(FairRegression, self).alpha(x, y, p, v)
-        if self.adaptive:
-            return alpha / self._macs.iteration
-        else:
-            return alpha
