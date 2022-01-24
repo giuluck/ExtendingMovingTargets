@@ -36,7 +36,7 @@ class BalancedCounts(ClassificationMaster):
 
     def use_beta(self, x, y: np.ndarray, p: np.ndarray) -> bool:
         # constraint is satisfied if all the classes counts are lower than then average number of counts per class
-        pred = probabilities.get_classes(p)
+        pred = probabilities.get_discrete(p, task='classification')
         classes, counts = np.unique(pred, return_counts=True)
         max_count = np.ceil(len(y) / len(classes))
         return np.all(counts <= max_count)
