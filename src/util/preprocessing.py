@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 
-from moving_targets.util.typing import Matrix, Vector
 from src.util.typing import Methods, Extrapolation
 
 
@@ -40,7 +39,7 @@ class Scaler:
         self._scaling: Optional[np.ndarray] = None
         """The scaling vector."""
 
-    def fit(self, data: Matrix):
+    def fit(self, data):
         """Fits the scaler parameters.
 
         :param data:
@@ -85,7 +84,7 @@ class Scaler:
         self._scaling[self._scaling == 0] = 1.0  # handle case with null scaling factor
         return self
 
-    def transform(self, data: Matrix) -> Matrix:
+    def transform(self, data) -> Any:
         """Transforms the data according to the scaler parameters.
 
         :param data:
@@ -96,7 +95,7 @@ class Scaler:
         """
         return (data - self._translation) / self._scaling
 
-    def fit_transform(self, data: Matrix) -> Matrix:
+    def fit_transform(self, data) -> Any:
         """Fits the scaler parameters.
 
         :param data:
@@ -107,7 +106,7 @@ class Scaler:
         """
         return self.fit(data).transform(data)
 
-    def inverse_transform(self, data: Matrix) -> Matrix:
+    def inverse_transform(self, data) -> Any:
         """Inverts the scaling according to the scaler parameters.
 
         :param data:
@@ -128,17 +127,17 @@ class Scaler:
         :return:
             A blank scaler.
         """
-        return Scaler(methods=None).fit(data=[[0.] * num_features])
+        return Scaler(methods=None).fit(data=pd.DataFrame([[0.] * num_features]))
 
 
 Scalers = Union[Optional[Scaler], Tuple[Optional[Scaler], Optional[Scaler]]]
 """Either an (optional) scaler for both the input and the output data, or a tuple of (optional) scalers for the input
 and the output data, respectively."""
 
-SplitArgs = Union[Matrix, Vector]
+SplitArgs = Union[np.ndarray, pd.Series, pd.DataFrame]
 """Either a `Matrix` or a `Vector` that needs to be split into train/test."""
 
-ValidationArgs = Union[pd.DataFrame, pd.Series]
+ValidationArgs = Union[pd.Series, pd.DataFrame]
 """Either a `DataFrame` or a `Series` that needs to be split for cross-validation."""
 
 
@@ -148,7 +147,7 @@ def split_dataset(*dataset: SplitArgs,
                   extrapolation: Extrapolation = None,
                   random_state: int = 0,
                   shuffle: bool = True,
-                  stratify: Optional[Vector] = None) -> Dict:
+                  stratify: Optional[np.ndarray] = None) -> Dict:
     """Splits the input data.
 
     :param dataset:
@@ -213,7 +212,7 @@ def cross_validate(*dataset: ValidationArgs,
                    num_folds: int = 10,
                    random_state: int = 0,
                    shuffle: bool = True,
-                   stratify: Optional[Vector] = None) -> List[Dict]:
+                   stratify: Optional[np.ndarray] = None) -> List[Dict]:
     """Splits the input data in folds.
 
     :param dataset:

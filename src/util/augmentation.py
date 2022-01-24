@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from moving_targets.util.typing import MonotonicitiesList, MonotonicitiesMatrix
+from src.util.typing import MonotonicitiesList, MonotonicitiesMatrix
 from src.util.typing import SamplingFunctions, AugmentedData
 
 

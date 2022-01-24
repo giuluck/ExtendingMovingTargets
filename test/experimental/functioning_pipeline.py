@@ -19,8 +19,7 @@ class TestFunctioning(TestPipelines):
         elif model == 'sbr':
             return dict(epochs=0, num_ground=2, num_random=0)
         elif model == 'mt':
-            return dict(lrn_epochs=0, aug_num_ground=2, aug_num_random=0,
-                        mt_iterations=1, mst_backend='cplex', mst_master_kind='regression')
+            return dict(lrn_epochs=0, aug_num_ground=2, aug_num_random=0, mt_iterations=1, mst_master_kind='regression')
         else:
             ValueError(f"unsupported model '{model}'")
 

@@ -1,19 +1,18 @@
 """Moving Targets Callbacks."""
 
-from typing import List, Dict, Union, Optional, Tuple
+from typing import List, Dict, Union, Optional, Tuple, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pandas import DataFrame
-
 from moving_targets.callbacks import Callback
-from moving_targets.util.typing import Matrix, Vector, Dataset, Iteration
+from moving_targets.util.typing import Dataset
+
 from src.datasets import RestaurantsManager, SyntheticManager
 from src.util.plot import ColorFader
 
-YInfo = Union[Vector, DataFrame]
+YInfo = Union[np.ndarray, pd.DataFrame]
 """Data type for the output class or output info."""
 
 
@@ -63,7 +62,7 @@ class AnalysisCallback(Callback):
         self.data: Optional[pd.DataFrame] = None
         """The dataframe of logged values which will be eventually plotted or stored in the output files."""
 
-        self.iterations: List[Iteration] = []
+        self.iterations: List[Any] = []
         """A list of ordered iteration names."""
 
         self.plt_kwargs: Dict = {'figsize': (20, 10), 'tight_layout': True}
@@ -71,28 +70,25 @@ class AnalysisCallback(Callback):
 
         self.plt_kwargs.update(plt_kwargs)
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
+    def on_process_start(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
         m = pd.Series(['aug' if m else 'label' for m in macs.master.augmented_mask], name='mask')
-        self.data = pd.concat((x.reset_index(drop=True), y.reset_index(drop=True), m), axis=1)
+        self.data = pd.concat((x.reset_index(drop=True), pd.Series(y, name='y'), m), axis=1)
 
-    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        additional_kwargs['iteration'] = AnalysisCallback.PRETRAINING
-        self.on_iteration_start(macs, x, y, val_data, **additional_kwargs)
-        self.on_adjustment_start(macs, x, y, val_data, **additional_kwargs)
-        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data, **additional_kwargs)
-        self.on_training_start(macs, x, y, val_data, **additional_kwargs)
+    def on_pretraining_start(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.on_iteration_start(macs, x, y, val_data)
+        self.on_adjustment_start(macs, x, y, val_data)
+        self.on_adjustment_end(macs, x, y, np.ones_like(y) * np.nan, val_data)
+        self.on_training_start(macs, x, y, val_data)
 
-    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        additional_kwargs['iteration'] = AnalysisCallback.PRETRAINING
-        self.on_training_end(macs, x, y, val_data, **additional_kwargs)
-        self.on_iteration_end(macs, x, y, val_data, **additional_kwargs)
+    def on_pretraining_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.on_training_end(macs, x, y, val_data)
+        self.on_iteration_end(macs, x, y, val_data)
 
-    def on_iteration_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                           **additional_kwargs):
-        self.iterations.append(iteration)
-        self.data[f'y {iteration}'] = y
+    def on_iteration_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.iterations.append(macs.iteration)
+        self.data[f'y {macs.iteration}'] = y
 
-    def on_process_end(self, macs, val_data: Optional[Dataset], **additional_kwargs):
+    def on_process_end(self, macs, val_data: Optional[Dataset]):
         # sort values
         if self.sorting_attribute is not None:
             self.data = self.data.sort_values(self.sorting_attribute)
@@ -113,7 +109,7 @@ class AnalysisCallback(Callback):
                 ax.set_title(f'{it})' if title is None else title)
             plt.show()
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         """Inner template method to build the plotting strategy.
 
         :param iteration:
@@ -144,29 +140,20 @@ class DistanceAnalysis(AnalysisCallback):
         self.ground_only: bool = ground_only
         """Whether to consider ground data points only or augmented data points as well."""
 
-        self.y: Optional[str] = None
-        """The name of the output feature."""
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'pred {macs.iteration}'] = macs.predict(x)
 
-    def on_pretraining_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        self.y = y.name
-        super(DistanceAnalysis, self).on_pretraining_start(macs, x, y, val_data, **additional_kwargs)
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'adj {macs.iteration}'] = adjusted_y
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self.data[f'pred {iteration}'] = macs.predict(x)
-
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.data[f'adj {iteration}'] = adjusted_y
-
-    def on_process_end(self, macs, val_data: Optional[Dataset], **additional_kwargs):
+    def on_process_end(self, macs, val_data: Optional[Dataset]):
         if self.ground_only:
             self.data = self.data[self.data['mask'] == 'label']
         super(DistanceAnalysis, self).on_process_end(macs, val_data)
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         x = np.arange(len(self.data))
-        y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
+        y, p, j = self.data['y'].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         style = self.data['mask']
         sns.scatterplot(x=x, y=y, color='black', alpha=0.6).set_xticks([])
         sns.scatterplot(x=x, y=p, color='red', alpha=0.6)
@@ -193,29 +180,27 @@ class BoundsAnalysis(AnalysisCallback):
         """
         super(BoundsAnalysis, self).__init__(num_columns=num_columns, **plt_kwargs)
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data, **additional_kwargs)
+    def on_pretraining_start(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        super(BoundsAnalysis, self).on_process_start(macs, x, y, val_data)
         hi, li = macs.master.higher_indices, macs.master.lower_indices
         self.data['lower'] = self.data.index.map(lambda i: li[hi == i])
         self.data['higher'] = self.data.index.map(lambda i: hi[li == i])
 
-    def on_pretraining_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
+    def on_pretraining_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
         pass
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self._insert_bounds(macs.predict(x), 'pred', iteration)
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self._insert_bounds(v=macs.predict(x), label='pred', iteration=macs.iteration)
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self._insert_bounds(adjusted_y, 'adj', iteration)
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self._insert_bounds(v=adjusted_y, label='adj', iteration=macs.iteration)
 
-    def _insert_bounds(self, v: np.ndarray, label: str, iteration: Iteration):
+    def _insert_bounds(self, v: np.ndarray, label: str, iteration: Any):
         self.data[f'{label} {iteration}'] = v
         self.data[f'{label} lb {iteration}'] = self.data['lower'].map(lambda i: v[i].max() if len(i) > 0 else None)
         self.data[f'{label} ub {iteration}'] = self.data['higher'].map(lambda i: v[i].min() if len(i) > 0 else None)
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         x = np.arange(len(self.data))
         avg_bound = {}
         for label, color in dict(adj='blue', pred='red').items():
@@ -252,18 +237,16 @@ class CarsAdjustments(AnalysisCallback):
         self.plot_kind: str = plot_kind
         """Either 'line' for a line output prediction, or 'scatter' for scatter output predictions."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self.data[f'pred {iteration}'] = macs.predict(x)
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'pred {macs.iteration}'] = macs.predict(x)
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.data[f'adj {iteration}'] = adjusted_y
-        self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
-                                                             np.where(self.data['mask'] == 'label', 1, 0))
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'adj {macs.iteration}'] = adjusted_y
+        self.data[f'sw {macs.iteration}'] = np.where(self.data['mask'] == 'label', 1, 0)
+        # self.data[f'sw {macs.iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
-        x, y = self.data['price'].values, self.data['sales'].values
+    def _plot_function(self, iteration: Any) -> Optional[str]:
+        x, y = self.data['price'].values, self.data['y'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, CarsAdjustments.max_size), CarsAdjustments.alpha
         p, adj, sw = self.data[f'pred {iteration}'], self.data[f'adj {iteration}'], self.data[f'sw {iteration}'].values
@@ -301,18 +284,16 @@ class DefaultAdjustments(AnalysisCallback):
         self.grid = pd.DataFrame.from_dict({'married': married.flatten(), 'payment': payment.flatten()})
         """The explicit grid used to plot the outputs."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self.data[f'pred {iteration}'] = macs.predict(x)
-        self.grid[f'pred {iteration}'] = macs.predict(self.grid[['married', 'payment']])
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'pred {macs.iteration}'] = macs.predict(x)
+        self.grid[f'pred {macs.iteration}'] = macs.predict(self.grid[['married', 'payment']])
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.data[f'adj {iteration}'] = adjusted_y
-        self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
-                                                             np.where(self.data['mask'] == 'label', 1, 0))
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'adj {macs.iteration}'] = adjusted_y
+        self.data[f'sw {macs.iteration}'] = np.where(self.data['mask'] == 'label', 1, 0)
+        # self.data[f'sw {macs.iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         y, adj = self.data['default'], self.data[f'adj {iteration}']
         label = 'default' if iteration == AnalysisCallback.PRETRAINING else f'adj {iteration}'
         data = self.data.astype({'married': int}).rename(columns={label: 'y', f'sw {iteration}': 'sw'})
@@ -356,20 +337,18 @@ class LawAdjustments(AnalysisCallback):
         self.data_points: bool = data_points
         """Whether or not to plot data points over the mesh plot."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
         grid = self.grid[['lsat', 'ugpa']]
         data = self.data[['lsat', 'ugpa']]
-        self.grid[f'pred {iteration}'] = macs.predict(grid)
-        self.data[f'pred {iteration}'] = macs.predict(data)
+        self.grid[f'pred {macs.iteration}'] = macs.predict(grid)
+        self.data[f'pred {macs.iteration}'] = macs.predict(data)
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.data[f'adj {iteration}'] = adjusted_y
-        self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
-                                                             np.where(self.data['mask'] == 'label', 1, 0))
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'adj {macs.iteration}'] = adjusted_y
+        self.data[f'sw {macs.iteration}'] = np.where(self.data['mask'] == 'label', 1, 0)
+        # self.data[f'sw {macs.iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         # plot 3D response
         lsat = self.grid['lsat'].values.reshape(self.res, self.res)
         ugpa = self.grid['ugpa'].values.reshape(self.res, self.res)
@@ -411,12 +390,11 @@ class LawResponse(AnalysisCallback):
         """A tuple containing the two monotonic features, where the first one is the investigated feature while the
         second one is used for grouping."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
         input_grid = self.grid[['lsat', 'ugpa']]
-        self.grid[f'pred {iteration}'] = macs.predict(input_grid)
+        self.grid[f'pred {macs.iteration}'] = macs.predict(input_grid)
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         feat, group_feat = self.features
         for group_val, group in self.grid.groupby([group_feat]):
             sns.lineplot(data=group, x=feat, y=f'pred {iteration}', color=self.fader(group_val), alpha=0.6)
@@ -450,11 +428,10 @@ class PuzzlesResponse(AnalysisCallback):
         self.feature: str = feature
         """The feature for which to plot the response, either 'word_count', 'star_rating', or 'num_reviews'."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self.grid[f'pred {iteration}'] = macs.predict(self.grid[self.features])
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.grid[f'pred {macs.iteration}'] = macs.predict(self.grid[self.features])
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         fi, fj = [f for f in self.features if f != self.feature]
         li, ui = self.grid[fi].min(), self.grid[fi].max()
         lj, uj = self.grid[fj].min(), self.grid[fj].max()
@@ -508,20 +485,18 @@ class RestaurantsAdjustment(AnalysisCallback):
         self.data_points: bool = data_points
         """Whether or not to plot data points over the mesh plot."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
         grid = self.grid[['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']]
         data = self.data[['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']]
-        self.grid[f'pred {iteration}'] = macs.predict(grid)
-        self.data[f'pred {iteration}'] = macs.predict(data)
+        self.grid[f'pred {macs.iteration}'] = macs.predict(grid)
+        self.data[f'pred {macs.iteration}'] = macs.predict(data)
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.data[f'adj {iteration}'] = adjusted_y
-        self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
-                                                             np.where(self.data['mask'] == 'label', 1, 0))
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'adj {macs.iteration}'] = adjusted_y
+        self.data[f'sw {macs.iteration}'] = np.where(self.data['mask'] == 'label', 1, 0)
+        # self.data[f'sw {macs.iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         # plot 3D response
         ctr = self.grid[f'pred {iteration}'].values.reshape(self.res, self.res)
         avg_ratings = self.grid['avg_rating'].values.reshape(self.res, self.res)
@@ -544,23 +519,22 @@ class SyntheticAdjustments2D(AnalysisCallback):
     alpha = 0.4
     """Alpha channel value."""
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data, **additional_kwargs)
+    def on_process_start(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        super(SyntheticAdjustments2D, self).on_process_start(macs, x, y, val_data)
         self.data['ground'] = SyntheticManager.function(self.data['a'], self.data['b'])
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self.data[f'pred {iteration}'] = macs.predict(x)
-        self.data[f'pred err {iteration}'] = self.data[f'pred {iteration}'] - self.data['ground']
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        p = macs.predict(x)
+        self.data[f'pred {macs.iteration}'] = p
+        self.data[f'pred err {macs.iteration}'] = p - self.data['ground']
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.data[f'adj {iteration}'] = adjusted_y
-        self.data[f'adj err {iteration}'] = self.data[f'adj {iteration}'] - self.data['ground']
-        self.data[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
-                                                             np.where(self.data['mask'] == 'label', 1, 0))
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.data[f'adj {macs.iteration}'] = adjusted_y
+        self.data[f'adj err {macs.iteration}'] = adjusted_y - self.data['ground']
+        self.data[f'sw {macs.iteration}'] = np.where(self.data['mask'] == 'label', 1, 0)
+        # self.data[f'sw {macs.iteration}'] = kwargs.get('sample_weight', np.where(self.data['mask'] == 'label', 1, 0))
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         def synthetic_inverse(column):
             """Computes the value of the expected value of the 'a' feature given the output label.
 
@@ -616,25 +590,23 @@ class SyntheticAdjustments3D(AnalysisCallback):
         self.val: Optional[pd.DataFrame] = None
         """The data values to be plotted."""
 
-    def on_process_start(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], **additional_kwargs):
-        super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data, **additional_kwargs)
+    def on_process_start(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        super(SyntheticAdjustments3D, self).on_process_start(macs, x, y, val_data)
         # swap values and data in order to print the grid
         self.val = self.data.copy()
         a, b = np.meshgrid(np.linspace(-1, 1, self.res), np.linspace(-1, 1, self.res))
         self.data = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
-        self.val[f'pred {iteration}'] = macs.predict(x)
-        self.data[f'z {iteration}'] = macs.predict(self.data[['a', 'b']])
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
+        self.val[f'pred {macs.iteration}'] = macs.predict(x)
+        self.data[f'z {macs.iteration}'] = macs.predict(self.data[['a', 'b']])
 
-    def on_adjustment_end(self, macs, x: Matrix, y: Vector, adjusted_y: Vector, val_data: Optional[Dataset],
-                          iteration: Iteration, **additional_kwargs):
-        self.val[f'adj {iteration}'] = adjusted_y
-        self.val[f'sw {iteration}'] = additional_kwargs.get('sample_weight',
-                                                            np.where(self.val['mask'] == 'label', 1, 0))
+    def on_adjustment_end(self, macs, x, y: np.ndarray, adjusted_y: np.ndarray, val_data: Optional[Dataset]):
+        self.val[f'adj {macs.iteration}'] = adjusted_y
+        self.val[f'sw {macs.iteration}'] = np.where(self.data['mask'] == 'label', 1, 0)
+        # self.val[f'sw {macs.iteration}'] = kwargs.get('sample_weight', np.where(self.val['mask'] == 'label', 1, 0))
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         # plot 3D response
         ga = self.data['a'].values.reshape(self.res, self.res)
         gb = self.data['b'].values.reshape(self.res, self.res)
@@ -669,12 +641,11 @@ class SyntheticResponse(AnalysisCallback):
         self.fader = ColorFader('red', 'blue', bounds=[-1, 1])
         """The `ColorFader` object to show the responses."""
 
-    def on_training_end(self, macs, x: Matrix, y: Vector, val_data: Optional[Dataset], iteration: Iteration,
-                        **additional_kwargs):
+    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Dataset]):
         input_grid = self.grid[['a', 'b']]
-        self.grid[f'pred {iteration}'] = macs.predict(input_grid)
+        self.grid[f'pred {macs.iteration}'] = macs.predict(input_grid)
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         for idx, group in self.grid.groupby('b'):
             label = f'b = {idx:.0f}' if idx in [-1, 1] else None
             sns.lineplot(data=group, x='a', y=f'pred {iteration}', color=self.fader(idx), alpha=0.4, label=label)

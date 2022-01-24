@@ -17,7 +17,7 @@ class TestCorrectness(TestPipelines):
         if model in ['mlp', 'sbr', 'sbr univariate', 'tfl']:
             return dict()
         elif model == 'mt':
-            return dict(mt_iterations=1, mst_backend='cplex', mst_master_kind='regression',
+            return dict(mt_iterations=1, mst_master_kind='regression',
                         lrn_loss='binary_crossentropy' if dataset in ['restaurants', 'default', 'law'] else 'mse')
         else:
             ValueError(f"unsupported model '{model}' with dataset '{dataset}'")

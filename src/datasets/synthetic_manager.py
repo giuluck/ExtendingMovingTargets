@@ -1,6 +1,6 @@
 """Synthetic Data Manager."""
 
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,7 +8,6 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import r2_score, mean_squared_error
 
-from moving_targets.util.typing import Number, Vector
 from src.datasets.abstract_manager import AbstractManager
 from src.util.plot import ColorFader
 from src.util.preprocessing import split_dataset
@@ -19,7 +18,7 @@ class SyntheticManager(AbstractManager):
     """Data Manager for the Synthetic Dataset."""
 
     @staticmethod
-    def function(a: Union[Vector, Number], b: Union[Vector, Number]) -> Union[Vector, Number]:
+    def function(a, b) -> Any:
         """Ground function.
 
         :param a:
@@ -137,7 +136,8 @@ class SyntheticManager(AbstractManager):
         return {'a': (num_augmented, lambda s: rng.uniform(-1, 1, size=s))}
 
     def _data_plot(self, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
-        _, ax = plt.subplots(3, len(additional_kwargs), sharex='row', sharey='row', figsize=figsize, tight_layout=tight_layout)
+        _, ax = plt.subplots(3, len(additional_kwargs), sharex='row', sharey='row',
+                             figsize=figsize, tight_layout=tight_layout)
         # hue/size bounds
         ybn = np.concatenate([[y.min(), y.max()] for _, y in additional_kwargs.values()])
         abn, bbn, ybn = (-1, 1), (-1, 1), (np.min(ybn), np.max(ybn))

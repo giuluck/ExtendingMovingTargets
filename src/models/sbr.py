@@ -3,7 +3,6 @@
 from typing import Optional, Callable, Union, Tuple, List, Dict
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 import tensorflow.keras.backend as k
 from tensorflow.keras.metrics import Mean
@@ -11,7 +10,6 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import Sequence
 from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2
 
-from moving_targets.util.typing import Matrix, Vector
 from src.models.mlp import MLP
 from src.util.preprocessing import Scalers
 
@@ -34,7 +32,7 @@ def hard_tanh(x, factor=10 ** 6):
 class SBRBatchGenerator(Sequence):
     """A Batch Generator to be used in Keras model's training."""
 
-    def __init__(self, x: Matrix, y: Vector, ground_indices: pd.Series, monotonicities: pd.Series, batch_size: int):
+    def __init__(self, x, y, ground_indices, monotonicities, batch_size: int):
         """
         :param x:
             The matrix/dataframe of augmented training samples.

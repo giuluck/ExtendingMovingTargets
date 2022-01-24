@@ -5,13 +5,11 @@ from typing import Optional
 import numpy as np
 from matplotlib.colors import to_rgb, to_hex
 
-from moving_targets.util.typing import Vector
-
 
 class ColorFader:
     """Interpolates numerical values on a hypercube having certain colours at the corners."""
 
-    def __init__(self, *colours, bounds: Optional[Vector] = None, error: str = 'raise'):
+    def __init__(self, *colours, bounds: Optional = None, error: str = 'raise'):
         """
         :param colours:
             The colours to be placed at the corner of the hypercube. This length must be a power of two.

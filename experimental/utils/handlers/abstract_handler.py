@@ -5,15 +5,15 @@ import time
 from typing import Dict, Any, Union, List, Optional, Callable
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import wandb
-from pandas import DataFrame
 
-from moving_targets.util.typing import Vector, Matrix, Dataset
+from moving_targets.util.typing import Dataset
 from src.datasets import AbstractManager
 from src.util.preprocessing import Scalers
 
-YInfo = Union[Vector, DataFrame]
+YInfo = Union[np.ndarray, pd.Series, pd.DataFrame]
 """Data type for the output class or output info."""
 
 
@@ -58,7 +58,7 @@ def default_config(handler, **config_kwargs) -> Dict:
 class Fold:
     """Data class containing the information of a fold for k-fold cross-validation."""
 
-    def __init__(self, x: Matrix, y: YInfo, scalers: Scalers, validation: Dataset):
+    def __init__(self, x, y: YInfo, scalers: Scalers, validation: Dataset):
         """
         :param x:
             The input data.
@@ -72,7 +72,7 @@ class Fold:
         :param validation:
             A shared validation dataset which is common among all the k folds.
         """
-        self.x: Matrix = x
+        self.x = x
         """The input data."""
 
         self.y: YInfo = y

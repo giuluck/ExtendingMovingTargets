@@ -36,7 +36,6 @@ if __name__ == '__main__':
     # PRELIMINARY STUDIES
     preliminary = cartesian_product(
         fixed_parameters=dict(
-            mst_backend='gurobi',
             mst_learner_weights='all',
             mst_learner_omega=1,
             mst_master_omega=1,
@@ -55,7 +54,6 @@ if __name__ == '__main__':
     # STUDIES ON REGRESSION DATASET
     regression = cartesian_product(
         fixed_parameters=dict(
-            mst_backend='gurobi',
             mst_beta=None,
             mnt_kind='group',
             mt_init_step='pretraining',
@@ -73,7 +71,6 @@ if __name__ == '__main__':
 
     # STUDIES ON CLASSIFICATION DATASET
     fixed_parameters = dict(
-        mst_backend='gurobi',
         mst_beta=None,
         mnt_kind='group',
         mt_init_step='pretraining',

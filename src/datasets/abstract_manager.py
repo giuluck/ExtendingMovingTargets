@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from moving_targets.util.typing import Vector, Matrix, Dataset, MonotonicitiesMatrix, MonotonicitiesList
+from moving_targets.util.typing import Dataset
 from src.util.augmentation import augment_data, compute_numeric_monotonicities, get_monotonicities_list
 from src.util.model import violations_summary, metrics_summary
 from src.util.preprocessing import Scaler, Scalers, split_dataset, cross_validate
-from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, TightLayout, AugmentedData, Rng
+from src.util.typing import Augmented, SamplingFunctions, Methods, Figsize, TightLayout, AugmentedData, Rng, \
+    MonotonicitiesList, MonotonicitiesMatrix
 
 
 class AbstractManager:
@@ -135,7 +136,7 @@ class AbstractManager:
         self.directions: Dict[str] = directions
         """Dictionary containing the name of the x features and the respective expected monotonicity."""
 
-        self.stratify: Optional[Vector] = self.train_data[1] if stratify else None
+        self.stratify: Optional[np.ndarray] = self.train_data[1] if stratify else None
         """Whether or not to stratify the dataset when splitting."""
 
         self.x_scaling: Methods = x_scaling
@@ -276,7 +277,7 @@ class AbstractManager:
         directions = np.array([self.directions.get(c) or 0 for c in samples.columns])
         return compute_numeric_monotonicities(samples.values, references.values, directions=directions, eps=eps)
 
-    def get_scalers(self, x: Matrix, y: Vector) -> Tuple[Scaler, Scaler]:
+    def get_scalers(self, x, y) -> Tuple[Scaler, Scaler]:
         """Returns the dataset scalers.
 
         :param x:
@@ -396,7 +397,7 @@ class AbstractManager:
         self._data_plot(**data_kwargs)
         plt.show()
 
-    def plot_augmented(self, x: Matrix, y: Vector, **augmented_kwargs):
+    def plot_augmented(self, x, y, **augmented_kwargs):
         """Plots the given augmented data.
 
         :param x:
@@ -479,7 +480,7 @@ class AbstractManager:
         return violations_summary(
             model=model,
             inputs=self.grid,
-            monotonicities=self.monotonicities,
+            mono=self.monotonicities,
             return_type=return_type
         )
 

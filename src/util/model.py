@@ -1,18 +1,18 @@
 """Model utils."""
 
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Union, Any, Tuple
 
 import numpy as np
-
 from moving_targets.metrics import MonotonicViolation
-from moving_targets.util.typing import Data, Matrix, MonotonicitiesList
+
+from src.util.typing import MonotonicitiesList
 
 
 def metrics_summary(model,
                     metric, metric_name: str = None,
                     post_process: Callable = None,
                     return_type: str = 'str',
-                    **data_splits: Data) -> Union[str, Dict[str, float]]:
+                    **data_splits: Tuple[Any, Any]) -> Union[str, Dict[str, float]]:
     """Computes the metrics over a custom set of validation data, then builds a summary.
 
     :param model:
@@ -52,8 +52,8 @@ def metrics_summary(model,
 
 
 def violations_summary(model,
-                       inputs: Matrix,
-                       monotonicities: MonotonicitiesList,
+                       inputs,
+                       mono: MonotonicitiesList,
                        return_type: str = 'str') -> Union[str, Dict[str, float]]:
     """Computes the violations over a custom set of validation data, then builds a summary.
 
@@ -63,7 +63,7 @@ def violations_summary(model,
     :param inputs:
         The matrix/dataframe representing the input space.
 
-    :param monotonicities:
+    :param mono:
         The list of monotonicities, in the form of [(<higher_index>, <lower_index>), ...].
 
     :param return_type:
@@ -73,9 +73,10 @@ def violations_summary(model,
         Either a dictionary for the metric values or a string representing the evaluation summary.
     """
     p = model.predict(inputs).astype(np.float64)
+    # since the 'x' argument of the lambda expression will not change, we return the same precomputed monotonicities
     summary = {
-        'avg_violation': MonotonicViolation(monotonicities=monotonicities, aggregation='average', eps=0.0),
-        'pct_violation': MonotonicViolation(monotonicities=monotonicities, aggregation='percentage', eps=0.0)
+        'avg_violation': MonotonicViolation(monotonicities_fn=lambda x: mono, aggregation='average', eps=0.0),
+        'pct_violation': MonotonicViolation(monotonicities_fn=lambda x: mono, aggregation='percentage', eps=0.0)
     }
     summary = {title: metric(x=[], y=[], p=p) for title, metric in summary.items()}
     if return_type in ['dict', 'dictionary']:

@@ -1,13 +1,13 @@
 """Script to obtain Sample Plots from Augmented Data and Moving Targets' Instances."""
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
+from moving_targets.util.typing import Dataset
 
 from experimental.utils import AnalysisCallback, DistanceAnalysis, CarsAdjustments
 from experimental.utils.factories import DatasetFactory
-from moving_targets.util.typing import Dataset, Iteration
 from src.datasets import PuzzlesManager
 
 ALPHA = 0.6
@@ -31,7 +31,7 @@ class ExportAnalysis(AnalysisCallback):
         plt.ylabel('')
         plt.savefig(f'../temp/{self.config_name}.png', format='png')
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         return
 
 
@@ -41,9 +41,9 @@ class ExportDistance(DistanceAnalysis, ExportAnalysis):
         super(ExportDistance, self).__init__()
         self.config_name = config_name
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         x = np.arange(len(self.data))
-        y, p, j = self.data[self.y].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
+        y, p, j = self.data['y'].values, self.data[f'pred {iteration}'].values, self.data[f'adj {iteration}'].values
         for i in x:
             plt.plot([i, i], [p[i], j[i]], c='red', alpha=ALPHA, linewidth=LINE_WIDTH)
             plt.plot([i, i], [y[i], j[i]], c='blue', alpha=ALPHA, linewidth=LINE_WIDTH)
@@ -59,7 +59,7 @@ class ExportCars(CarsAdjustments, ExportAnalysis):
         super(ExportCars, self).__init__()
         self.config_name = config_name
 
-    def _plot_function(self, iteration: Iteration) -> Optional[str]:
+    def _plot_function(self, iteration: Any) -> Optional[str]:
         x, y = self.data['price'].values, self.data['sales'].values
         s, m = np.array(self.data['mask']), dict(aug='o', label='X')
         sn, al = (0, POINT_WIDTH), ALPHA

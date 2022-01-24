@@ -1,16 +1,16 @@
 """Moving Targets Handler."""
 import time
-from typing import Any, Union, List, Optional, Dict, Type, Tuple, Callable
+from typing import Any, Union, List, Optional, Dict, Tuple, Callable
 
 import numpy as np
 import pandas as pd
+from moving_targets.callbacks import WandBLogger, Callback
+from moving_targets.metrics import Metric, MonotonicViolation
 from tensorflow.python.keras.callbacks import EarlyStopping, History
 
 from experimental.utils.handlers import AbstractHandler, Fold, setup, default_config
-from moving_targets.callbacks import WandBLogger, Callback
-from moving_targets.metrics import Metric, MonotonicViolation
 from src.datasets import AbstractManager
-from src.models import MT, MTLearner, MTMaster, MTClassificationMaster, MTRegressionMaster
+from src.models import MT, MTLearner, MTMaster
 from src.util.augmentation import get_monotonicities_list
 from src.util.dictionaries import merge_dictionaries
 from src.util.typing import Augmented
@@ -47,8 +47,8 @@ class MTHandler(AbstractHandler):
                  lrn_early_stop: Optional[EarlyStopping] = EarlyStopping(monitor='loss', patience=10, min_delta=1e-4),
                  lrn_warm_start: bool = False,
                  mst_master_kind: Optional[str] = None,
-                 mst_backend: str = 'cplex',
-                 mst_loss_fn: str = 'default',
+                 mst_y_loss: str = 'default',
+                 mst_p_loss: str = 'default',
                  mst_alpha: float = 1.0,
                  mst_beta: Optional[float] = None,
                  mst_learner_weights: str = 'all',
@@ -151,9 +151,6 @@ class MTHandler(AbstractHandler):
         :param mst_master_kind:
             The Moving Targets' master kind, either 'regression' or 'classification'.
 
-        :param mst_backend:
-            The backend solver for the master problem.
-
         :param mst_loss_fn:
             The master's loss function.
 
@@ -193,13 +190,13 @@ class MTHandler(AbstractHandler):
                                         wandb_entity=wandb_entity,
                                         wandb_config=wandb_config,
                                         seed=seed)
-        self.master_class = None
-        """The Moving Targets' master kind, either 'regression' or 'classification'."""
+        self.classification: bool = True
+        """Whether to use a classification or regression `MTMaster`"""
 
         if mst_master_kind in ['cls', 'classification']:
-            self.master_class: Type[MTMaster] = MTClassificationMaster
+            self.classification = True
         elif mst_master_kind in ['reg', 'regression']:
-            self.master_class: Type[MTMaster] = MTRegressionMaster
+            self.classification = False
         else:
             raise ValueError(f"'{mst_master_kind}' is not a valid master kind")
 
@@ -236,11 +233,12 @@ class MTHandler(AbstractHandler):
         )
         """Arguments to be passed to the `MTLearner` constructor."""
 
-        if mst_loss_fn != 'default':
-            mst_kwargs['loss_fn'] = mst_loss_fn
+        if mst_y_loss != 'default':
+            mst_kwargs['y_loss'] = mst_y_loss
+        if mst_p_loss != 'default':
+            mst_kwargs['p_loss'] = mst_p_loss
 
         self.master_args: Dict = dict(
-            backend=mst_backend,
             alpha=mst_alpha,
             beta=mst_beta,
             learner_weights=mst_learner_weights,
@@ -265,13 +263,16 @@ class MTHandler(AbstractHandler):
             **self.mono_args
         )
         metrics = [] if not metrics else self.metrics + [
-            MonotonicViolation(monotonicities=mono, aggregation='average', name='avg. violation'),
-            MonotonicViolation(monotonicities=mono, aggregation='percentage', name='pct. violation'),
-            MonotonicViolation(monotonicities=mono, aggregation='feasible', name='is feasible')
+            MonotonicViolation(monotonicities_fn=lambda v: mono, aggregation='average', name='avg. violation'),
+            MonotonicViolation(monotonicities_fn=lambda v: mono, aggregation='percentage', name='pct. violation'),
+            MonotonicViolation(monotonicities_fn=lambda v: mono, aggregation='feasible', name='is feasible')
         ]
         model = MT(
             learner=MTLearner(scalers=scalers, **self.learner_args),
-            master=self.master_class(monotonicities=mono, augmented_mask=np.isnan(y[label]), **self.master_args),
+            master=MTMaster(monotonicities=mono,
+                            augmented_mask=np.isnan(y[label]),
+                            classification=self.classification,
+                            **self.master_args),
             init_step=self.init_step,
             metrics=metrics
         )

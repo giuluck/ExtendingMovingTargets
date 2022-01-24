@@ -5,8 +5,8 @@ from experimental.utils.factories import DatasetFactory
 
 if __name__ == '__main__':
     iterations: int = 1
-    factory, callbacks = DatasetFactory().cars(
-        data_args=dict(full_features=False, full_grid=False),
+    factory, callbacks = DatasetFactory().cars_univariate(
+        data_args=dict(full_grid=True),
         num_col=int(np.ceil(np.sqrt(iterations + 1))),
         callbacks=['logger', 'distance', 'adjustments', 'response'],
     )
@@ -17,8 +17,8 @@ if __name__ == '__main__':
         lrn_warm_start=False,
         lrn_verbose=False,
         mst_master_kind='regression',
-        mst_backend='cplex',
-        mst_loss_fn='mse',
+        mst_y_loss='mse',
+        mst_p_loss='mse',
         mst_alpha=1.0,
         mst_learner_omega=1.0,
         mst_master_omega=1.0,

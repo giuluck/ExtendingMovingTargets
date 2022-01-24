@@ -1,6 +1,6 @@
 """Restaurants Data Manager."""
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,16 +9,15 @@ import seaborn as sns
 from sklearn.metrics import roc_auc_score, log_loss
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
-from moving_targets.util.typing import Vector, MonotonicitiesMatrix
 from src.datasets.abstract_manager import AbstractManager
-from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions
+from src.util.typing import Rng, Figsize, TightLayout, Augmented, SamplingFunctions, MonotonicitiesMatrix
 
 
 class RestaurantsManager(AbstractManager):
     """Data Manager for the Restaurant Dataset."""
 
     @staticmethod
-    def ctr_estimate(avg_ratings: Vector, num_reviews: Vector, dollar_ratings: Vector) -> Vector:
+    def ctr_estimate(avg_ratings, num_reviews, dollar_ratings) -> Any:
         """Computes the real click-trough rate estimate.
 
         :param avg_ratings:
@@ -31,14 +30,14 @@ class RestaurantsManager(AbstractManager):
             Input vector of dollar ratings.
 
         :return:
-            Output vector of click-through rate vlues.
+            Output vector of click-through rate values.
         """
         dollar_rating_baseline = {'D': 3, 'DD': 2, 'DDD': 4, 'DDDD': 4.5}
         dollar_ratings = np.array([dollar_rating_baseline[d] for d in dollar_ratings])
         return 1 / (1 + np.exp(dollar_ratings - avg_ratings * np.log1p(num_reviews) / 4))
 
     @staticmethod
-    def predict(dataframe: pd.DataFrame) -> Vector:
+    def predict(dataframe: pd.DataFrame) -> np.ndarray:
         """Predicts the real click-trough rate estimate from a dataframe.
 
         :param dataframe:
@@ -54,7 +53,7 @@ class RestaurantsManager(AbstractManager):
         ).values
 
     @staticmethod
-    def sample_restaurants(n: int, rng: Rng) -> Tuple[Vector, Vector, Vector, Vector]:
+    def sample_restaurants(n: int, rng: Rng) -> Tuple[Any, Any, Any, Any]:
         """Samples ground truth about restaurants.
 
         :param n:
@@ -65,7 +64,7 @@ class RestaurantsManager(AbstractManager):
 
         :return:
             A tuple with four vectors, each one representing either one of the three input features or the output
-            feature of the retaurants dataset.
+            feature of the restaurants dataset.
         """
         avg_ratings = rng.uniform(1.0, 5.0, n)
         num_reviews = np.round(np.exp(rng.uniform(0.0, np.log(200), n)))
@@ -147,7 +146,7 @@ class RestaurantsManager(AbstractManager):
             plt.show()
 
     @staticmethod
-    def process_data(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+    def process_data(dataset: pd.DataFrame) -> Tuple[Any, np.ndarray]:
         """Processes the dataframe by applying one-hot encoding and computing the ground truths if needed.
 
         :param dataset:
@@ -249,6 +248,7 @@ class RestaurantsManager(AbstractManager):
             A NxM matrix where N is the number of samples and M is the number of references, where each cell is filled
             with -1, 0, or 1 depending on the kind of monotonicity between samples[i] and references[j].
         """
+
         def _categorical_monotonicities(diffs):
             mono = 1 * (diffs == 1) - 1 * (diffs == -1)  # DD (2) > D    (1) -> DD - D = 1, D - DD = -1
             mono += 1 * (diffs == -6) - 1 * (diffs == 6)  # DD (2) > DDDD (8) -> DD - DDDD = -6, DDDD - DD = 6
@@ -306,4 +306,5 @@ class RestaurantsManager(AbstractManager):
 
     def _summary_plot(self, model, figsize: Figsize, tight_layout: TightLayout, **additional_kwargs):
         self.plot_conclusions(models={'Estimated CTR': model, 'Real CTR': RestaurantsManager}, figsize=figsize,
-                              tight_layout=tight_layout, res=additional_kwargs.pop('res'), orient_columns=False, show=False)
+                              tight_layout=tight_layout, res=additional_kwargs.pop('res'), orient_columns=False,
+                              show=False)

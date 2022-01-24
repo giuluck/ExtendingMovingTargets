@@ -99,19 +99,16 @@ class TestPipelines(unittest.TestCase):
         """
         expected_factory, expected_manager = DATASETS[dataset]
         handler_routine, expected_handler = MODELS[model]
-        try:
-            # we can now use these information to retrieve the correct pipeline
-            factory, _ = DatasetFactory(res_folder=RES_FOLDER).get_dataset(name=dataset, **kwargs)
-            manager = factory.manager
-            handler = handler_routine(factory, self._model_parameters(model, dataset) or {})
-            test_routine = handler.test
-            # variables are placed before so to avoid warnings due to incorrect type assignment after assertIsInstance()
-            self.assertIsInstance(factory, expected_factory)
-            self.assertIsInstance(manager, expected_manager)
-            self.assertIsInstance(handler, expected_handler)
-            test_routine(summary_args=self._summary_args(model, dataset, **kwargs))
-        except Exception as exception:
-            self.fail(f'{exception}\nArguments: {kwargs}')
+        # we can now use these information to retrieve the correct pipeline
+        factory, _ = DatasetFactory(res_folder=RES_FOLDER).get_dataset(name=dataset, **kwargs)
+        manager = factory.manager
+        handler = handler_routine(factory, self._model_parameters(model, dataset) or {})
+        test_routine = handler.test
+        # variables are placed before so to avoid warnings due to incorrect type assignment after assertIsInstance()
+        self.assertIsInstance(factory, expected_factory)
+        self.assertIsInstance(manager, expected_manager)
+        self.assertIsInstance(handler, expected_handler)
+        test_routine(summary_args=self._summary_args(model, dataset, **kwargs))
 
     def _test_dataset_model(self, dataset: str, model: str, **kwargs):
         """Runs multiple "self._test()" instances depending on the dataset, the model, and the additional arguments.

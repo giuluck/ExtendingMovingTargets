@@ -2,7 +2,7 @@
 
 from typing import Union, List, Dict, Callable, Tuple, Optional, Any
 
-from moving_targets.util.typing import Matrix, Number
+import numpy as np
 
 Augmented = Union[int, Tuple[int], List[int], Dict[str, int]]
 """The number of augmented samples.
@@ -11,14 +11,14 @@ It can be a single integer number, a tuple/list of integers, or a dictionary of
 integers indexed via the name of the feature to augment.
 """
 
-AugmentedData = Tuple[Matrix, Matrix]
+AugmentedData = Tuple[Any, Any]
 """A tuple of matrices of kind (<x augmented>, <y augmented>)."""
 
 SamplingFunctions = Dict[str, Tuple[int, Callable]]
 """A dictionary that assigns to each feature name (str) a tuple (<n>, <fn>), where <n> is the number of augmented
 samples and <fn> is a callable function used for sampling."""
 
-Method = Union[None, str, Tuple[Number, Number]]
+Method = Union[None, str, Tuple[float, float]]
 """Scaling method.
 
 It can be either None (no scaling), a string representing the kind of scaling, or a tuple of integers representing the
@@ -46,3 +46,9 @@ Extrapolation = Union[None, bool, float, List[float], Dict[str, float]]
 It can be either None (no extrapolation), a boolean value, a single float or a list of them (one for each feature,
 ordered), or a dictionary of float values indexed via the feature name.
 """
+
+MonotonicitiesList = List[Tuple[int, int]]
+"""A list of tuples (<higher>, <lower>), where the values represent the indices of the greater and the lower samples."""
+
+MonotonicitiesMatrix = Union[int, np.ndarray]
+"""Either a numpy scalar, vector or matrix which contains {-1, 0, 1} depending on the expected monotonicity."""
