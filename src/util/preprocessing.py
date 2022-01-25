@@ -1,12 +1,9 @@
-"""Processing utils."""
-
 from typing import Union, Dict, Tuple, List, Optional, Any
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
-from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
+from sklearn.preprocessing import OneHotEncoder
 
 from src.util.typing import Method, Extrapolation
 
@@ -43,37 +40,19 @@ class Scaler:
 
         # if a single method is passed (and default_method is known to be None), then we consider it the default one
         self.default_method: Method = methods[1] if len(methods) == 1 else default_method
-        """The default scaling method."""
 
         # if more than a single method is passed we use them, otherwise we use the custom_methods dictionary
         self.methods: Union[List[Method], Dict[str, Method]] = list(methods) if len(methods) > 1 else custom_methods
-        """The custom scaling methods."""
 
         self._is_2d: bool = True
-        """Whether or not the input data is 2d."""
-
         self._is_pandas: bool = True
-        """Whether or not the input data is pandas-like."""
-
         self._onehot: Dict[int, Tuple[OneHotEncoder, Any]] = {}
-        """The dictionary of onehot encoders (paired with the previous column id, if any) indexed by column number."""
-
         self._translation: Optional[np.ndarray] = None
-        """The translation vector."""
-
         self._scaling: Optional[np.ndarray] = None
-        """The scaling vector."""
 
     @staticmethod
     def _handle_input(data) -> Tuple[Any, Tuple[bool, bool]]:
-        """Handles the input data and stores metadata on its dimension and data type.
-
-        :param data:
-            The input data.
-
-        :return:
-            A tuple containing the processed input and its metadata.
-        """
+        """Handles the input data and stores metadata on its dimension and data type."""
         # handle non-dataframe data (convert to dataframe in case of series, to 2D array in case of non-pandas)
         is_2d, is_pandas = True, True
         if isinstance(data, pd.Series):
@@ -87,33 +66,13 @@ class Scaler:
 
     @staticmethod
     def _handle_output(data, is_2d: bool, is_pandas: bool) -> Any:
-        """Handles the output data depending on its dimension and data type.
-
-        :param data:
-            The output data.
-
-        :param is_2d:
-            Whether the output must be returned in 2d or not (may differ from `self.is_2d` due to one hot encoding).
-
-        :param is_pandas:
-            Whether the output must be returned in pandas-like.
-
-        :return:
-            The processed output data.
-        """
+        """Handles the output data depending on its dimension and data type."""
         # handle non-dataframe data (convert to dataframe in case of series, to 2D array in case of non-pandas)
         data = data if is_2d else data.iloc[:, 0]
         return data if is_pandas else data.values
 
     def fit(self, data):
-        """Fits the scaler parameters.
-
-        :param data:
-            The matrix/dataframe of samples.
-
-        :return:
-            The scaler itself.
-        """
+        """Fits the scaler parameters."""
         # handle input
         data, (self._is_2d, self._is_pandas) = Scaler._handle_input(data=data)
 
@@ -163,14 +122,7 @@ class Scaler:
         return self
 
     def transform(self, data) -> Any:
-        """Transforms the data according to the scaler parameters.
-
-        :param data:
-            The matrix/dataframe of samples.
-
-        :return:
-            The scaled data.
-        """
+        """Transforms the data according to the scaler parameters."""
         # handle input
         data_types = data.dtype if isinstance(data, np.ndarray) else data.dtypes
         data, _ = Scaler._handle_input(data=data)
@@ -189,25 +141,11 @@ class Scaler:
         return Scaler._handle_output(data=data, is_2d=is_2d, is_pandas=self._is_pandas).astype(data_types)
 
     def fit_transform(self, data) -> Any:
-        """Fits the scaler parameters.
-
-        :param data:
-            The matrix/dataframe of samples.
-
-        :return:
-            The scaled data.
-        """
+        """Fits the scaler parameters."""
         return self.fit(data).transform(data)
 
     def inverse_transform(self, data) -> Any:
-        """Inverts the scaling according to the scaler parameters.
-
-        :param data:
-            The previously scaled matrix/dataframe of samples.
-
-        :return:
-            The original data.
-        """
+        """Inverts the scaling according to the scaler parameters."""
         # handle input
         data_types = data.dtype if isinstance(data, np.ndarray) else data.dtypes
         data, _ = Scaler._handle_input(data=data)
@@ -231,32 +169,7 @@ def split_dataset(*dataset,
                   random_state: int = 0,
                   shuffle: bool = True,
                   stratify: Optional = None) -> Dict:
-    """Splits the input data.
-
-    :param dataset:
-        The input data vectors.
-
-    :param test_size:
-        The percentage of data left for testing (ignored in case of extrapolation).
-
-    :param val_size:
-        The percentage of data left for validation. If zero, no validation set is returned.
-
-    :param extrapolation:
-        Whether to split the data randomly or to test on a given percentage of extrapolated data.
-
-    :param random_state:
-        Controls the seed for the shuffling applied to the data before applying the split.
-
-    :param shuffle:
-        Whether or not to shuffle the data before splitting (if shuffle=False then stratify must be None).
-
-    :param stratify:
-        If not None, data is split in a stratified fashion, using this as the class labels.
-
-    :return:
-        A dictionary of datasets.
-    """
+    """Splits the input data."""
     val_size = test_size if val_size is None else val_size
     val_size = val_size if isinstance(val_size, float) else val_size / len(dataset[0])
     test_size = test_size if isinstance(test_size, float) else test_size / len(dataset[0])
@@ -296,52 +209,10 @@ def cross_validate(*dataset,
                    random_state: int = 0,
                    shuffle: bool = True,
                    stratify: Optional = None) -> List[Dict]:
-    """Splits the input data in folds.
-
-    :param dataset:
-        The input data vectors.
-
-    :param num_folds:
-        The number of folds.
-
-    :param random_state:
-        Controls the seed for the shuffling applied to the data before applying the split.
-
-    :param shuffle:
-        Whether or not to shuffle the data before splitting (if shuffle=False then stratify must be None).
-
-    :param stratify:
-        Either None (no stratification) or the vector of labels.
-
-    :return:
-        A list of dictionaries of datasets.
-    """
+    """Splits the input data in folds."""
     kf = KFold if stratify is None else StratifiedKFold
     kf = kf(n_splits=num_folds, random_state=random_state, shuffle=shuffle)
     folds = []
     for tr, vl in kf.split(X=dataset[0], y=stratify):
-        folds.append(
-            {'train': tuple([v.iloc[tr] for v in dataset]), 'validation': tuple([v.iloc[vl] for v in dataset])})
+        folds += [{'train': tuple([v.iloc[tr] for v in dataset]), 'validation': tuple([v.iloc[vl] for v in dataset])}]
     return folds
-
-
-def get_top_features(x, y, n: int = 10) -> list:
-    """Get the n most relevant features of the input dataset. In order to do feature selection, we have to fix a model:
-    here we use a random forest for simplicity, since feature importance is already implemented in sklearn routines.
-    :param x:
-        The input data.
-    :param y:
-        The output data.
-    :param n:
-        The number of features to be taken.
-    :return:
-        A list of n features ordered by importance.
-    """
-    x_scaled = MinMaxScaler().fit_transform(x)
-    y_scaled = MinMaxScaler().fit_transform(y)
-    features = list(x.columns)
-    model = SelectKBest(k=n).fit(x_scaled, y_scaled.reshape((-1,)))
-    # noinspection PyUnresolvedReferences
-    feat_ranking = model.scores_
-    ranked_features = np.take(features, np.argsort(feat_ranking))
-    return list(ranked_features)[:n]
