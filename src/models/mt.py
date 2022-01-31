@@ -1,14 +1,15 @@
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Tuple
 
 import numpy as np
 from moving_targets import MACS
 from moving_targets.callbacks import Callback
 from moving_targets.learners import MultiLayerPerceptron
 from moving_targets.masters import Master
-from moving_targets.masters.backends import GurobiBackend
+from moving_targets.masters.backends import CplexBackend
 from moving_targets.masters.losses import HammingDistance, CrossEntropy, SAE, SSE, MAE, MSE, aliases
 from moving_targets.masters.optimizers import Optimizer
 from moving_targets.metrics import Metric
+from moving_targets.util.scalers import Scaler
 from moving_targets.util.typing import Dataset
 
 from src.models import Model
@@ -38,7 +39,7 @@ class MonotonicityMaster(Master):
             y_loss, p_loss = y_class(), p_class()
             lb, ub, vtype = -float('inf'), float('inf'), 'continuous'
 
-        super().__init__(backend=GurobiBackend(time_limit=30),
+        super().__init__(backend=CplexBackend(time_limit=30),
                          y_loss=y_loss,
                          p_loss=p_loss,
                          alpha=Optimizer(base=alpha),
@@ -74,14 +75,17 @@ class MT(Model):
                  metrics: List[Metric],
                  callbacks: List[Callback],
                  val_data: Optional[Dataset],
-                 verbose: Union[int, bool]):
+                 verbose: Union[int, bool],
+                 scalers: Tuple[Scaler, Scaler]):
         learner = MultiLayerPerceptron(
             loss='binary_crossentropy' if classification else 'mean_squared_error',
             output_activation='sigmoid' if classification else None,
             hidden_units=[128, 128],
             batch_size=32,
             epochs=1000,
-            verbose=False
+            verbose=False,
+            x_scaler=scalers[0],
+            y_scaler=scalers[1]
         )
         master = MonotonicityMaster(
             directions=directions,

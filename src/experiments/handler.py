@@ -1,11 +1,13 @@
+import random
 import time
 from typing import Optional, List, Union
 
+import numpy as np
+import tensorflow as tf
 from moving_targets.callbacks import WandBLogger, Callback
 
 from src.datasets import Synthetic
 from src.models import MT
-from src.util.experiments import setup
 
 
 class Handler:
@@ -58,7 +60,9 @@ class Handler:
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
         folds = self.dataset.get_folds(num_folds=num_folds)
         for i, fold in enumerate([folds] if num_folds is None else folds):
-            setup(seed=self._SEED)
+            random.seed(self._SEED)
+            np.random.seed(self._SEED)
+            tf.random.set_seed(self._SEED)
             if folds_index is not None and i not in folds_index:
                 continue
             # handle verbosity
@@ -81,7 +85,8 @@ class Handler:
                 iterations=iterations,
                 callbacks=callbacks,
                 val_data=None,
-                verbose=model_verbosity
+                verbose=model_verbosity,
+                scalers=self.dataset.get_scalers()
             ).fit(x=fold.x, y=fold.y)
             # handle plots
             if plot_history:

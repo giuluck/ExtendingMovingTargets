@@ -5,19 +5,15 @@ import numpy as np
 import pandas as pd
 from moving_targets.metrics import MSE, R2, CrossEntropy, Accuracy, Metric
 from moving_targets.util.errors import not_implemented_message
+from moving_targets.util.scalers import Scaler
 
-from src.util.preprocessing import Scaler, split_dataset, cross_validate
+from src.util.preprocessing import split_dataset, cross_validate
 
 
 class Fold:
     """Data class containing the information of a fold for k-fold cross-validation."""
 
-    def __init__(self,
-                 data: pd.DataFrame,
-                 label: str,
-                 x_scaler: Scaler,
-                 y_scaler: Scaler,
-                 validation: Dict[str, pd.DataFrame]):
+    def __init__(self, data: pd.DataFrame, label: str, validation: Dict[str, pd.DataFrame]):
         """
         :param data:
             The training data.
@@ -25,25 +21,14 @@ class Fold:
         :param label:
             The target label.
 
-        :param x_scaler:
-            The input data scaler.
-
-        :param y_scaler:
-            The output data scaler.
-
         :param validation:
             A shared validation dataset which is common among all the k folds.
         """
 
-        def split_df(df: pd.DataFrame, fit: bool = False) -> Tuple[pd.DataFrame, np.ndarray]:
-            x_df, y_df = df.drop(columns=label), df[label].values
-            if fit:
-                x_scaler.fit(x_df)
-                y_scaler.fit(y_df)
-            return x_scaler.transform(x_df), y_scaler.transform(y_df)
+        def split_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, np.ndarray]:
+            return df.drop(columns=label), df[label].values
 
-        self.x, self.y = split_df(df=data, fit=True)
-        self.x_scaler, self.y_scaler = x_scaler, y_scaler
+        self.x, self.y = split_df(df=data)
         self.validation: Dict[str, Tuple[pd.DataFrame, np.ndarray]] = {k: split_df(df=v) for k, v in validation.items()}
 
 
@@ -116,17 +101,15 @@ class Dataset:
         :return:
             Either a tuple of `Dataset` and `Scalers` or a list of them, depending on the number of folds.
         """
-        x_scaler, y_scaler = self.get_scalers()
         stratify = self.train[self.label] if self.classification else None
-        fold_kwargs = dict(label=self.label, x_scaler=x_scaler, y_scaler=y_scaler)
         if num_folds is None:
             validation = dict(train=self.train, test=self.test)
-            return Fold(data=self.train, validation=validation, **fold_kwargs)
+            return Fold(data=self.train, label=self.label, validation=validation)
         elif num_folds == 1:
             fold = split_dataset(self.train, test_size=0.2, val_size=0.0, stratify=stratify, **kwargs)
             fold['validation'] = fold.pop('test')
             fold['test'] = self.test
-            return [Fold(data=fold['train'], validation=fold, **fold_kwargs)]
+            return [Fold(data=fold['train'], label=self.label, validation=fold)]
         else:
             folds = cross_validate(self.train, num_folds=num_folds, stratify=stratify, **kwargs)
-            return [Fold(data=fold['train'], validation={**fold, 'test': self.test}, **fold_kwargs) for fold in folds]
+            return [Fold(data=f['train'], validation={**f, 'test': self.test}, label=self.label) for f in folds]

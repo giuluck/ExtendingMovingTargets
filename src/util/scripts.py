@@ -1,16 +1,6 @@
-import random
 from typing import Optional, Callable, List, Dict
 
-import numpy as np
 import pandas as pd
-import tensorflow as tf
-
-
-def setup(seed: int = 0):
-    """Sets up an experiment."""
-    random.seed(seed)
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
 
 
 def cartesian_product(fixed_parameters: Optional[Dict] = None, **parameters: List) -> List[Dict]:
