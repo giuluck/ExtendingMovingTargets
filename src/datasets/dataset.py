@@ -1,8 +1,9 @@
 """Data Manager."""
-from typing import Dict, Optional, Tuple, List, Union
+from typing import Dict, Optional, Tuple, List, Union, Any
 
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from moving_targets.metrics import MSE, R2, CrossEntropy, Accuracy, Metric
 from moving_targets.util.errors import not_implemented_message
 from moving_targets.util.scalers import Scaler
@@ -11,19 +12,14 @@ from src.util.preprocessing import split_dataset, cross_validate
 
 
 class Fold:
-    """Data class containing the information of a fold for k-fold cross-validation."""
+    """Data class containing the information of a fold for k-fold cross-validation.
+
+    - 'data' is the training data.
+    - 'label' is the target column name.
+    - 'validation' is the  shared validation dataset which is common among all the k folds.
+    """
 
     def __init__(self, data: pd.DataFrame, label: str, validation: Dict[str, pd.DataFrame]):
-        """
-        :param data:
-            The training data.
-
-        :param label:
-            The target label.
-
-        :param validation:
-            A shared validation dataset which is common among all the k folds.
-        """
 
         def split_df(df: pd.DataFrame) -> Tuple[pd.DataFrame, np.ndarray]:
             return df.drop(columns=label), df[label].values
@@ -33,7 +29,16 @@ class Fold:
 
 
 class Dataset:
-    """Abstract Dataset Manager."""
+    """Abstract Dataset Manager.
+
+    - 'label' is the name of the target feature.
+    - 'directions' is a dictionary pairing each monotonic attribute to its direction (-1, 0, or 1).
+    - 'grid' is the explicit evaluation grid for the dataset.
+    - 'classification' is a boolean value representing whether the dataset implies a classification task or not.
+    - 'metrics' is the list of metrics that must be evaluated.
+    """
+
+    __name__: str = 'dataset'
 
     @staticmethod
     def load() -> Dict[str, pd.DataFrame]:
@@ -52,23 +57,14 @@ class Dataset:
         train, test = self.load().values()
 
         self.train: pd.DataFrame = train
-        """The training data."""
-
         self.test: pd.DataFrame = test
-        """The test data."""
-
         self.label: str = label
-        """The name of the target feature."""
-
         self.directions: Dict[str, int] = directions
-        """A dictionary pairing each monotonic attribute to its direction (-1, 0, or 1)."""
-
+        self.grid: pd.DataFrame = grid
         self.classification: bool = classification
-        """Whether the model should solve a (binary) classification or a regression task."""
 
-        # TODO: add violation metric using grid (NB: need to scale the grid... add scalers in Moving Targets?)
+        # TODO: add violation metric using grid
         self.metrics: List[Metric] = []  # ConstraintMetric(directions=directions, grid=grid)
-        """The list of metrics to evaluate models learning on this dataset"""
 
         if classification:
             self.metrics.insert(0, Accuracy(name='metric'))
@@ -77,12 +73,12 @@ class Dataset:
             self.metrics.insert(0, R2(name='metric'))
             self.metrics.insert(0, MSE(name='loss'))
 
-    def get_scalers(self) -> Tuple[Scaler, Scaler]:
-        """Returns the dataset scalers.
+    def _plot(self, model):
+        """Implements the plotting routine."""
+        raise NotImplementedError(not_implemented_message(name='_summary_plot'))
 
-        :return:
-            A pair of scalers, one for the input and one for the output data, respectively.
-        """
+    def get_scalers(self) -> Tuple[Scaler, Scaler]:
+        """Returns the dataset scalers."""
         return Scaler(default_method='std'), Scaler(default_method=None if self.classification else 'norm')
 
     def get_folds(self, num_folds: Optional[int] = None, **kwargs) -> Union[Fold, List[Fold]]:
@@ -91,15 +87,6 @@ class Dataset:
         With num_folds = None directly returns a tuple with train/test splits and scalers.
         With num_folds = 1 returns a list with a single tuple with train/val/test splits and scalers.
         With num_folds > 1 returns a list of tuples with train/val/test splits and their respective scalers.
-
-        :param num_folds:
-            The number of folds for k-fold cross-validation.
-
-        :param kwargs:
-            Arguments passed either to `split_dataset()` or `cross_validate()` method, depending on the number of folds.
-
-        :return:
-            Either a tuple of `Dataset` and `Scalers` or a list of them, depending on the number of folds.
         """
         stratify = self.train[self.label] if self.classification else None
         if num_folds is None:
@@ -113,3 +100,20 @@ class Dataset:
         else:
             folds = cross_validate(self.train, num_folds=num_folds, stratify=stratify, **kwargs)
             return [Fold(data=f['train'], validation={**f, 'test': self.test}, label=self.label) for f in folds]
+
+    def summary(self, model, plot: bool = True, **data: Tuple[Any, np.ndarray]):
+        """Executes the an evaluation summary on the dataset.
+
+        - 'model' is the machine learning model used.
+        - 'plot' is True if the evaluation plot is needed, False otherwise.
+        - 'data' is a dictionary of data splits, if not empty, is used to print final metrics evaluations.
+        """
+        if plot:
+            self._plot(model=model)
+            plt.suptitle(model.__name__)
+            plt.show()
+        if len(data) > 0:
+            evaluation = pd.DataFrame(index=[m.__name__ for m in self.metrics])
+            for split, (x, y) in data.items():
+                evaluation[split] = [metric(x, y, model.predict(x)) for metric in self.metrics]
+            print(evaluation)

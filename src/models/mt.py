@@ -22,6 +22,8 @@ class MonotonicityMaster(Master):
     - 'classification' is True for (binary) classification tasks and False for regression tasks.
     """
 
+    __name__: str = 'MT'
+
     def __init__(self, directions: Dict[str, int], classification: bool, alpha: float, y_loss: str, p_loss: str):
         y_class, p_class = aliases.get(y_loss), aliases.get(p_loss)
         assert y_class is not None, f"Unknown y_loss '{y_loss}'"

@@ -7,6 +7,8 @@ from moving_targets.util.errors import not_implemented_message
 class Model:
     """Abstract Model Interface."""
 
+    __name__: str = 'Model'
+
     def fit(self, x, y: np.ndarray) -> Any:
         """Fits the model."""
         raise NotImplementedError(not_implemented_message('fit'))

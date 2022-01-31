@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from moving_targets.callbacks import Callback
 
 from src.datasets import Dataset
-from src.util.scripts import set_pandas_options
+from src.util.analysis import set_pandas_options
 
 
 class AnalysisCallback(Callback):

@@ -74,7 +74,7 @@ class Handler:
                 if isinstance(c, WandBLogger) and num_folds is not None:
                     c.config['fold'] = i
             # build and fit model
-            history = MT(
+            model = MT(
                 directions=self.dataset.directions,
                 classification=self.dataset.classification,
                 metrics=self.dataset.metrics,
@@ -87,13 +87,13 @@ class Handler:
                 val_data=None,
                 verbose=model_verbosity,
                 scalers=self.dataset.get_scalers()
-            ).fit(x=fold.x, y=fold.y)
+            )
+            history = model.fit(x=fold.x, y=fold.y)
             # handle plots
             if plot_history:
                 history.plot()
             if plot_summary:
-                # TODO: implement summary plot for dataset
-                pass
+                self.dataset.summary(model=model, plot=True, **fold.validation)
             # handle verbosity
             if fold_verbosity in [2, True]:
                 print(f'-- elapsed time: {time.time() - start_time}')
