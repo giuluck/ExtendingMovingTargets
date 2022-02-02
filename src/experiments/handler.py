@@ -40,10 +40,10 @@ class Handler:
             p_loss=p_loss
         )
 
-        self.init_step = init_step
-        self.alpha = alpha
-        self.y_loss = y_loss
-        self.p_loss = p_loss
+        self.init_step: str = init_step
+        self.alpha: float = alpha
+        self.y_loss: str = y_loss
+        self.p_loss: str = p_loss
 
     def experiment(self,
                    iterations: int = 15,
@@ -51,10 +51,15 @@ class Handler:
                    folds_index: Optional[List[int]] = None,
                    fold_verbosity: Union[bool, int] = True,
                    model_verbosity: Union[bool, int] = False,
-                   callbacks: Optional[List[Callback]] = None,
+                   callbacks: Optional[List[Union[str, Callback]]] = None,
+                   folder: Optional[str] = None,
                    plot_history: bool = True,
                    plot_summary: bool = True):
-        """Builds controllable Moving Targets experiment with custom callbacks and plots."""
+        """Builds controllable Moving Targets experiment with custom callbacks and plots.
+
+        - 'callbacks' is a list of either callbacks instances or (string) aliases. If None, datasets callbacks are used.
+        - 'folder' is the folder where to export callbacks files.
+        """
         fold_verbosity = False if num_folds is None or num_folds == 1 else fold_verbosity
         if fold_verbosity is not False:
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
@@ -69,10 +74,14 @@ class Handler:
             start_time = time.time()
             if fold_verbosity in [2, True]:
                 print(f'  > fold {i + 1:0{len(str(num_folds))}}/{num_folds}', end=' ')
-            # handle wandb callback
-            for c in callbacks:
-                if isinstance(c, WandBLogger) and num_folds is not None:
-                    c.config['fold'] = i
+            # handle default (dataset) callbacks and wandb callback
+            callbacks = list(self.dataset.callbacks.keys() if callbacks is None else callbacks)
+            signature = (lambda c: None) if folder is None else (lambda c: f'{folder}/{self.dataset.__name__}_{c}')
+            for index, callback in enumerate(callbacks):
+                if isinstance(callback, str):
+                    callbacks[index] = self.dataset.callbacks[callback](fs=signature(callback))
+                elif isinstance(callback, WandBLogger) and num_folds is not None:
+                    callback.config['fold'] = i
             # build and fit model
             model = MT(
                 directions=self.dataset.directions,

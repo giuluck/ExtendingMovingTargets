@@ -10,7 +10,7 @@ if __name__ == '__main__':
     Handler(dataset='synthetic').experiment(
         iterations=5,
         num_folds=None,
-        callbacks=[],
+        callbacks=None,
         model_verbosity=1,
         fold_verbosity=False,
         plot_history=False,

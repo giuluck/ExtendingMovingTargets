@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Union, Any, Tuple
 
 import numpy as np
+import pandas as pd
 from moving_targets import MACS
 from moving_targets.callbacks import Callback
 from moving_targets.learners import MultiLayerPerceptron
@@ -18,7 +19,7 @@ from src.models import Model
 class MonotonicityMaster(Master):
     """Master for the monotonicity enforcement problem.
 
-    - 'directions' is a dictionary pairing each monotonic attribute to its direction (-1, 0, or 1).
+    - 'directions' is a dictionary pairing each monotonic attribute to its direction (-1 or 1).
     - 'classification' is True for (binary) classification tasks and False for regression tasks.
     """
 
@@ -29,17 +30,15 @@ class MonotonicityMaster(Master):
         assert y_class is not None, f"Unknown y_loss '{y_loss}'"
         assert p_class is not None, f"Unknown p_loss '{p_loss}'"
         if classification:
-            # use binary targets only if required (i.e., HammingDistance or CrossEntropy loss), otherwise continuous
-            binary = y_class in [HammingDistance, CrossEntropy] or p_class in [HammingDistance, CrossEntropy]
-            y_loss = y_class() if y_class in [HammingDistance, CrossEntropy] else y_class(binary=binary)
-            p_loss = p_class() if p_class in [HammingDistance, CrossEntropy] else p_class(binary=binary)
-            lb, ub, vtype = 0, 1, 'binary' if binary else 'continuous'
+            # check that the loss is a valid classification loss that can use continuous targets
+            assert y_class not in [HammingDistance, CrossEntropy], f"Unsupported y_loss '{y_loss}'"
+            assert p_class not in [HammingDistance, CrossEntropy], f"Unsupported y_loss '{p_loss}'"
+            y_loss, p_loss, lb, ub = y_class(binary=False), p_class(binary=False), 0, 1
         else:
             # check that the loss is a valid regression loss
             assert y_class in [SAE, SSE, MAE, MSE], f"Unsupported y_loss '{y_loss}'"
             assert p_class in [SAE, SSE, MAE, MSE], f"Unsupported p_loss '{p_loss}'"
-            y_loss, p_loss = y_class(), p_class()
-            lb, ub, vtype = -float('inf'), float('inf'), 'continuous'
+            y_loss, p_loss, lb, ub = y_class(), p_class(), -float('inf'), float('inf')
 
         super().__init__(backend=CplexBackend(time_limit=30),
                          y_loss=y_loss,
@@ -49,13 +48,18 @@ class MonotonicityMaster(Master):
                          stats=False)
 
         self.directions: Dict[str, int] = directions
-        self.lb = lb
-        self.ub = ub
-        self.vtype = vtype
+        self.lb: float = lb
+        self.ub: float = ub
 
-    def build(self, x, y: np.ndarray) -> np.ndarray:
-        v = self.backend.add_variables(len(y), vtype=self.vtype, lb=self.lb, ub=self.ub, name='y')
-        # TODO: implement master
+    def build(self, x: pd.DataFrame, y: np.ndarray) -> np.ndarray:
+        # we build a linear regression for each one of the monotonic features by solving the least-squares method:
+        #       a.T @ a @ w = a.T @ y
+        # where a = x[c] is the data about a specific feature (column) and w is the respective (scalar) weight which
+        # is constrained to be either positive or negative depending on the kind of expected monotonicity
+        v = self.backend.add_variables(*y.shape, vtype='continuous', lb=self.lb, ub=self.ub, name='y')
+        for c, d in self.directions.items():
+            a, w = x[c].values, self.backend.add_continuous_variable(name=f'w_{c}')
+            self.backend.add_constraints([d * w >= 0, (a.T @ a) * w == self.backend.sum(a.T * v)])
         return v
 
 
@@ -102,7 +106,7 @@ class MT(Model):
         self.val_data = val_data
         self.verbose = verbose
 
-    def fit(self, x, y: np.ndarray) -> Any:
+    def fit(self, x: pd.DataFrame, y: np.ndarray) -> Any:
         return self.macs.fit(
             x=x,
             y=y,
@@ -113,5 +117,5 @@ class MT(Model):
             sample_weight=None
         )
 
-    def predict(self, x) -> np.ndarray:
+    def predict(self, x: pd.DataFrame) -> np.ndarray:
         return self.macs.predict(x)
