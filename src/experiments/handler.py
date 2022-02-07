@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from moving_targets.callbacks import WandBLogger, Callback
 
-from src.datasets import Synthetic, Manager, Cars
+from src.datasets import Synthetic, Manager, Cars, Puzzles
 from src.models import MT
 
 
@@ -28,6 +28,8 @@ class Handler:
             self.dataset: Manager = Cars()
         elif dataset == 'synthetic':
             self.dataset: Manager = Synthetic()
+        elif dataset == 'puzzles':
+            self.dataset: Manager = Puzzles()
         else:
             raise ValueError(f"Unknown dataset '{dataset}'")
 

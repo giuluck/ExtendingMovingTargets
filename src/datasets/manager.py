@@ -186,15 +186,11 @@ class AnalysisCallback(Callback):
     def __init__(self,
                  sorting_attribute: Optional[str] = None,
                  file_signature: Optional[str] = None,
-                 num_columns: Union[int, str] = 'auto',
-                 figsize: Tuple[int, int] = (16, 9),
-                 tight_layout: bool = True,
-                 **plt_kwargs):
+                 num_columns: Union[int, str] = 'auto'):
         super(AnalysisCallback, self).__init__()
         self.sorting_attribute: Optional[str] = sorting_attribute
         self.file_signature: Optional[str] = file_signature
         self.num_columns: Optional[int] = num_columns
-        self.plt_kwargs: Dict[str, Any] = {'figsize': figsize, 'tight_layout': tight_layout, **plt_kwargs}
         self.data: Optional[pd.DataFrame] = None
         self.iterations: List[Any] = []
 
@@ -221,9 +217,9 @@ class AnalysisCallback(Callback):
                 f.write(str(self.data))
         # plots results
         if self.num_columns is not None:
-            plt.figure(**self.plt_kwargs)
+            plt.figure(figsize=(16, 9), tight_layout=True)
             if self.num_columns == 'auto':
-                self.num_columns = self._auto_columns(ratio=np.divide(*self.plt_kwargs['figsize']))
+                self.num_columns = self._auto_columns(ratio=16 / 9)
             num_rows = np.ceil(len(self.iterations) / self.num_columns).astype(int)
             ax = None
             for idx, it in enumerate(self.iterations):

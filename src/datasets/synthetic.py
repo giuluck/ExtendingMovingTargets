@@ -1,6 +1,6 @@
 """Synthetic Data Manager."""
 
-from typing import Any, Dict, Optional, Callable, Union, Tuple
+from typing import Any, Dict, Optional, Callable, Union
 
 import numpy as np
 import pandas as pd
@@ -19,8 +19,8 @@ class Synthetic(Manager):
     callbacks: Dict[str, Callable] = {
         **Manager.callbacks,
         'response': lambda fs: SyntheticResponse(file_signature=fs),
-        'adjustments2D': lambda fs: SyntheticAdjustments2D(file_signature=fs),
-        'adjustments3D': lambda fs: SyntheticAdjustments3D(file_signature=fs)
+        'adjustments_2D': lambda fs: SyntheticAdjustments2D(file_signature=fs),
+        'adjustments_3D': lambda fs: SyntheticAdjustments3D(file_signature=fs)
     }
 
     @staticmethod
@@ -46,7 +46,7 @@ class Synthetic(Manager):
 
     @classmethod
     def grid(cls, plot: bool = True) -> pd.DataFrame:
-        res = 60 if plot else 20
+        res = 50 if plot else 80
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         return pd.DataFrame({'a': a.flatten(), 'b': b.flatten()})
 
@@ -55,7 +55,7 @@ class Synthetic(Manager):
 
     def _plot(self, model):
         # get data
-        grid = self.grid()
+        grid = self.grid(plot=True)
         grid['pred'] = model.predict(grid)
         grid['label'] = Synthetic.function(grid['a'], grid['b'])
         res = np.sqrt(len(grid)).astype(int)
@@ -90,16 +90,10 @@ class SyntheticResponse(AnalysisCallback):
                  res: int = 10,
                  sorting_attribute: Optional[str] = None,
                  file_signature: Optional[str] = None,
-                 num_columns: Union[int, str] = 'auto',
-                 figsize: Tuple[int, int] = (16, 9),
-                 tight_layout: bool = True,
-                 **plt_kwargs):
+                 num_columns: Union[int, str] = 'auto'):
         super(SyntheticResponse, self).__init__(sorting_attribute=sorting_attribute,
                                                 file_signature=file_signature,
-                                                num_columns=num_columns,
-                                                figsize=figsize,
-                                                tight_layout=tight_layout,
-                                                **plt_kwargs)
+                                                num_columns=num_columns)
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         self.data: pd.DataFrame = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.fader: ColorFader = ColorFader('red', 'blue', bounds=[-1, 1])
@@ -158,16 +152,10 @@ class SyntheticAdjustments3D(AnalysisCallback):
     def __init__(self,
                  res: int = 100,
                  file_signature: Optional[str] = None,
-                 num_columns: Union[int, str] = 'auto',
-                 figsize: Tuple[int, int] = (16, 9),
-                 tight_layout: bool = True,
-                 **plt_kwargs):
+                 num_columns: Union[int, str] = 'auto'):
         super(SyntheticAdjustments3D, self).__init__(sorting_attribute=None,
                                                      file_signature=file_signature,
-                                                     num_columns=num_columns,
-                                                     figsize=figsize,
-                                                     tight_layout=tight_layout,
-                                                     **plt_kwargs)
+                                                     num_columns=num_columns)
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         self.data: pd.DataFrame = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.data['ground'] = Synthetic.function(self.data['a'], self.data['b'])

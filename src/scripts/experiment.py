@@ -7,8 +7,8 @@ from src.experiments import Handler
 if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
-    Handler(dataset='cars').experiment(
-        iterations=5,
+    Handler(dataset='puzzles').experiment(
+        iterations=0,
         num_folds=None,
         callbacks=None,
         model_verbosity=True,
