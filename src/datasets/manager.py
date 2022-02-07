@@ -54,7 +54,7 @@ class Manager:
         raise NotImplementedError(not_implemented_message(name='data', static=True))
 
     @classmethod
-    def grid(cls, plot: bool):
+    def grid(cls, plot: bool = True) -> pd.DataFrame:
         """Builds the explicit grid.
 
         - 'plot' is True if the grid is used for plotting, False if it is used for monotonicity evaluation.
@@ -237,7 +237,7 @@ class AnalysisCallback(Callback):
         """Implements the strategy to compute the optimal number of columns."""
         return max(np.sqrt(ratio * len(self.iterations)).round().astype(int), 1)
 
-    def _plot_function(self, iteration: Any) -> Optional[str]:
+    def _plot_function(self, iteration: int) -> Optional[str]:
         """Implements the plotting strategy for each iteration."""
         raise NotImplementedError(not_implemented_message(name='_plot_function', static=True))
 
@@ -259,7 +259,7 @@ class DistanceAnalysis(AnalysisCallback):
         """Implements the strategy to compute the optimal number of columns."""
         return super(DistanceAnalysis, self)._auto_columns(ratio=ratio / 3)
 
-    def _plot_function(self, iteration: Any) -> Optional[str]:
+    def _plot_function(self, iteration: int) -> Optional[str]:
         x = np.arange(len(self.data))
         y, p = self.data['y'].values, self.data[f'pred {iteration}'].values
         plt.scatter(x=x, y=p, color='red', marker='_')

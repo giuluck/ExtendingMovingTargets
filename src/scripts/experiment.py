@@ -7,10 +7,10 @@ from src.experiments import Handler
 if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
-    Handler(dataset='synthetic').experiment(
-        iterations=0,
+    Handler(dataset='cars').experiment(
+        iterations=5,
         num_folds=None,
-        callbacks=[],
+        callbacks=None,
         model_verbosity=True,
         fold_verbosity=False,
         plot_history=True,

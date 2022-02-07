@@ -19,8 +19,8 @@ class Synthetic(Manager):
     callbacks: Dict[str, Callable] = {
         **Manager.callbacks,
         'response': lambda fs: SyntheticResponse(file_signature=fs),
-        'synthetic2D': lambda fs: SyntheticAdjustments2D(file_signature=fs),
-        'synthetic3D': lambda fs: SyntheticAdjustments3D(file_signature=fs)
+        'adjustments2D': lambda fs: SyntheticAdjustments2D(file_signature=fs),
+        'adjustments3D': lambda fs: SyntheticAdjustments3D(file_signature=fs)
     }
 
     @staticmethod
@@ -45,20 +45,17 @@ class Synthetic(Manager):
         return {'train': Synthetic.sample(n=200, testing_set=False), 'test': Synthetic.sample(n=500, testing_set=True)}
 
     @classmethod
-    def grid(cls, plot: bool):
+    def grid(cls, plot: bool = True) -> pd.DataFrame:
         res = 60 if plot else 20
         a, b = np.meshgrid(np.linspace(-1, 1, res), np.linspace(-1, 1, res))
         return pd.DataFrame({'a': a.flatten(), 'b': b.flatten()})
 
     def __init__(self):
-
-        super(Synthetic, self).__init__(label='y',
-                                        directions={'a': 1},
-                                        classification=False)
+        super(Synthetic, self).__init__(label='y', directions={'a': 1}, classification=False)
 
     def _plot(self, model):
         # get data
-        grid = self.grid(plot=True)
+        grid = self.grid()
         grid['pred'] = model.predict(grid)
         grid['label'] = Synthetic.function(grid['a'], grid['b'])
         res = np.sqrt(len(grid)).astype(int)
@@ -110,7 +107,7 @@ class SyntheticResponse(AnalysisCallback):
     def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Manager]):
         self.data[f'pred {macs.iteration}'] = macs.predict(self.data[['a', 'b']])
 
-    def _plot_function(self, iteration: Any) -> Optional[str]:
+    def _plot_function(self, iteration: int) -> Optional[str]:
         for idx, group in self.data.groupby('b'):
             label = f'b = {idx:.0f}' if idx in [-1, 1] else None
             sns.lineplot(data=group, x='a', y=f'pred {iteration}', color=self.fader(idx), alpha=0.4, label=label)
@@ -134,7 +131,7 @@ class SyntheticAdjustments2D(AnalysisCallback):
         self.data[f'adj {macs.iteration}'] = adjusted_y
         self.data[f'adj err {macs.iteration}'] = adjusted_y - self.data['ground']
 
-    def _plot_function(self, iteration: Any) -> Optional[str]:
+    def _plot_function(self, iteration: int) -> Optional[str]:
         def synthetic_inverse(column):
             """Computes the value of the expected value of the 'a' feature given the output label."""
             b = np.sin(np.pi * (self.data['b'] - 0.01)) ** 2 + 1
@@ -178,7 +175,7 @@ class SyntheticAdjustments3D(AnalysisCallback):
     def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Manager]):
         self.data[f'z {macs.iteration}'] = macs.predict(self.data[['a', 'b']])
 
-    def _plot_function(self, iteration: Any) -> Optional[str]:
+    def _plot_function(self, iteration: int) -> Optional[str]:
         # plot 3D response
         res = np.sqrt(len(self.data)).astype(int)
         ga = self.data['a'].values.reshape(res, res)

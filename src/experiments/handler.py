@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from moving_targets.callbacks import WandBLogger, Callback
 
-from src.datasets import Synthetic, Manager
+from src.datasets import Synthetic, Manager, Cars
 from src.models import MT
 
 
@@ -24,7 +24,9 @@ class Handler:
                  p_loss: str = 'mse'):
 
         # handle dataset
-        if dataset == 'synthetic':
+        if dataset == 'cars':
+            self.dataset: Manager = Cars()
+        elif dataset == 'synthetic':
             self.dataset: Manager = Synthetic()
         else:
             raise ValueError(f"Unknown dataset '{dataset}'")
