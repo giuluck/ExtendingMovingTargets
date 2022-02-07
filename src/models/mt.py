@@ -1,19 +1,20 @@
-from typing import Dict, List, Optional, Union, Any, Tuple
+from typing import Dict, List, Optional, Union, Any
 
 import numpy as np
 import pandas as pd
 from moving_targets import MACS
 from moving_targets.callbacks import Callback
-from moving_targets.learners import MultiLayerPerceptron
+from moving_targets.learners import MultiLayerPerceptron, Learner
 from moving_targets.masters import Master
 from moving_targets.masters.backends import CplexBackend
 from moving_targets.masters.losses import HammingDistance, CrossEntropy, SAE, SSE, MAE, MSE, aliases
 from moving_targets.masters.optimizers import Optimizer
 from moving_targets.metrics import Metric
-from moving_targets.util.scalers import Scaler
 from moving_targets.util.typing import Dataset
 
+from src.datasets import Manager
 from src.models import Model
+from src.util.metrics import GridConstraint
 
 
 class MonotonicityMaster(Master):
@@ -63,44 +64,70 @@ class MonotonicityMaster(Master):
         return v
 
 
-class MT(Model):
-    """The Moving Targets model.
-
-    - 'directions' is a dictionary pairing each monotonic attribute to its direction (-1, 0, or 1).
-    - 'classification' is True for (binary) classification tasks and False for regression tasks.
-    """
+class CustomMACS(MACS):
+    """Custom MACS implementation to deal with violation metric (which is evaluated on the grid)."""
 
     def __init__(self,
-                 directions: Dict[str, int],
-                 classification: bool,
+                 init_step: str,
+                 master: Master,
+                 learner: Learner,
+                 metrics: List[Metric],
+                 constraint: GridConstraint,
+                 stats: Union[bool, List[str]]):
+        super(CustomMACS, self).__init__(master, learner, init_step, metrics, stats)
+        self.constraint: GridConstraint = constraint
+
+    def _compute_metrics(self,
+                         x,
+                         y: np.ndarray,
+                         p: np.ndarray,
+                         metrics: List[Metric],
+                         prefix: Optional[str] = None) -> Dict[str, float]:
+        results = super(CustomMACS, self)._compute_metrics(x, y, p, metrics, prefix)
+        for aggregation, value in self.constraint(model=self).items():
+            results[f'monotonicity/{aggregation}'] = value
+        return results
+
+
+class MT(Model):
+    """The Moving Targets model, which leverages the dataset instance to choose the correct metrics and scalers."""
+
+    def __init__(self,
+                 dataset: Manager,
                  init_step: str,
                  alpha: float,
                  y_loss: str,
                  p_loss: str,
                  iterations: int,
-                 metrics: List[Metric],
                  callbacks: List[Callback],
                  val_data: Optional[Dataset],
-                 verbose: Union[int, bool],
-                 scalers: Tuple[Scaler, Scaler]):
+                 verbose: Union[int, bool]):
+        x_scaler, y_scaler = dataset.scalers()
         learner = MultiLayerPerceptron(
-            loss='binary_crossentropy' if classification else 'mean_squared_error',
-            output_activation='sigmoid' if classification else None,
+            loss='binary_crossentropy' if dataset.classification else 'mean_squared_error',
+            output_activation='sigmoid' if dataset.classification else None,
             hidden_units=[128, 128],
             batch_size=32,
             epochs=1000,
             verbose=False,
-            x_scaler=scalers[0],
-            y_scaler=scalers[1]
+            x_scaler=x_scaler,
+            y_scaler=y_scaler
         )
         master = MonotonicityMaster(
-            directions=directions,
-            classification=classification,
+            directions=dataset.directions,
+            classification=dataset.classification,
             alpha=alpha,
             y_loss=y_loss,
             p_loss=p_loss
         )
-        self.macs = MACS(learner=learner, master=master, init_step=init_step, metrics=metrics, stats=True)
+        self.macs = CustomMACS(
+            master=master,
+            learner=learner,
+            init_step=init_step,
+            metrics=dataset.metrics,
+            constraint=dataset.constraint,
+            stats=True
+        )
         self.iterations = iterations
         self.callbacks = callbacks
         self.val_data = val_data

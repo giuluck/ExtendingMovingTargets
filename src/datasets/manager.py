@@ -6,11 +6,12 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from moving_targets.callbacks import Callback
-from moving_targets.metrics import MSE, R2, CrossEntropy, Accuracy, Metric
+from moving_targets.metrics import CrossEntropy, Accuracy, Metric, MSE, R2
 from moving_targets.util.errors import not_implemented_message
 from moving_targets.util.scalers import Scaler
 
 from src.util.analysis import set_pandas_options
+from src.util.metrics import GridConstraint, MonotonicityConstraint
 from src.util.preprocessing import split_dataset, cross_validate
 
 
@@ -30,7 +31,7 @@ class Fold:
         self.validation: Dict[str, Tuple[pd.DataFrame, np.ndarray]] = {k: split_df(df=v) for k, v in validation.items()}
 
 
-class Dataset:
+class Manager:
     """Abstract Dataset Manager.
 
     - 'label' is the name of the target feature.
@@ -50,41 +51,51 @@ class Dataset:
     @classmethod
     def load(cls) -> Dict[str, pd.DataFrame]:
         """Loads the dataset and returns a dictionary of dataframes representing the train and test sets."""
-        raise NotImplementedError(not_implemented_message(name='load_data', static=True))
+        raise NotImplementedError(not_implemented_message(name='data', static=True))
+
+    @classmethod
+    def grid(cls, plot: bool):
+        """Builds the explicit grid.
+
+        - 'plot' is True if the grid is used for plotting, False if it is used for monotonicity evaluation.
+        """
+        raise NotImplementedError(not_implemented_message(name='grid', static=True))
 
     def __init__(self,
                  label: str,
-                 directions: Dict[str, int],
-                 grid: pd.DataFrame,
-                 classification: bool):
+                 classification: bool,
+                 directions: Dict[str, int]):
         train, test = self.load().values()
+        grid = self.grid(plot=False)
 
         self.train: pd.DataFrame = train
         self.test: pd.DataFrame = test
         self.label: str = label
-        self.directions: Dict[str, int] = directions
-        self.grid: pd.DataFrame = grid
         self.classification: bool = classification
-
-        # TODO: add violation metric using grid
-        self.metrics: List[Metric] = []  # ConstraintMetric(directions=directions, grid=grid)
-
+        self.directions: Dict[str, int] = {column: directions.get(column) or 0 for column in grid.columns}
+        self.constraint: GridConstraint = GridConstraint(grid=grid, monotonicities=self.monotonicities(grid, grid))
         if classification:
-            self.metrics.insert(0, Accuracy(name='metric'))
-            self.metrics.insert(0, CrossEntropy(name='loss'))
+            self.metrics: List[Metric] = [
+                CrossEntropy(name='loss'),
+                Accuracy(name='metric'),
+                MonotonicityConstraint(directions=directions, name='constraint')
+            ]
         else:
-            self.metrics.insert(0, R2(name='metric'))
-            self.metrics.insert(0, MSE(name='loss'))
+            self.metrics: List[Metric] = [
+                MSE(name='loss'),
+                R2(name='metric'),
+                MonotonicityConstraint(directions=directions, name='constraint')
+            ]
 
     def _plot(self, model):
         """Implements the plotting routine."""
         raise NotImplementedError(not_implemented_message(name='_summary_plot'))
 
-    def get_scalers(self) -> Tuple[Scaler, Scaler]:
+    def scalers(self) -> Tuple[Scaler, Scaler]:
         """Returns the dataset scalers."""
         return Scaler(default_method='std'), Scaler(default_method=None if self.classification else 'norm')
 
-    def get_folds(self, num_folds: Optional[int] = None, **kwargs) -> Union[Fold, List[Fold]]:
+    def folds(self, num_folds: Optional[int] = None, **kwargs) -> Union[Fold, List[Fold]]:
         """Gets the data split in folds.
 
         With num_folds = None directly returns a tuple with train/test splits and scalers.
@@ -104,6 +115,44 @@ class Dataset:
             folds = cross_validate(self.train, num_folds=num_folds, stratify=stratify, **kwargs)
             return [Fold(data=f['train'], validation={**f, 'test': self.test}, label=self.label) for f in folds]
 
+    def monotonicities(self,
+                       samples,
+                       references,
+                       eps: float = 1e-6,
+                       return_matrix: bool = False) -> Union[np.ndarray, List[Tuple[int, int]]]:
+        """Implements the strategy to compute expected monotonicities by returning either a list of tuples (hi, li),
+        with <hi> being the higher index and <li> being the lower index, or a NxM matrix, with N the number of samples
+        and M the number of references, where each cell is filled with -1, 0, or 1 depending on the kind of expected
+        monotonicity between samples[i] and references[j].
+
+        - 'samples' is the array of data points.
+        - 'references' is the array of reference data point(s).
+        - 'eps' is the slack value under which a violation is considered to be acceptable.
+        """
+        assert samples.ndim <= 2, f"'samples' should have 2 dimensions at most, but it has {samples.ndim}"
+        assert references.ndim <= 2, f"'references' should have 2 dimensions at most, but it has {references.ndim}"
+        # convert vectors into a matrices
+        samples, references = np.atleast_2d(samples), np.atleast_2d(references)
+        # increase samples dimension to match references
+        samples = np.hstack([samples] * len(references)).reshape((len(samples), len(references), -1))
+        # compute differences between samples to get the number of different attributes
+        differences = samples - references
+        differences[np.abs(differences) < eps] = 0.
+        num_differences = np.sign(np.abs(differences)).sum(axis=-1)
+        # get whole monotonicity (sum of monotonicity signs) and mask for pairs with just one different attribute
+        # (directions is converted to an array that says whether the monotonicity is increasing, decreasing, or null)
+        directions = np.array([d for d in self.directions.values()])
+        monotonicities = np.sign(directions * differences).sum(axis=-1).astype('int')
+        monotonicities = monotonicities * (num_differences == 1)
+        if return_matrix:
+            # if the matrix is needed, and handle the case in which there is a single sample and a single reference,
+            # since numpy.sum(axis=-1) will return a zero-dimensional array instead of a scalar
+            monotonicities = np.squeeze(monotonicities)
+            return np.int32(monotonicities) if monotonicities.ndim == 0 else monotonicities
+        else:
+            # otherwise we compute the list of indices
+            return [(hi, li) for hi, row in enumerate(monotonicities) for li, mono in enumerate(row) if mono == 1]
+
     def summary(self, model, plot: bool = True, **data: Tuple[Any, np.ndarray]):
         """Executes the an evaluation summary on the dataset.
 
@@ -119,7 +168,11 @@ class Dataset:
             evaluation = pd.DataFrame(index=[m.__name__ for m in self.metrics])
             for split, (x, y) in data.items():
                 evaluation[split] = [metric(x, y, model.predict(x)) for metric in self.metrics]
+            print('METRICS:')
             print(evaluation)
+            print()
+        print('CONSTRAINTS:')
+        print(pd.Series(self.constraint(model=model), name='monotonicity'))
 
 
 class AnalysisCallback(Callback):

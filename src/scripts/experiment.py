@@ -8,11 +8,11 @@ if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
 
     Handler(dataset='synthetic').experiment(
-        iterations=5,
+        iterations=0,
         num_folds=None,
-        callbacks=None,
-        model_verbosity=1,
+        callbacks=[],
+        model_verbosity=True,
         fold_verbosity=False,
-        plot_history=False,
+        plot_history=True,
         plot_summary=True
     )

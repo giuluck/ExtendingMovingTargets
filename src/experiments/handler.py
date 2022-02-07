@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from moving_targets.callbacks import WandBLogger, Callback
 
-from src.datasets import Synthetic
+from src.datasets import Synthetic, Manager
 from src.models import MT
 
 
@@ -25,7 +25,7 @@ class Handler:
 
         # handle dataset
         if dataset == 'synthetic':
-            self.dataset = Synthetic()
+            self.dataset: Manager = Synthetic()
         else:
             raise ValueError(f"Unknown dataset '{dataset}'")
 
@@ -63,7 +63,7 @@ class Handler:
         fold_verbosity = False if num_folds is None or num_folds == 1 else fold_verbosity
         if fold_verbosity is not False:
             print(f'{num_folds}-FOLDS CROSS-VALIDATION STARTED')
-        folds = self.dataset.get_folds(num_folds=num_folds)
+        folds = self.dataset.folds(num_folds=num_folds)
         for i, fold in enumerate([folds] if num_folds is None else folds):
             random.seed(self._SEED)
             np.random.seed(self._SEED)
@@ -84,18 +84,15 @@ class Handler:
                     callback.config['fold'] = i
             # build and fit model
             model = MT(
-                directions=self.dataset.directions,
-                classification=self.dataset.classification,
-                metrics=self.dataset.metrics,
+                dataset=self.dataset,
                 init_step=self.init_step,
                 alpha=self.alpha,
                 y_loss=self.y_loss,
                 p_loss=self.p_loss,
                 iterations=iterations,
                 callbacks=callbacks,
-                val_data=None,
-                verbose=model_verbosity,
-                scalers=self.dataset.get_scalers()
+                val_data={split: data for split, data in fold.validation.items() if split != 'train'},
+                verbose=model_verbosity
             )
             history = model.fit(x=fold.x, y=fold.y)
             # handle plots
