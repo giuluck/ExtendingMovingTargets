@@ -71,18 +71,18 @@ class PuzzlesResponse(AnalysisCallback):
                                               file_signature=file_signature,
                                               num_columns=num_columns)
         assert feature in self.features, f"'{feature}' is not a valid feature"
-        self.grid: pd.DataFrame = Puzzles.grid(plot=True)
+        self.data: pd.DataFrame = Puzzles.grid(plot=True)
         self.feature: str = feature
 
     def on_training_end(self, macs, x, y, val_data):
-        self.grid[f'pred {macs.iteration}'] = macs.predict(self.grid[self.features])
+        self.data[f'pred {macs.iteration}'] = macs.predict(self.data[self.features])
 
     def _plot_function(self, iteration: int) -> Optional[str]:
         fi, fj = [f for f in self.features if f != self.feature]
-        li, ui = self.grid[fi].min(), self.grid[fi].max()
-        lj, uj = self.grid[fj].min(), self.grid[fj].max()
+        li, ui = self.data[fi].min(), self.data[fi].max()
+        lj, uj = self.data[fj].min(), self.data[fj].max()
         fader = ColorFader('black', 'magenta', 'cyan', 'yellow', bounds=[li, lj, ui, uj])
-        for (i, j), group in self.grid.groupby([fi, fj]):
+        for (i, j), group in self.data.groupby([fi, fj]):
             label = f'{fi}: {i:.0f}, {fj}: {j:.0f}' if (i in [li, ui] and j in [lj, uj]) else None
             sns.lineplot(data=group, x=self.feature, y=f'pred {iteration}', color=fader(i, j), alpha=0.6, label=label)
         return f'{iteration}) {self.feature.replace("_", " ").upper()}'

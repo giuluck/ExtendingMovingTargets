@@ -180,6 +180,8 @@ class CustomMACS(MACS):
 class MT(Model):
     """The Moving Targets model, which leverages the dataset instance to choose the correct metrics and scalers."""
 
+    __name__: str = 'MT'
+
     def __init__(self,
                  dataset: Manager,
                  init_step: str,
@@ -196,13 +198,13 @@ class MT(Model):
             output_activation='sigmoid' if dataset.classification else None,
             hidden_units=[128, 128],
             batch_size=32,
-            epochs=1000,
+            epochs=200,
             verbose=False,
             x_scaler=x_scaler,
             y_scaler=y_scaler
         )
-        # from moving_targets.learners import LinearRegression
-        # learner = LinearRegression()
+        # from moving_targets.learners import LinearRegression, LogisticRegression
+        # learner = LogisticRegression() if dataset.classification else LinearRegression()
         master = MonotonicityMaster(
             directions=dataset.directions,
             classification=dataset.classification,

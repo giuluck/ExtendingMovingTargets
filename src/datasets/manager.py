@@ -91,9 +91,9 @@ class Manager:
         """Implements the plotting routine."""
         raise NotImplementedError(not_implemented_message(name='_summary_plot'))
 
-    def scalers(self) -> Tuple[Scaler, Scaler]:
+    def scalers(self) -> Tuple[Optional[Scaler], Optional[Scaler]]:
         """Returns the dataset scalers."""
-        return Scaler(default_method='std'), Scaler(default_method=None if self.classification else 'norm')
+        return Scaler(default_method='std'), None if self.classification else Scaler(default_method='norm')
 
     def folds(self, num_folds: Optional[int] = None, **kwargs) -> Union[Fold, List[Fold]]:
         """Gets the data split in folds.
@@ -118,7 +118,6 @@ class Manager:
     def monotonicities(self,
                        samples,
                        references,
-                       eps: float = 1e-6,
                        return_matrix: bool = False) -> Union[np.ndarray, List[Tuple[int, int]]]:
         """Implements the strategy to compute expected monotonicities by returning either a list of tuples (hi, li),
         with <hi> being the higher index and <li> being the lower index, or a NxM matrix, with N the number of samples
@@ -127,7 +126,6 @@ class Manager:
 
         - 'samples' is the array of data points.
         - 'references' is the array of reference data point(s).
-        - 'eps' is the slack value under which a violation is considered to be acceptable.
         """
         assert samples.ndim <= 2, f"'samples' should have 2 dimensions at most, but it has {samples.ndim}"
         assert references.ndim <= 2, f"'references' should have 2 dimensions at most, but it has {references.ndim}"
@@ -137,7 +135,6 @@ class Manager:
         samples = np.hstack([samples] * len(references)).reshape((len(samples), len(references), -1))
         # compute differences between samples to get the number of different attributes
         differences = samples - references
-        differences[np.abs(differences) < eps] = 0.
         num_differences = np.sign(np.abs(differences)).sum(axis=-1)
         # get whole monotonicity (sum of monotonicity signs) and mask for pairs with just one different attribute
         # (directions is converted to an array that says whether the monotonicity is increasing, decreasing, or null)
