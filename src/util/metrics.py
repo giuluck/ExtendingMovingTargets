@@ -41,7 +41,7 @@ class MonotonicityConstraint(Metric):
                  binarize: bool = True,
                  name: str = 'constraint'):
         super(MonotonicityConstraint, self).__init__(name=name)
-        self.directions: Dict[str, int] = directions
+        self.directions: Dict[str, int] = {c: d for c, d in directions.items() if d != 0}
 
         if aggregation is None:
             # if the given aggregation is None, return the weights as a dictionary indexed by feature
@@ -56,7 +56,8 @@ class MonotonicityConstraint(Metric):
 
     def __call__(self, x, y: np.ndarray, p: np.ndarray) -> Union[float, Dict[str, float]]:
         weights = []
-        for feature, direction in self.directions.items():
-            w, _, _, _ = np.linalg.lstsq(x[[feature]], p, rcond=None)
-            weights.append(max(0, -w[0] * direction))
+        for c, d in self.directions.items():
+            a = np.concatenate((np.ones_like(x[[c]]), x[[c]]), axis=1)
+            w, _, _, _ = np.linalg.lstsq(a, p, rcond=None)
+            weights.append(max(0, -w[1] * d))
         return self.aggregation(np.array(weights))

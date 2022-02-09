@@ -39,7 +39,7 @@ class Cars(Manager):
         plt.figure(figsize=(16, 9), tight_layout=True)
         for split, df in [('train', self.train), ('test', self.test)]:
             sns.scatterplot(x=df['price'], y=df['sales'], alpha=0.6, sizes=0.6, label=split.capitalize())
-        x = self.grid(plot=True)
+        x = self.grid(plot=True).values
         y = model.predict(x)
         sns.lineplot(x=x.flatten(), y=y.flatten(), color='black').set(ylabel='sales', title='Estimated Function')
         plt.xlim(0, 100)
@@ -76,7 +76,7 @@ class CarsAdjustments(AnalysisCallback):
         # rescale original labels weights
         if iteration == 0:
             mse, label = np.nan, 'labels'
-            sns.scatterplot(x=x, y=y, color='black')
+            sns.scatterplot(x=x, y=y, color='black', alpha=0.4)
         else:
             j = self.data[f'adj {iteration}'].values
             mse, label = np.square(j - y).mean(), 'adjusted'
