@@ -23,12 +23,10 @@ class MonotonicityMaster(Master):
     - 'directions' is a dictionary pairing each monotonic attribute to its direction (-1 or 1).
     - 'classification' is True for (binary) classification tasks and False for regression tasks.
     - 'degree' is the polynomial degree to cancel higher-order effects.
-    - 'eps' is the tolerance used to cancel higher-order effects.
     """
 
-    def __init__(self, classification: bool, directions: Dict[str, int], degree: int, eps: float, loss: str):
+    def __init__(self, classification: bool, directions: Dict[str, int], degree: int, loss: str):
         assert degree > 0, f"'degree' should be a positive integer, got {degree}"
-        assert eps > 0, f"'eps' should be a positive real number, got {eps}"
 
         # 1. check the correctness of the loss name
         # 2. check that either we are in a regression task or the classification loss can use continuous targets
@@ -44,7 +42,6 @@ class MonotonicityMaster(Master):
         self.lb: float = 0 if classification else -float('inf')
         self.ub: float = 1 if classification else float('inf')
         self.degree: int = degree
-        self.eps: float = eps
 
     # def build(self, x, y, p):
     #     v = self.backend.add_continuous_variables(*y.shape, lb=self.lb, ub=self.ub, name='y')
@@ -72,31 +69,36 @@ class MonotonicityMaster(Master):
         assert len(self.directions) == 1
         c = list(self.directions.keys())[0]
         d = self.directions[c]
+        x = x[c].values
         v = self.backend.add_continuous_variables(*y.shape, lb=self.lb, ub=self.ub, name='y')
-        a = PolynomialFeatures(degree=self.degree).fit_transform(x[[c]])
-        w = self.backend.add_continuous_variables(a.shape[1])
-        lr_lhs = np.dot((a.T @ a), w)
-        lr_rhs = self.backend.dot(a.T, v)
-        self.backend.add_constraints([lrl == lrr for lrl, lrr in zip(lr_lhs, lr_rhs)])
-        self.backend.add_constraints([w[i] <= self.eps for i in range(2, self.degree + 1)])
-        self.backend.add_constraints([w[i] >= -self.eps for i in range(2, self.degree + 1)])
-        self.backend.add_constraint(d * w[1] >= 0)
+        w = self.backend.add_continuous_variables(2, name=f'w')
+        self.backend.model.update()
+        for i in range(self.degree + 1):
+            lhs = w[0] * np.sum(x ** i) + w[1] * np.sum(x ** (i + 1))
+            rhs = self.backend.sum(v * (x ** i))
+            self.backend.add_constraint(lhs == rhs)
+
+        if self._macs.iteration != 9:
+            self.backend.add_constraint(d * w[1] >= 0)
+        else:
+            print('no constraint', end=' ')
 
         alpha = self.alpha(x, y, p)
         nabla_term, squared_term = self.loss(self.backend, v, y, p, sample_weight)
         self.backend.minimize(alpha * nabla_term + squared_term)
         adjusted = self.backend.get_values(v) if self.backend.solve().solution is not None else None
 
-        a = PolynomialFeatures(degree=self.degree).fit_transform(x[['price']])
+        a = PolynomialFeatures(degree=self.degree).fit_transform(x.reshape((-1, 1)))
         w_lr, _, _, _ = np.linalg.lstsq(a, adjusted, rcond=None)
-        w_mt = self.backend.get_values(w)
-        print('Iteration    :', self._macs.iteration)
-        print('MT weights   :', w_mt)
-        print('MT loss      :', np.abs((a.T @ a) @ w_mt - a.T @ adjusted).sum())
-        print('LR weights   :', w_lr)
-        print('LR loss      :', np.abs((a.T @ a) @ w_lr - a.T @ adjusted).sum())
-        print('Weights diff :', w_mt - w_lr)
-        print()
+        w_mt = np.array(list(self.backend.get_values(w)) + [0] * (self.degree - 1))
+        # from sklearn.metrics import r2_score
+        # print('Iteration    :', self._macs.iteration)
+        # print('MT weights   :', w_mt)
+        # print('MT loss      :', r2_score((a.T @ a) @ w_mt, a.T @ adjusted))
+        # print('LR weights   :', w_lr)
+        # print('LR loss      :', r2_score((a.T @ a) @ w_lr, a.T @ adjusted))
+        # print('Weights diff :', w_mt - w_lr)
+        # print()
         self.log(w_lr=w_lr, w_mt=w_mt)
 
         self.backend.clear()
@@ -137,7 +139,6 @@ class MT(Model):
                  dataset: Manager,
                  loss: str,
                  degree: int,
-                 eps: float,
                  iterations: int,
                  callbacks: List[Callback],
                  val_data: Optional[Dataset],
@@ -159,7 +160,6 @@ class MT(Model):
             classification=dataset.classification,
             directions=dataset.directions,
             degree=degree,
-            eps=eps,
             loss=loss
         )
         self.macs = CustomMACS(
@@ -176,11 +176,10 @@ class MT(Model):
         self.verbose = verbose
 
     def fit(self, x: pd.DataFrame, y: np.ndarray) -> Any:
-        # # TODO: rollback
-        from moving_targets.util.scalers import Scaler
-        xsc, ysc = Scaler('norm'), Scaler('norm')
-        x, y = xsc.fit_transform(x), ysc.fit_transform(y)
-        self.val_data = {k: (xsc.transform(x), ysc.transform(y)) for k, (x, y) in self.val_data.items()}
+        # from moving_targets.util.scalers import Scaler
+        # xsc, ysc = Scaler('norm'), Scaler('norm')
+        # x, y = xsc.fit_transform(x), ysc.fit_transform(y)
+        # self.val_data = {k: (xsc.transform(x), ysc.transform(y)) for k, (x, y) in self.val_data.items()}
         return self.macs.fit(
             x=x,
             y=y,

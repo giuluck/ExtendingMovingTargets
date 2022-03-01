@@ -1,10 +1,11 @@
+import time
 import warnings
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from moving_targets.callbacks import Logger
+from moving_targets.callbacks import Logger, Callback
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.preprocessing import PolynomialFeatures
 
@@ -51,25 +52,80 @@ class CarsRegressor(AnalysisCallback, Logger):
             plt.legend(['adjusted', 'ref regression', 'mt regression'])
         return
 
-# TODO: increasing polynomial orders is not numerically stable
-#
-# > even numpy least squares method makes mistakes (quantified by the sum of the differences between (A.T @ A) @ w and
-#   A.T @ z, but they are still some order of magnitudes less than the errors made in the master
-# > for orders higher than 4, there is a lot of discrepancy between the master weights and the numpy weights
-# > sometimes the master weights don't even satisfy the constraint -- TODO: check why
-# > using standardized inputs/outputs to limit numerical errors has only a small effect
 
+class ExperimentCallback(Callback):
+    def __init__(self, degrees):
+        super(ExperimentCallback, self).__init__()
+        self.idx: int = 0
+        self.time: float = 0.0
+        self.data: pd.DataFrame = pd.DataFrame()
+        self.degrees: List[int] = list(degrees)
+
+    def on_process_start(self, macs, x, y, val_data):
+        # rewrite x and y after each new experiment, it does not change anything since it is always the same input
+        print(f'> Degree {self.degrees[self.idx]:2} ({self.idx + 1:02}/{len(self.degrees):02})', end='')
+        self.time = time.time()
+        self.data['x'] = x['price']
+        self.data['y'] = y
+
+    # def on_adjustment_end(self, macs, x, y, z, val_data):
+    def on_pretraining_end(self, macs, x, y, p, val_data):
+        # rewrite self.data[degree] after each adjustment of the same experiment since we want just the last one
+        degree = self.degrees[self.idx]
+        self.data[degree] = p
+
+    def on_process_end(self, macs, val_data):
+        # increase the idx after each new experiment
+        print(f' -- elapsed time: {time.time() - self.time:.2f}s')
+        self.idx += 1
+
+    def plot(self):
+        self.data = self.data.sort_values('x')
+        plt.figure(figsize=(16, 9), tight_layout=True)
+        num_columns = max(np.sqrt(16 * len(self.degrees) / 9).round().astype(int), 1)
+        num_rows = np.ceil(len(self.degrees) / num_columns).astype(int)
+        ax = None
+        for idx, deg in enumerate(self.degrees):
+            ax = plt.subplot(num_rows, num_columns, idx + 1, sharex=ax, sharey=ax)
+            x = self.data['x'].values
+            y = self.data['y'].values
+            z = self.data[deg].values
+            a = PolynomialFeatures(degree=deg).fit_transform(x.reshape((-1, 1)))
+            w, _, _, _ = np.linalg.lstsq(a, z, rcond=None)
+            plt.scatter(x, y, alpha=0.3, color='red', label='targets')
+            plt.plot(x, a @ w, alpha=0.6, color='blue', label='regressor')
+            plt.plot(x, z, color='black', label='predictions')
+            ax.set(xlabel='', ylabel='')
+            ax.set_title(f'Order {deg}')
+            ax.legend()
+        plt.show()
+
+
+# TODO: with degree 10 we get an infeasible master problem at iteration 9, is this due to numerical errors?
 
 if __name__ == '__main__':
     warnings.simplefilter("ignore", category=ConvergenceWarning)
+
+    # callback = ExperimentCallback(degrees=[1, 2, 3, 5, 10, 20])
+    # for d in callback.degrees:
+    #     Handler(dataset='cars', loss='mse', degree=d).experiment(
+    #         iterations=10,
+    #         num_folds=None,
+    #         callbacks=[callback],
+    #         model_verbosity=False,
+    #         fold_verbosity=False,
+    #         plot_history=False,
+    #         plot_summary=False
+    #     )
+    # callback.plot()
 
     d = 10
     Handler(dataset='cars', loss='mse', degree=d).experiment(
         iterations=10,
         num_folds=None,
-        callbacks=[CarsRegressor(degree=d)],
         # callbacks=[],
-        model_verbosity=False,
+        callbacks=[CarsRegressor(degree=d)],
+        model_verbosity=1,
         fold_verbosity=False,
         plot_history=False,
         plot_summary=False

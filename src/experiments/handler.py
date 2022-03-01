@@ -19,8 +19,7 @@ class Handler:
                  dataset: str,
                  project: Optional[str] = None,
                  loss: str = 'mse',
-                 degree: int = 2,
-                 eps: float = 1e-3):
+                 degree: int = 2):
 
         # handle dataset
         if dataset == 'cars':
@@ -45,7 +44,6 @@ class Handler:
 
         self.loss: str = loss
         self.degree: int = degree
-        self.eps: float = eps
 
     def experiment(self,
                    iterations: int = 15,
@@ -88,7 +86,6 @@ class Handler:
             model = MT(dataset=self.dataset,
                        loss=self.loss,
                        degree=self.degree,
-                       eps=self.eps,
                        iterations=iterations,
                        callbacks=callbacks,
                        val_data={split: data for split, data in fold.validation.items() if split != 'train'},
