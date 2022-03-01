@@ -18,10 +18,9 @@ class Handler:
     def __init__(self,
                  dataset: str,
                  project: Optional[str] = None,
-                 init_step: str = 'pretraining',
-                 alpha: float = 1.0,
-                 y_loss: str = 'mse',
-                 p_loss: str = 'mse'):
+                 loss: str = 'mse',
+                 degree: int = 2,
+                 eps: float = 1e-3):
 
         # handle dataset
         if dataset == 'cars':
@@ -40,16 +39,13 @@ class Handler:
             project=project,
             entity='giuluck',
             run_name=dataset,
-            init_step=init_step,
-            alpha=alpha,
-            y_loss=y_loss,
-            p_loss=p_loss
+            degree=degree,
+            loss=loss
         )
 
-        self.init_step: str = init_step
-        self.alpha: float = alpha
-        self.y_loss: str = y_loss
-        self.p_loss: str = p_loss
+        self.loss: str = loss
+        self.degree: int = degree
+        self.eps: float = eps
 
     def experiment(self,
                    iterations: int = 15,
@@ -89,17 +85,14 @@ class Handler:
                 elif isinstance(callback, WandBLogger) and num_folds is not None:
                     callback.config['fold'] = i
             # build and fit model
-            model = MT(
-                dataset=self.dataset,
-                init_step=self.init_step,
-                alpha=self.alpha,
-                y_loss=self.y_loss,
-                p_loss=self.p_loss,
-                iterations=iterations,
-                callbacks=callbacks,
-                val_data={split: data for split, data in fold.validation.items() if split != 'train'},
-                verbose=model_verbosity
-            )
+            model = MT(dataset=self.dataset,
+                       loss=self.loss,
+                       degree=self.degree,
+                       eps=self.eps,
+                       iterations=iterations,
+                       callbacks=callbacks,
+                       val_data={split: data for split, data in fold.validation.items() if split != 'train'},
+                       verbose=model_verbosity)
             history = model.fit(x=fold.x, y=fold.y)
             # handle plots
             if plot_history:

@@ -65,11 +65,11 @@ class CarsAdjustments(AnalysisCallback):
         self.data = x.reset_index(drop=True)
         self.data['y'] = pd.Series(y, name='y')
 
-    def on_training_end(self, macs, x, y, val_data):
-        self.data[f'pred {macs.iteration}'] = macs.predict(x)
+    def on_training_end(self, macs, x, y, p, val_data):
+        self.data[f'pred {macs.iteration}'] = p
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data):
-        self.data[f'adj {macs.iteration}'] = adjusted_y
+    def on_adjustment_end(self, macs, x, y, z, val_data):
+        self.data[f'adj {macs.iteration}'] = z
 
     def _plot_function(self, iteration: int) -> Optional[str]:
         x, y, p = self.data['price'].values, self.data['y'].values, self.data[f'pred {iteration}'].values,

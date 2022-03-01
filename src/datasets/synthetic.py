@@ -98,7 +98,7 @@ class SyntheticResponse(AnalysisCallback):
         self.data: pd.DataFrame = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.fader: ColorFader = ColorFader('red', 'blue', bounds=[-1, 1])
 
-    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Manager]):
+    def on_training_end(self, macs, x, y, p, val_data):
         self.data[f'pred {macs.iteration}'] = macs.predict(self.data[['a', 'b']])
 
     def _plot_function(self, iteration: int) -> Optional[str]:
@@ -116,14 +116,13 @@ class SyntheticAdjustments2D(AnalysisCallback):
         self.data['y'] = pd.Series(y, name='y')
         self.data['ground'] = Synthetic.function(x['a'], x['b'])
 
-    def on_training_end(self, macs, x, y, val_data):
-        predictions = macs.predict(x)
-        self.data[f'pred {macs.iteration}'] = predictions
-        self.data[f'pred err {macs.iteration}'] = predictions - self.data['ground']
+    def on_training_end(self, macs, x, y, p, val_data):
+        self.data[f'pred {macs.iteration}'] = p
+        self.data[f'pred err {macs.iteration}'] = p - self.data['ground']
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data):
-        self.data[f'adj {macs.iteration}'] = adjusted_y
-        self.data[f'adj err {macs.iteration}'] = adjusted_y - self.data['ground']
+    def on_adjustment_end(self, macs, x, y, z, val_data):
+        self.data[f'adj {macs.iteration}'] = z
+        self.data[f'adj err {macs.iteration}'] = z - self.data['ground']
 
     def _plot_function(self, iteration: int) -> Optional[str]:
         def synthetic_inverse(column):
@@ -160,7 +159,7 @@ class SyntheticAdjustments3D(AnalysisCallback):
         self.data: pd.DataFrame = pd.DataFrame.from_dict({'a': a.flatten(), 'b': b.flatten()})
         self.data['ground'] = Synthetic.function(self.data['a'], self.data['b'])
 
-    def on_training_end(self, macs, x, y: np.ndarray, val_data: Optional[Manager]):
+    def on_training_end(self, macs, x, y, p, val_data):
         self.data[f'z {macs.iteration}'] = macs.predict(self.data[['a', 'b']])
 
     def _plot_function(self, iteration: int) -> Optional[str]:

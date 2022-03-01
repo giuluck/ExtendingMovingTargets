@@ -195,8 +195,8 @@ class AnalysisCallback(Callback):
         self.on_iteration_start(macs, x, y, val_data)
         self.on_training_start(macs, x, y, val_data)
 
-    def on_pretraining_end(self, macs, x, y, val_data):
-        self.on_training_end(macs, x, y, val_data)
+    def on_pretraining_end(self, macs, x, y, p, val_data):
+        self.on_training_end(macs, x, y, p, val_data)
         self.on_iteration_end(macs, x, y, val_data)
 
     def on_iteration_end(self, macs, x, y, val_data):
@@ -242,11 +242,11 @@ class DistanceAnalysis(AnalysisCallback):
         self.data = x.reset_index(drop=True)
         self.data['y'] = pd.Series(y, name='y')
 
-    def on_training_end(self, macs, x, y, val_data):
-        self.data[f'pred {macs.iteration}'] = macs.predict(x)
+    def on_training_end(self, macs, x, y, p, val_data):
+        self.data[f'pred {macs.iteration}'] = p
 
-    def on_adjustment_end(self, macs, x, y, adjusted_y, val_data):
-        self.data[f'adj {macs.iteration}'] = adjusted_y
+    def on_adjustment_end(self, macs, x, y, z, val_data):
+        self.data[f'adj {macs.iteration}'] = z
 
     def _auto_columns(self, ratio: float) -> int:
         """Implements the strategy to compute the optimal number of columns."""

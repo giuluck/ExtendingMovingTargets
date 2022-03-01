@@ -74,7 +74,7 @@ class PuzzlesResponse(AnalysisCallback):
         self.data: pd.DataFrame = Puzzles.grid(plot=True)
         self.feature: str = feature
 
-    def on_training_end(self, macs, x, y, val_data):
+    def on_training_end(self, macs, x, y, p, val_data):
         self.data[f'pred {macs.iteration}'] = macs.predict(self.data[self.features])
 
     def _plot_function(self, iteration: int) -> Optional[str]:

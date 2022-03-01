@@ -131,7 +131,7 @@ class RestaurantsResponse(AnalysisCallback):
         self.data: pd.DataFrame = Restaurants.grid(plot=True)
         self.data[rating] = 1
 
-    def on_training_end(self, macs, x, y, val_data):
+    def on_training_end(self, macs, x, y, p, val_data):
         data = self.data[['avg_rating', 'num_reviews', 'D', 'DD', 'DDD', 'DDDD']]
         self.data[f'pred {macs.iteration}'] = macs.predict(data)
 

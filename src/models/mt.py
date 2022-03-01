@@ -7,10 +7,10 @@ from moving_targets.callbacks import Callback
 from moving_targets.learners import Learner, MultiLayerPerceptron
 from moving_targets.masters import Master
 from moving_targets.masters.backends import GurobiBackend
-from moving_targets.masters.losses import HammingDistance, CrossEntropy, SAE, SSE, MAE, MSE, aliases
-from moving_targets.masters.optimizers import Optimizer
+from moving_targets.masters.losses import HammingDistance, MAE, MSE, aliases
 from moving_targets.metrics import Metric
 from moving_targets.util.typing import Dataset
+from sklearn.preprocessing import PolynomialFeatures
 
 from src.datasets import Manager
 from src.models import Model
@@ -22,37 +22,31 @@ class MonotonicityMaster(Master):
 
     - 'directions' is a dictionary pairing each monotonic attribute to its direction (-1 or 1).
     - 'classification' is True for (binary) classification tasks and False for regression tasks.
+    - 'degree': the polynomial degree to cancel higher-order effects.
+    - 'eps': the tolerance used to cancel higher-order effects.
     """
 
-    __name__: str = 'MT'
+    def __init__(self, classification: bool, directions: Dict[str, int], degree: int, eps: float, loss: str):
+        assert degree > 0, f"'degree' should be a positive integer, got {degree}"
+        assert eps > 0, f"'eps' should be a positive real number, got {eps}"
 
-    def __init__(self, directions: Dict[str, int], classification: bool, alpha: float, y_loss: str, p_loss: str):
-        y_class, p_class = aliases.get(y_loss), aliases.get(p_loss)
-        assert y_class is not None, f"Unknown y_loss '{y_loss}'"
-        assert p_class is not None, f"Unknown p_loss '{p_loss}'"
-        if classification:
-            # check that the loss is a valid classification loss that can use continuous targets
-            assert y_class not in [HammingDistance, CrossEntropy], f"Unsupported y_loss '{y_loss}'"
-            assert p_class not in [HammingDistance, CrossEntropy], f"Unsupported y_loss '{p_loss}'"
-            y_loss, p_loss, lb, ub = y_class(binary=False), p_class(binary=False), 0, 1
-        else:
-            # check that the loss is a valid regression loss
-            assert y_class in [SAE, SSE, MAE, MSE], f"Unsupported y_loss '{y_loss}'"
-            assert p_class in [SAE, SSE, MAE, MSE], f"Unsupported p_loss '{p_loss}'"
-            y_loss, p_loss, lb, ub = y_class(), p_class(), -float('inf'), float('inf')
-
-        super().__init__(backend=GurobiBackend(time_limit=30),
-                         y_loss=y_loss,
-                         p_loss=p_loss,
-                         alpha=Optimizer(base=alpha),
-                         beta=None,
-                         stats=False)
+        # 1. check the correctness of the loss name
+        # 2. check that either we are in a regression task or the classification loss can use continuous targets
+        # 3. check that either we are in a classification task or the loss is a valid regression loss
+        loss_cls = aliases.get(loss)
+        assert loss_cls is not None, f"Unknown loss '{loss}'"
+        assert not classification or loss_cls != HammingDistance, f"Unsupported loss '{loss}' for classification tasks"
+        assert classification or loss_cls in [MAE, MSE], f"Unsupported loss '{loss}' for regression tasks"
+        loss = loss_cls(binary=False, name=loss)
+        super().__init__(backend=GurobiBackend(time_limit=30), loss=loss, alpha='harmonic', stats=False)
 
         self.directions: Dict[str, int] = {c: d for c, d in directions.items() if d != 0}
-        self.lb: float = lb
-        self.ub: float = ub
+        self.lb: float = 0 if classification else -float('inf')
+        self.ub: float = 1 if classification else float('inf')
+        self.degree: int = degree
+        self.eps: float = eps
 
-    def build(self, x: pd.DataFrame, y: np.ndarray) -> np.ndarray:
+    def build(self, x, y: np.ndarray, p: np.ndarray) -> np.ndarray:
         """
         ---------------------------------------------------------------------------------------------------------------
         
@@ -144,11 +138,14 @@ class MonotonicityMaster(Master):
         """
         v = self.backend.add_continuous_variables(*y.shape, lb=self.lb, ub=self.ub, name='y')
         for c, d in self.directions.items():
-            a = np.concatenate((np.ones_like(x[[c]]), x[[c]]), axis=1)
-            w = self.backend.add_continuous_variables(2, name=f'w_{c}')
+            a = PolynomialFeatures(degree=self.degree).fit_transform(x[[c]])
+            w = self.backend.add_continuous_variables(a.shape[1])
             lr_lhs = np.dot((a.T @ a), w)
             lr_rhs = self.backend.dot(a.T, v)
-            self.backend.add_constraints([d * w[1] >= 0] + [lrl == lrr for lrl, lrr in zip(lr_lhs, lr_rhs)])
+            self.backend.add_constraints([lrl == lrr for lrl, lrr in zip(lr_lhs, lr_rhs)])
+            self.backend.add_constraints([w[i] <= self.eps for i in range(2, self.degree + 1)])
+            self.backend.add_constraints([w[i] >= -self.eps for i in range(2, self.degree + 1)])
+            self.backend.add_constraint(d * w[1] >= 0)
         return v
 
 
@@ -184,10 +181,9 @@ class MT(Model):
 
     def __init__(self,
                  dataset: Manager,
-                 init_step: str,
-                 alpha: float,
-                 y_loss: str,
-                 p_loss: str,
+                 loss: str,
+                 degree: int,
+                 eps: float,
                  iterations: int,
                  callbacks: List[Callback],
                  val_data: Optional[Dataset],
@@ -206,16 +202,16 @@ class MT(Model):
         # from moving_targets.learners import LinearRegression, LogisticRegression
         # learner = LogisticRegression() if dataset.classification else LinearRegression()
         master = MonotonicityMaster(
-            directions=dataset.directions,
             classification=dataset.classification,
-            alpha=alpha,
-            y_loss=y_loss,
-            p_loss=p_loss
+            directions=dataset.directions,
+            degree=degree,
+            eps=eps,
+            loss=loss
         )
         self.macs = CustomMACS(
             master=master,
             learner=learner,
-            init_step=init_step,
+            init_step='pretraining',
             metrics=dataset.metrics,
             constraint=dataset.constraint,
             stats=True
