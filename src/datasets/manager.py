@@ -11,7 +11,7 @@ from moving_targets.util.errors import not_implemented_message
 from moving_targets.util.scalers import Scaler
 
 from src.util.analysis import set_pandas_options
-from src.util.metrics import GridConstraint, MonotonicityConstraint
+from src.util.metrics import GridConstraint
 from src.util.preprocessing import split_dataset, cross_validate
 
 
@@ -77,14 +77,12 @@ class Manager:
         if classification:
             self.metrics: List[Metric] = [
                 CrossEntropy(name='loss'),
-                Accuracy(name='metric'),
-                MonotonicityConstraint(directions=directions, name='constraint')
+                Accuracy(name='metric')
             ]
         else:
             self.metrics: List[Metric] = [
                 MSE(name='loss'),
-                R2(name='metric'),
-                MonotonicityConstraint(directions=directions, name='constraint')
+                R2(name='metric')
             ]
 
     def _plot(self, model):

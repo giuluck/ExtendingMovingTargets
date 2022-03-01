@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union, Callable
 import numpy as np
 import pandas as pd
 from moving_targets.metrics import MonotonicViolation, Metric
+from sklearn.preprocessing import PolynomialFeatures
 
 
 class GridConstraint:
@@ -27,6 +28,8 @@ class GridConstraint:
 class MonotonicityConstraint(Metric):
     """Constraint metric that resembles the moving targets constraint.
 
+    - 'degree' is the polynomial degree to cancel higher-order effects.
+
     - 'aggregation' is the aggregation policy in case of multiple features, which can be either a string representing a
         numpy method (e.g., 'sum', 'mean', 'max', 'min', 'std'), a custom callable function taking the vector 'w' as
         parameter, or None to get in output the weight for each feature without any aggregation.
@@ -36,12 +39,16 @@ class MonotonicityConstraint(Metric):
     """
 
     def __init__(self,
+                 degree: int,
                  directions: Dict[str, int],
                  aggregation: Union[None, str, Callable] = 'sum',
                  binarize: bool = True,
                  name: str = 'constraint'):
+        assert degree > 0, f"'degree' should be a positive integer, got {degree}"
+
         super(MonotonicityConstraint, self).__init__(name=name)
         self.directions: Dict[str, int] = {c: d for c, d in directions.items() if d != 0}
+        self.degree: int = degree
 
         if aggregation is None:
             # if the given aggregation is None, return the weights as a dictionary indexed by feature
@@ -57,7 +64,7 @@ class MonotonicityConstraint(Metric):
     def __call__(self, x, y: np.ndarray, p: np.ndarray) -> Union[float, Dict[str, float]]:
         weights = []
         for c, d in self.directions.items():
-            a = np.concatenate((np.ones_like(x[[c]]), x[[c]]), axis=1)
+            a = PolynomialFeatures(degree=self.degree).fit_transform(x[[c]])
             w, _, _, _ = np.linalg.lstsq(a, p, rcond=None)
             weights.append(max(0, -w[1] * d))
         return self.aggregation(np.array(weights))
