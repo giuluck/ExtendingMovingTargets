@@ -67,42 +67,47 @@ class MonotonicityMaster(Master):
         self.backend.build()
 
         assert len(self.directions) == 1
-        c = list(self.directions.keys())[0]
-        d = self.directions[c]
-        x = x[c].values
+        x = x['price'].values
         v = self.backend.add_continuous_variables(*y.shape, lb=self.lb, ub=self.ub, name='y')
-        w = self.backend.add_continuous_variables(2, name=f'w')
         self.backend.model.update()
-        for i in range(self.degree + 1):
-            lhs = w[0] * np.sum(x ** i) + w[1] * np.sum(x ** (i + 1))
-            rhs = self.backend.sum(v * (x ** i))
-            self.backend.add_constraint(lhs == rhs)
-
-        if self._macs.iteration != 9:
-            self.backend.add_constraint(d * w[1] >= 0)
-        else:
-            print('no constraint', end=' ')
+        constraints = []
+        v_mean = self.backend.mean(v)
+        for i in np.arange(1, self.degree + 1):
+            x_i = x ** i
+            cov_v = self.backend.mean(x_i * v) - x_i.mean() * v_mean
+            cov_x = np.mean(x_i * x) - x_i.mean() * x.mean()
+            constraints.append(cov_v / cov_x)
+        self.backend.add_constraints([constraints[0] <= 0] + [constraints[0] == ci for ci in constraints[1:]])
 
         alpha = self.alpha(x, y, p)
         nabla_term, squared_term = self.loss(self.backend, v, y, p, sample_weight)
         self.backend.minimize(alpha * nabla_term + squared_term)
-        adjusted = self.backend.get_values(v) if self.backend.solve().solution is not None else None
+        z = self.backend.get_values(v) if self.backend.solve().solution is not None else None
 
         a = PolynomialFeatures(degree=self.degree).fit_transform(x.reshape((-1, 1)))
-        w_lr, _, _, _ = np.linalg.lstsq(a, adjusted, rcond=None)
-        w_mt = np.array(list(self.backend.get_values(w)) + [0] * (self.degree - 1))
+        c_mt = [self.backend.get_value(c) for c in constraints]
+        c_ref = [np.cov(x ** i, z)[0, 1] / np.cov(x ** i, x)[0, 1] for i in range(1, self.degree + 1)]
+        # print('Iteration       :', self._macs.iteration)
+        # print('MT  constraints :', c_mt)
+        # print('Ref constraints :', c_ref)
+        # print('Cst difference  :', [m - r for m, r in zip(c_mt, c_ref)])
+        # print()
+        self.log(c_mt=c_mt, c_ref=c_ref)
+
+        w_lr, _, _, _ = np.linalg.lstsq(a, z, rcond=None)
+        w_mt = np.array([z.mean() - c_mt[0] * x.mean(), c_mt[0]] + [0] * (self.degree - 1))
         # from sklearn.metrics import r2_score
         # print('Iteration    :', self._macs.iteration)
         # print('MT weights   :', w_mt)
-        # print('MT loss      :', r2_score((a.T @ a) @ w_mt, a.T @ adjusted))
+        # print('MT loss      :', r2_score((a.T @ a) @ w_mt, a.T @ z))
         # print('LR weights   :', w_lr)
-        # print('LR loss      :', r2_score((a.T @ a) @ w_lr, a.T @ adjusted))
+        # print('LR loss      :', r2_score((a.T @ a) @ w_lr, a.T @ z))
         # print('Weights diff :', w_mt - w_lr)
         # print()
         self.log(w_lr=w_lr, w_mt=w_mt)
 
         self.backend.clear()
-        return adjusted
+        return z
 
 
 class CustomMACS(MACS):
@@ -147,7 +152,7 @@ class MT(Model):
         learner = MultiLayerPerceptron(
             loss='binary_crossentropy' if dataset.classification else 'mean_squared_error',
             output_activation='sigmoid' if dataset.classification else None,
-            hidden_units=[128, 128],
+            hidden_units=[8, 8],
             batch_size=32,
             epochs=200,
             verbose=False,

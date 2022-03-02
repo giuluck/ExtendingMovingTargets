@@ -124,9 +124,9 @@ if __name__ == '__main__':
         iterations=10,
         num_folds=None,
         # callbacks=[],
-        callbacks=[CarsRegressor(degree=d)],
+        callbacks=[CarsRegressor(degree=d), 'adjustments_line', 'adjustments_scatter'],
         model_verbosity=1,
         fold_verbosity=False,
         plot_history=False,
-        plot_summary=False
+        plot_summary=True
     )

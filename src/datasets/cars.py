@@ -31,7 +31,7 @@ class Cars(Manager):
     def grid(cls, plot: bool = True) -> pd.DataFrame:
         # TODO: rollback
         # res = 100 if plot else 700
-        res = 2
+        res = 100 if plot else 2
         return pd.DataFrame.from_dict({'price': np.linspace(0, 100, res)})
 
     def __init__(self):

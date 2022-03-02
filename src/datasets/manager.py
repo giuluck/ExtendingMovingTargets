@@ -253,8 +253,8 @@ class DistanceAnalysis(AnalysisCallback):
     def _plot_function(self, iteration: int) -> Optional[str]:
         x = np.arange(len(self.data))
         y, p = self.data['y'].values, self.data[f'pred {iteration}'].values
-        plt.scatter(x=x, y=p, color='red', marker='_')
         plt.scatter(x=x, y=y, color='black', marker='_')
+        plt.scatter(x=x, y=p, color='red', marker='_')
         if iteration == 0:
             plt.legend(['labels', 'predictions'])
             for i in x:
